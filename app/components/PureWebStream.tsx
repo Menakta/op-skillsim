@@ -15,8 +15,11 @@ import {
   VideoStream
 } from '@pureweb/platform-sdk-react'
 
-// Message types
-export type TrainingControlAction = 'start' | 'pause' | 'resume' | 'reset' | 'abort'
+// Import message types
+import type { TrainingControlAction } from '../lib/messageTypes'
+
+// Re-export for backwards compatibility
+export type { TrainingControlAction } from '../lib/messageTypes'
 
 export interface PureWebStreamHandle {
   emitUIInteraction: (descriptor: string | object) => void
@@ -68,9 +71,11 @@ const PureWebStream = forwardRef<PureWebStreamHandle, PureWebStreamProps>(
       if (!launched && queueLaunchRequest && isValidModel) {
         console.log('🚀 Queuing launch request for model:', modelDefinition.id)
         setLaunched(true)
-        queueLaunchRequest().catch((err: Error) => {
+        try {
+          queueLaunchRequest()
+        } catch (err) {
           console.error('Launch request failed:', err)
-        })
+        }
       }
     }, [launched, queueLaunchRequest, modelDefinition])
 

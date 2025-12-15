@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken'
 import * as fs from 'node:fs'
 import { logger } from './lib/logger'
+import type { UserRole } from './lib/database'
 
 const privateKeyPath =
   process.env.JWT_PRIVATE_KEY_PATH ||
@@ -21,20 +22,41 @@ try {
 }
 
 export interface JwtPayload {
-  // export interface SessionPayload extends JwtPayload {
   sub: string
   aud: string
   iat: number
   exp: number
   jti: string
+  role?: UserRole // User role for authorization
   fp?: string // optional fingerprint
 }
 
+/**
+ * Sign a JWT token without role (legacy support)
+ */
 export function signToken(userId: string): string {
   const payload = {
     sub: userId,
     aud: 'webxr-stream',
     jti: crypto.randomUUID()
+  }
+
+  return jwt.sign(payload, PRIVATE_KEY, {
+    algorithm: 'RS256',
+    expiresIn: '20m',
+    issuer: 'your-auth-server'
+  })
+}
+
+/**
+ * Sign a JWT token with user role
+ */
+export function signTokenWithRole(userId: string, role: UserRole): string {
+  const payload = {
+    sub: userId,
+    aud: 'webxr-stream',
+    jti: crypto.randomUUID(),
+    role
   }
 
   return jwt.sign(payload, PRIVATE_KEY, {

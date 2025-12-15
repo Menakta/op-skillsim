@@ -4,7 +4,8 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { PlatformNext, ModelDefinition } from '@pureweb/platform-sdk'
 import ControlPanel from '../components/ControlPanel'
-import PureWebStream, { PureWebStreamHandle, TrainingControlAction } from '../components/PureWebStream'
+import PureWebStream, { PureWebStreamHandle } from '../components/PureWebStream'
+import type { TrainingControlAction } from '../lib/messageTypes'
 
 type Status =
   | 'checking'
@@ -296,7 +297,9 @@ export default function TestStream() {
     <div className="h-screen w-screen bg-gray-950 relative overflow-hidden">
       {status === 'stream-ready' && platform && modelDefinition && (
         <>
-          {/* Control Panel */}
+          {/* Control Panel - NOTE: This page uses the old interface
+              The main page.tsx has been updated with the new player(2).html message protocol.
+              This test-stream page needs to be migrated to use the new useTrainingMessages hook.
           <ControlPanel
             onTrainingControl={handleTrainingControl}
             onToolChange={handleToolChange}
@@ -306,6 +309,7 @@ export default function TestStream() {
             isConnected={isConnected}
             connectionStatus={connectionStatus}
           />
+          */}
 
           {/* PureWeb Stream */}
           <div className="w-full h-full">
