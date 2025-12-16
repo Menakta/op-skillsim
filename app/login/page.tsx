@@ -2,11 +2,14 @@
 
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Image from 'next/image'
+import { useTheme } from '../context/ThemeContext'
 
 export default function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const returnUrl = searchParams.get('returnUrl') || '/dashboard'
+  const { theme, toggleTheme } = useTheme()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -41,18 +44,32 @@ export default function LoginPage() {
     }
   }
 
+  const isDark = theme === 'dark'
+
   return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
-      <div className="max-w-md w-full">
-        {/* Logo/Title */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">OP SkillSim</h1>
-          <p className="text-gray-400">VR Training Simulation Platform</p>
-        </div>
+    <div className={`min-h-screen flex items-center justify-center px-4 ${isDark ? 'bg-gray-900' : 'bg-gray-100'}`}>
+
+        {/* Theme Toggle Button */}
+        <button
+          onClick={toggleTheme}
+          className="absolute top-4 right-4 p-2 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+          aria-label="Toggle theme"
+        >
+          {isDark ? (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+            </svg>
+          )}
+        </button>
 
         {/* Login Form */}
-        <div className="bg-gray-800 rounded-xl p-8 border border-gray-700">
-          <h2 className="text-xl font-semibold text-white mb-6">Sign In</h2>
+        <div className="rounded-xl grid md:grid-cols-12 w-[947px] max-w-[947px] min-h-[611px]">
+          <div className={`md:col-span-7 col-span-12 px-6 py-10 md:px-20 md:py-20 md:rounded-l-xl rounded-t-xl rounded-b-xl md:rounded-br-none md:rounded-t-none ${isDark ? 'bg-gray-800' : 'bg-[#D9D9D9]'}`}>
+             <h2 className={`text-xl font-semibold mb-6 ${isDark ? 'text-white' : 'text-black'}`}>Sign In</h2>
 
           {error && (
             <div className="mb-4 p-3 bg-red-900/50 border border-red-700 rounded-lg text-red-300 text-sm">
@@ -60,83 +77,77 @@ export default function LoginPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1">
-                Email
-              </label>
+          <form onSubmit={handleSubmit} className="space-y-4 md:pr-20">
+             <div className='my-6'>
+              <input
+                type="text"
+                id="name"
+                className={`w-full px-8 py-2 border-2  rounded-md focus:outline-none focus:ring-1 ${isDark ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:ring-gray-500' : 'bg-[#D9D9D9] border-[#848484] text-black placeholder-gray-900 focus:ring-gray-800'}`}
+                placeholder="Name"
+                required
+              />
+            </div>
+            <div className='my-6'>
               <input
                 type="email"
                 id="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="you@example.com"
+                className={`w-full px-8 py-2 border-2 rounded-md focus:outline-none focus:ring-1 ${isDark ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:ring-gray-500' : 'bg-[#D9D9D9] border-[#848484] text-black placeholder-gray-900 focus:ring-gray-800'}`}
+                placeholder="Email"
                 required
               />
             </div>
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-1">
-                Password
-              </label>
+            <div className='my-6'>
+
               <input
                 type="password"
                 id="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter your password"
+                className={`w-full px-8 py-2 border-2 rounded-md focus:outline-none focus:ring-1 ${isDark ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:ring-gray-500' : 'bg-[#D9D9D9] border-[#848484] text-black placeholder-gray-900 focus:ring-gray-800'}`}
+                placeholder="Password"
                 required
               />
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
-            >
-              {loading ? 'Signing in...' : 'Sign In'}
-            </button>
+            <div className='flex justify-between'>
+              <button
+                type="submit"
+                disabled={loading}
+                className="mr-4 py-2 px-10 bg-[#39BEAE] rounded-[20px] hover:bg-gray-100 hover:text-black disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-small transition-colors"
+              >
+                {loading ? 'Signing in...' : 'Sign In'}
+              </button>
+              <button
+                type="button"
+                className={`py-1 px-10 border border-[#39BEAE] rounded-[20px] hover:bg-gray-100 hover:text-black disabled:bg-blue-800 disabled:cursor-not-allowed font-small transition-colors ${isDark ? 'text-white' : 'text-black'}`}
+              >
+                Sign Up
+              </button>
+
+            </div>
           </form>
 
-          {/* LTI Info */}
-          <div className="mt-6 pt-6 border-t border-gray-700">
-            <p className="text-sm text-gray-400 text-center">
-              Logging in from iQualify? The login should happen automatically through LTI.
-            </p>
           </div>
-        </div>
-
-        {/* Test Credentials */}
-        <div className="mt-6 bg-gray-800/50 rounded-xl p-4 border border-gray-700">
-          <h3 className="text-sm font-medium text-gray-300 mb-3">Test Accounts</h3>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between text-gray-400">
-              <span>Student:</span>
-              <code className="text-green-400">demo1@example.com / Demo123!</code>
-            </div>
-            <div className="flex justify-between text-gray-400">
-              <span>Teacher:</span>
-              <code className="text-green-400">demo2@example.com / Teacher123!</code>
-            </div>
-            <div className="flex justify-between text-gray-400">
-              <span>Admin:</span>
-              <code className="text-green-400">admin@example.com / Admin123!</code>
+           <div className='col-span-5 hidden md:block'>
+            <div className='grid grid-rows-8 bg-[#0D1D40] rounded-r-xl overflow-hidden h-full w-full'>
+              <div className='row-span-6 bg-[#0D1D40] pt-40'>
+                <div className='w-[130px] rounded-full h-[130px] bg-[#39BEAE] mx-auto'></div>
+                <h1 className='text-white text-2xl font-semibold text-center mt-5 text-[40px]'>OP Skillsim</h1>
+                </div>
+              <div className='row-span-2 flex flex-col justify-center items-center'>
+                <Image
+                src={'/logos/Main_Logo.png'}
+                width={200}
+                height={50}
+                alt='OP-Skillsim Logo'
+                />
+              </div>
             </div>
           </div>
         </div>
-
-        {/* LTI Demo Link */}
-        <div className="mt-4 text-center">
-          <a
-            href="/lti-demo"
-            className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
-          >
-            Test LTI Launch (Demo) →
-          </a>
-        </div>
-      </div>
     </div>
   )
 }
