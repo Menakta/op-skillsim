@@ -223,7 +223,7 @@ export interface WaypointUpdateData {
 }
 
 // Re-export TrainingState from hook for backward compatibility
-export type { TrainingState } from '../hooks/useTrainingMessages'
+export type { TrainingState } from '../hooks/useTrainingMessagesComposite'
 
 // Legacy type alias for backward compatibility
 export type TrainingAction = TrainingControlAction

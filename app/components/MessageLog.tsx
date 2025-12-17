@@ -10,7 +10,11 @@ interface MessageLogProps {
   onSendTest?: (message: string) => void
   isConnected: boolean
   connectionStatus: 'disconnected' | 'connecting' | 'connected'
+  isDark?: boolean
 }
+
+// Accent color
+const ACCENT = '#39BEAE'
 
 export default function MessageLog({
   messages,
@@ -18,7 +22,8 @@ export default function MessageLog({
   onClear,
   onSendTest,
   isConnected,
-  connectionStatus
+  connectionStatus,
+  isDark = true
 }: MessageLogProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isMinimized, setIsMinimized] = useState(false)
@@ -74,11 +79,20 @@ export default function MessageLog({
     }) + '.' + date.getMilliseconds().toString().padStart(3, '0')
   }
 
+  // Theme colors
+  const colors = {
+    bg: isDark ? 'bg-gray-900/95' : 'bg-white/95',
+    bgSecondary: isDark ? 'bg-gray-800' : 'bg-gray-100',
+    border: isDark ? 'border-gray-700' : 'border-gray-200',
+    text: isDark ? 'text-white' : 'text-gray-900',
+    textSecondary: isDark ? 'text-gray-400' : 'text-gray-600'
+  }
+
   const getConnectionColor = () => {
     switch (connectionStatus) {
-      case 'connected': return 'bg-green-500'
-      case 'connecting': return 'bg-yellow-500 animate-pulse'
-      default: return 'bg-red-500'
+      case 'connected': return ACCENT
+      case 'connecting': return '#eab308'
+      default: return '#ef4444'
     }
   }
 
@@ -87,12 +101,18 @@ export default function MessageLog({
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-4 left-4 z-50 flex items-center gap-2 px-3 py-2 bg-gray-900/90 backdrop-blur-sm border border-gray-700 rounded-lg hover:bg-gray-800 transition-colors"
+        className={`fixed bottom-4 left-4 z-50 flex items-center gap-2 px-4 py-2.5 ${colors.bg} backdrop-blur-sm ${colors.border} border rounded-xl hover:scale-105 transition-all shadow-lg`}
       >
-        <div className={`w-2 h-2 rounded-full ${getConnectionColor()}`} />
-        <span className="text-white/80 text-sm font-mono">Messages</span>
+        <div
+          className={`w-2 h-2 rounded-full ${connectionStatus === 'connecting' ? 'animate-pulse' : ''}`}
+          style={{ backgroundColor: getConnectionColor() }}
+        />
+        <span className={`${colors.text} text-sm font-medium`}>Messages</span>
         {messages.length > 0 && (
-          <span className="px-1.5 py-0.5 bg-indigo-500/30 text-indigo-300 text-xs rounded">
+          <span
+            className="px-2 py-0.5 text-white text-xs rounded-full"
+            style={{ backgroundColor: ACCENT }}
+          >
             {messages.length}
           </span>
         )}
@@ -102,23 +122,26 @@ export default function MessageLog({
 
   return (
     <div
-      className={`fixed bottom-4 left-4 z-50 bg-gray-900/95 backdrop-blur-md border border-gray-700 rounded-xl shadow-2xl transition-all duration-300 ${
+      className={`fixed bottom-4 left-4 z-50 ${colors.bg} backdrop-blur-md ${colors.border} border rounded-xl shadow-2xl transition-all duration-300 ${
         isMinimized ? 'w-80 h-12' : 'w-[500px] h-[450px]'
       }`}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-gray-700">
+      <div className={`flex items-center justify-between px-4 py-2 ${colors.border} border-b`}>
         <div className="flex items-center gap-3">
-          <div className={`w-2 h-2 rounded-full ${getConnectionColor()}`} />
-          <span className="text-white font-medium text-sm">Message Log</span>
-          <span className="text-gray-500 text-xs">
+          <div
+            className={`w-2 h-2 rounded-full ${connectionStatus === 'connecting' ? 'animate-pulse' : ''}`}
+            style={{ backgroundColor: getConnectionColor() }}
+          />
+          <span className={`${colors.text} font-medium text-sm`}>Message Log</span>
+          <span className={colors.textSecondary} style={{ fontSize: '11px' }}>
             {connectionStatus === 'connected' ? 'Live' : connectionStatus}
           </span>
         </div>
         <div className="flex items-center gap-1">
           <button
             onClick={() => setIsMinimized(!isMinimized)}
-            className="p-1.5 text-gray-400 hover:text-white rounded transition-colors"
+            className={`p-1.5 ${colors.textSecondary} hover:${colors.text} rounded transition-colors`}
             title={isMinimized ? 'Expand' : 'Minimize'}
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -129,7 +152,7 @@ export default function MessageLog({
           </button>
           <button
             onClick={() => setIsOpen(false)}
-            className="p-1.5 text-gray-400 hover:text-white rounded transition-colors"
+            className={`p-1.5 ${colors.textSecondary} hover:${colors.text} rounded transition-colors`}
             title="Close"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -142,18 +165,19 @@ export default function MessageLog({
       {!isMinimized && (
         <>
           {/* Toolbar */}
-          <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-800">
+          <div className={`flex items-center gap-2 px-4 py-2 ${colors.border} border-b`}>
             {/* Filter buttons */}
-            <div className="flex items-center gap-1 bg-gray-800 rounded-lg p-0.5">
+            <div className={`flex items-center gap-1 ${colors.bgSecondary} rounded-lg p-0.5`}>
               {(['all', 'sent', 'received'] as const).map((f) => (
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
                   className={`px-2 py-1 text-xs rounded transition-colors ${
                     filter === f
-                      ? 'bg-indigo-500 text-white'
-                      : 'text-gray-400 hover:text-white'
+                      ? 'text-white'
+                      : `${colors.textSecondary} hover:${colors.text}`
                   }`}
+                  style={filter === f ? { backgroundColor: ACCENT } : {}}
                 >
                   {f === 'all' ? 'All' : f === 'sent' ? '↑ Sent' : '↓ Recv'}
                 </button>
@@ -166,8 +190,9 @@ export default function MessageLog({
             <button
               onClick={() => setAutoScroll(!autoScroll)}
               className={`p-1.5 rounded transition-colors ${
-                autoScroll ? 'text-indigo-400 bg-indigo-500/20' : 'text-gray-400 hover:text-white'
+                autoScroll ? '' : `${colors.textSecondary} hover:${colors.text}`
               }`}
+              style={autoScroll ? { color: ACCENT, backgroundColor: `${ACCENT}20` } : {}}
               title={autoScroll ? 'Auto-scroll on' : 'Auto-scroll off'}
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -178,7 +203,7 @@ export default function MessageLog({
             {/* Clear button */}
             <button
               onClick={onClear}
-              className="p-1.5 text-gray-400 hover:text-red-400 rounded transition-colors"
+              className={`p-1.5 ${colors.textSecondary} hover:text-red-400 rounded transition-colors`}
               title="Clear log"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -188,12 +213,13 @@ export default function MessageLog({
           </div>
 
           {/* Quick Send Presets */}
-          <div className="flex flex-wrap gap-1 px-4 py-2 border-b border-gray-800">
+          <div className={`flex flex-wrap gap-1 px-4 py-2 ${colors.border} border-b`}>
             {presetMessages.map((preset) => (
               <button
                 key={preset.label}
                 onClick={() => handlePresetClick(preset.msg)}
-                className="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs rounded transition-colors"
+                className={`px-2 py-1 ${colors.bgSecondary} ${colors.textSecondary} text-xs rounded transition-all hover:scale-105`}
+                style={{ ':hover': { backgroundColor: ACCENT } } as React.CSSProperties}
                 title={preset.msg}
               >
                 {preset.label}
@@ -207,38 +233,40 @@ export default function MessageLog({
             className="h-[calc(100%-180px)] overflow-y-auto p-2 space-y-1 font-mono text-xs"
           >
             {filteredMessages.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-gray-500">
+              <div className={`flex items-center justify-center h-full ${colors.textSecondary}`}>
                 No messages yet
               </div>
             ) : (
               filteredMessages.map((entry) => (
                 <div
                   key={entry.id}
-                  className={`p-2 rounded-lg ${
+                  className={`p-2 rounded-lg border-l-2 ${
                     entry.direction === 'sent'
-                      ? 'bg-blue-500/10 border-l-2 border-blue-500'
-                      : 'bg-green-500/10 border-l-2 border-green-500'
+                      ? `${isDark ? 'bg-blue-500/10' : 'bg-blue-50'} border-blue-500`
+                      : `${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`
                   }`}
+                  style={entry.direction === 'received' ? { borderColor: ACCENT } : {}}
                 >
                   <div className="flex items-center gap-2 mb-1">
-                    <span className={`text-[10px] font-bold ${
-                      entry.direction === 'sent' ? 'text-blue-400' : 'text-green-400'
-                    }`}>
+                    <span
+                      className="text-[10px] font-bold"
+                      style={{ color: entry.direction === 'sent' ? '#3b82f6' : ACCENT }}
+                    >
                       {entry.direction === 'sent' ? '↑ SENT' : '↓ RECV'}
                     </span>
-                    <span className="text-gray-500 text-[10px]">
+                    <span className={`${colors.textSecondary} text-[10px]`}>
                       {formatTimestamp(entry.timestamp)}
                     </span>
-                    <span className="px-1.5 py-0.5 bg-gray-700 text-gray-300 text-[10px] rounded">
+                    <span className={`px-1.5 py-0.5 ${colors.bgSecondary} ${colors.textSecondary} text-[10px] rounded`}>
                       {entry.type}
                     </span>
                   </div>
-                  <div className="text-gray-300 whitespace-pre-wrap break-all overflow-hidden">
-                    <span className="text-yellow-400">{entry.type}</span>
+                  <div className={`${colors.text} whitespace-pre-wrap break-all overflow-hidden`}>
+                    <span style={{ color: ACCENT }}>{entry.type}</span>
                     {entry.data && (
                       <>
-                        <span className="text-gray-500">:</span>
-                        <span className="text-cyan-400">{entry.data}</span>
+                        <span className={colors.textSecondary}>:</span>
+                        <span className="text-cyan-500">{entry.data}</span>
                       </>
                     )}
                   </div>
@@ -249,7 +277,7 @@ export default function MessageLog({
 
           {/* Test message input */}
           {onSendTest && (
-            <div className="p-2 border-t border-gray-800">
+            <div className={`p-2 ${colors.border} border-t`}>
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -257,12 +285,16 @@ export default function MessageLog({
                   onChange={(e) => setTestMessage(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSendTest()}
                   placeholder="type:data (e.g. training_control:start)"
-                  className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs font-mono placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+                  className={`flex-1 px-3 py-2 ${colors.bgSecondary} ${colors.border} border rounded-lg ${colors.text} text-xs font-mono placeholder-gray-500 focus:outline-none`}
+                  style={{ borderColor: 'transparent' }}
+                  onFocus={(e) => e.target.style.borderColor = ACCENT}
+                  onBlur={(e) => e.target.style.borderColor = 'transparent'}
                 />
                 <button
                   onClick={handleSendTest}
                   disabled={!testMessage.trim()}
-                  className="px-4 py-2 bg-indigo-500 text-white text-xs font-medium rounded-lg hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="px-4 py-2 text-white text-xs font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors hover:opacity-90"
+                  style={{ backgroundColor: ACCENT }}
                 >
                   Send
                 </button>
@@ -272,8 +304,11 @@ export default function MessageLog({
 
           {/* Last message indicator */}
           {lastMessage && (
-            <div className="absolute -top-10 left-0 px-3 py-1.5 bg-green-500/20 border border-green-500/30 rounded-lg">
-              <span className="text-green-400 text-xs font-mono">
+            <div
+              className="absolute -top-10 left-0 px-3 py-1.5 rounded-lg"
+              style={{ backgroundColor: `${ACCENT}20`, border: `1px solid ${ACCENT}40` }}
+            >
+              <span className="text-xs font-mono" style={{ color: ACCENT }}>
                 Last: {lastMessage.type}
               </span>
             </div>

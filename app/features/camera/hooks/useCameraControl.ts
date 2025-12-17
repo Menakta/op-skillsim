@@ -1,0 +1,124 @@
+'use client'
+
+import { useCallback, useEffect, useState, useRef } from 'react'
+import type { ParsedMessage, CameraPerspective, CameraMode } from '@/app/lib/messageTypes'
+import { WEB_TO_UE_MESSAGES } from '@/app/lib/messageTypes'
+import type { UseMessageBusReturn } from '@/app/features/messaging/hooks/useMessageBus'
+
+// =============================================================================
+// Camera State Type
+// =============================================================================
+
+export interface CameraStateData {
+  cameraMode: CameraMode
+  cameraPerspective: string
+  cameraDistance: number
+}
+
+// =============================================================================
+// Callbacks
+// =============================================================================
+
+export interface CameraControlCallbacks {
+  onCameraUpdate?: (data: {
+    mode: CameraMode
+    perspective: string
+    distance: number
+    isTransitioning: boolean
+  }) => void
+}
+
+// =============================================================================
+// Initial State
+// =============================================================================
+
+const initialState: CameraStateData = {
+  cameraMode: 'Manual',
+  cameraPerspective: 'IsometricNE',
+  cameraDistance: 1500
+}
+
+// =============================================================================
+// Hook Return Type
+// =============================================================================
+
+export interface UseCameraControlReturn {
+  state: CameraStateData
+  setCameraPerspective: (perspective: CameraPerspective) => void
+  toggleAutoOrbit: () => void
+  resetCamera: () => void
+}
+
+// =============================================================================
+// Hook Implementation
+// =============================================================================
+
+export function useCameraControl(
+  messageBus: UseMessageBusReturn,
+  callbacks: CameraControlCallbacks = {}
+): UseCameraControlReturn {
+  const [state, setState] = useState<CameraStateData>(initialState)
+  const callbacksRef = useRef(callbacks)
+  callbacksRef.current = callbacks
+
+  // ==========================================================================
+  // Message Handler
+  // ==========================================================================
+
+  useEffect(() => {
+    const unsubscribe = messageBus.onMessage((message: ParsedMessage) => {
+      const { type, dataString } = message
+      const parts = dataString.split(':')
+
+      if (type === 'camera_update') {
+        const mode = (parts[0] as CameraMode) || 'Manual'
+        const perspective = parts[1] || 'IsometricNE'
+        const distance = parseFloat(parts[2]) || 1500
+
+        setState({
+          cameraMode: mode,
+          cameraPerspective: perspective,
+          cameraDistance: distance
+        })
+
+        callbacksRef.current.onCameraUpdate?.({
+          mode,
+          perspective,
+          distance,
+          isTransitioning: parts[3] === 'true'
+        })
+      }
+    })
+
+    return unsubscribe
+  }, [messageBus])
+
+  // ==========================================================================
+  // Actions
+  // ==========================================================================
+
+  const setCameraPerspective = useCallback((perspective: CameraPerspective) => {
+    messageBus.sendMessage(WEB_TO_UE_MESSAGES.CAMERA_CONTROL, perspective)
+  }, [messageBus])
+
+  const toggleAutoOrbit = useCallback(() => {
+    if (state.cameraMode === 'Orbit') {
+      messageBus.sendMessage(WEB_TO_UE_MESSAGES.CAMERA_CONTROL, 'orbit_stop')
+    } else {
+      messageBus.sendMessage(WEB_TO_UE_MESSAGES.CAMERA_CONTROL, 'orbit_start')
+    }
+  }, [state.cameraMode, messageBus])
+
+  const resetCamera = useCallback(() => {
+    messageBus.sendMessage(WEB_TO_UE_MESSAGES.CAMERA_CONTROL, 'reset')
+  }, [messageBus])
+
+  return {
+    state,
+    setCameraPerspective,
+    toggleAutoOrbit,
+    resetCamera
+  }
+}
+
+export default useCameraControl

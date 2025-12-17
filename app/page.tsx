@@ -1,147 +1,217 @@
 'use client'
+
 import { useEffect, useState, useRef, useCallback } from 'react'
 import {
   PlatformNext,
   ModelDefinition,
   UndefinedModelDefinition,
   DefaultStreamerOptions,
-  StreamerStatus,
-  LaunchStatusType
+  StreamerStatus
 } from '@pureweb/platform-sdk'
 import {
   useStreamer,
   useLaunchRequest,
   VideoStream
 } from '@pureweb/platform-sdk-react'
+
+// Theme support
+import { useTheme } from './context/ThemeContext'
+
+// Feature imports - New modular components
+import { QuestionModal } from './features/questions'
+import { CompletionPopup } from './features/training'
+import { LoadingOverlay } from './features/streaming'
+import { StatusBar } from './components/layout'
 import ControlPanel from './components/ControlPanel'
 import MessageLog from './components/MessageLog'
-import { useTrainingMessages } from './hooks/useTrainingMessages'
+import { TrainingWalkthrough } from './components/ui/WalkThrough/TrainingWalkthrough'
+
+// New composite hook that uses all the modular hooks
+import { useTrainingMessagesComposite } from './hooks/useTrainingMessagesComposite'
 import type { QuestionData } from './lib/messageTypes'
 
-// Configuration - same as my-app's client.json
+// =============================================================================
+// Configuration
+// =============================================================================
+
 const projectId = '94adc3ba-7020-49f0-9a7c-bb8f1531536a'
 const modelId = '26c1dfea-9845-46bb-861d-fb90a22b28df'
 
-// Initialize platform OUTSIDE component (like my-app does)
-const platform = new PlatformNext()
-platform.initialize({ endpoint: 'https://api.pureweb.io' })
+// Retry configuration
+const MAX_RETRIES = 3
+const RETRY_DELAY = 2000 // 2 seconds between retries
 
-// Streamer options (like my-app)
+// Streamer options
 const streamerOptions = DefaultStreamerOptions
+
+// =============================================================================
+// Main Page Component - Using New Modular Architecture
+// =============================================================================
 
 export default function Home() {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const { theme, toggleTheme } = useTheme()
+  const isDark = theme === 'dark'
 
-  // State - match my-app exactly
+  // Platform ref - persists across renders
+  const platformRef = useRef<PlatformNext | null>(null)
+
+  // Initialize platform on first render
+  if (!platformRef.current) {
+    platformRef.current = new PlatformNext()
+    platformRef.current.initialize({ endpoint: 'https://api.pureweb.io' })
+  }
+
+  // Platform state
   const [modelDefinition, setModelDefinition] = useState<ModelDefinition>(new UndefinedModelDefinition())
   const [availableModels, setAvailableModels] = useState<ModelDefinition[]>()
   const [loading, setLoading] = useState(false)
   const [initError, setInitError] = useState<string | null>(null)
 
-  // Quiz display state (matching player(2).html showQuestion/hideQuestion)
+  // Retry state
+  const [retryCount, setRetryCount] = useState(0)
+  const [isRetrying, setIsRetrying] = useState(false)
+  const [connectionStatus, setConnectionStatus] = useState<'initializing' | 'connecting' | 'connected' | 'failed' | 'retrying'>('initializing')
+
+  // UI state
   const [showingQuestion, setShowingQuestion] = useState<QuestionData | null>(null)
-  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
-  const [answerFeedback, setAnswerFeedback] = useState<{ correct: boolean; message: string } | null>(null)
-
-  // Training complete popup state
   const [showCompletionPopup, setShowCompletionPopup] = useState(false)
+  const [showWalkthrough, setShowWalkthrough] = useState(false)
+  const [hasSeenWalkthrough, setHasSeenWalkthrough] = useState(false)
 
-  // Initialize platform - match my-app's useAsyncEffect
+  // Check if user has seen walkthrough before
   useEffect(() => {
-    async function init() {
-      try {
-        console.log('Initializing with project:', projectId)
-
-        await platform.launchRequestAccess({
-          projectId,
-          modelId
-        })
-
-        console.log('Agent Connected:', platform.agent?.id)
-
-        if (platform.agent?.serviceCredentials?.iceServers) {
-          streamerOptions.iceServers = platform.agent.serviceCredentials.iceServers as RTCIceServer[]
-        }
-
-        const models = await platform.getModels()
-        console.log('Available models:', models)
-        setAvailableModels(models)
-
-      } catch (err) {
-        console.error('Init error:', err)
-        setInitError(String(err))
-      }
+    const seen = localStorage.getItem('hasSeenWalkthrough')
+    if (!seen) {
+      setShowWalkthrough(true)
+    } else {
+      setHasSeenWalkthrough(true)
     }
-    init()
   }, [])
 
-  // Select model when available - match my-app pattern
+  // ==========================================================================
+  // Platform Initialization with Retry Logic
+  // ==========================================================================
+
+  const initializePlatform = useCallback(async (attempt: number = 1) => {
+    try {
+      console.log(`🚀 Initializing with project (attempt ${attempt}/${MAX_RETRIES}):`, projectId)
+      setConnectionStatus(attempt > 1 ? 'retrying' : 'initializing')
+      setIsRetrying(attempt > 1)
+
+      // Reset platform on retry
+      if (attempt > 1 && platformRef.current) {
+        try {
+          platformRef.current.disconnect()
+        } catch (e) {
+          console.log('Disconnect error (ignored):', e)
+        }
+        platformRef.current = new PlatformNext()
+        platformRef.current.initialize({ endpoint: 'https://api.pureweb.io' })
+      }
+
+      const platform = platformRef.current
+      if (!platform) {
+        throw new Error('Platform not initialized')
+      }
+
+      await platform.launchRequestAccess({
+        projectId,
+        modelId
+      })
+
+      console.log('✅ Agent Connected:', platform.agent?.id)
+
+      if (platform.agent?.serviceCredentials?.iceServers) {
+        streamerOptions.iceServers = platform.agent.serviceCredentials.iceServers as RTCIceServer[]
+      }
+
+      const models = await platform.getModels()
+      console.log('📦 Available models:', models)
+      setAvailableModels(models)
+      setConnectionStatus('connecting')
+      setRetryCount(0)
+      setIsRetrying(false)
+
+    } catch (err) {
+      console.error(`❌ Init error (attempt ${attempt}):`, err)
+
+      if (attempt < MAX_RETRIES) {
+        console.log(`⏳ Retrying in ${RETRY_DELAY / 1000} seconds...`)
+        setRetryCount(attempt)
+        setTimeout(() => {
+          initializePlatform(attempt + 1)
+        }, RETRY_DELAY)
+      } else {
+        setInitError(String(err))
+        setConnectionStatus('failed')
+        setIsRetrying(false)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    initializePlatform(1)
+  }, [initializePlatform])
+
+  // ==========================================================================
+  // Model Selection
+  // ==========================================================================
+
   useEffect(() => {
     if (availableModels?.length) {
       const selected = availableModels.filter((m) => m.id === modelId && m.active)
       if (selected.length) {
-        console.log('Selected model:', selected[0])
+        console.log('✅ Selected model:', selected[0])
         setModelDefinition(selected[0])
       } else if (availableModels.length > 0) {
-        console.log('Using first model:', availableModels[0])
+        console.log('📦 Using first model:', availableModels[0])
         setModelDefinition(availableModels[0])
       }
     }
   }, [availableModels])
 
-  // HOOKS AT TOP LEVEL - like my-app (lines 321-330)
+  // ==========================================================================
+  // PureWeb Hooks
+  // ==========================================================================
+
   const [launchStatus, launchRequest, queueLaunchRequest] = useLaunchRequest(
-    platform,
+    platformRef.current!,
     modelDefinition,
     {}
   )
 
-  // useStreamer returns: [status, emitter, videoStream, audioStream, messageSubject]
   const [streamerStatus, emitter, videoStream, audioStream, messageSubject] = useStreamer(
-    platform,
+    platformRef.current!,
     launchRequest,
     streamerOptions
   )
 
   // ==========================================================================
-  // BIDIRECTIONAL MESSAGING - Using useTrainingMessages hook
-  // Matching player(2).html initialization and message handling
+  // NEW: Composite Training Hook (uses all modular hooks internally)
   // ==========================================================================
-  const training = useTrainingMessages(emitter, messageSubject, {
-    // Question callback - show the question modal (matching player(2).html showQuestion)
-    onQuestionRequest: (questionId, question) => {
-      console.log('🎯 Question requested:', questionId)
-      setShowingQuestion(question)
-      setSelectedAnswer(null)
-      setAnswerFeedback(null)
-    },
 
-    // Training progress callback
+  const training = useTrainingMessagesComposite(emitter, messageSubject, {
+    onQuestionRequest: (questionId, question) => {
+      console.log('❓ Question requested:', questionId)
+      setShowingQuestion(question)
+    },
     onTrainingProgress: (data) => {
       console.log('📊 Progress:', data.progress + '%', data.taskName, data.phase)
     },
-
-    // Training complete callback
     onTrainingComplete: (progress, currentTask, totalTasks) => {
       console.log('🎉 Training Complete!', { progress, currentTask, totalTasks })
       setShowCompletionPopup(true)
     },
-
-    // Task callbacks
     onTaskCompleted: (taskId) => {
       console.log('✅ Task completed:', taskId)
     },
-
     onTaskStart: (toolName) => {
       console.log('🚀 Task started:', toolName)
     },
-
-    // Tool callback
     onToolChange: (toolName) => {
       console.log('🔧 Tool changed to:', toolName)
     },
-
-    // Generic message callback
     onMessage: (message) => {
       console.log('📨 Message:', message.type, message.dataString)
     }
@@ -150,16 +220,16 @@ export default function Home() {
   })
 
   // ==========================================================================
-  // LAUNCH
+  // Launch
   // ==========================================================================
 
   const launch = useCallback(async () => {
-    console.log('Launch clicked')
+    console.log('🚀 Launch clicked')
     setLoading(true)
     try {
       await queueLaunchRequest()
     } catch (err) {
-      console.error('Launch failed:', err)
+      console.error('❌ Launch failed:', err)
       setInitError(String(err))
     }
   }, [queueLaunchRequest])
@@ -168,159 +238,256 @@ export default function Home() {
   useEffect(() => {
     const isValidModel = modelDefinition && modelDefinition.id && modelDefinition.id !== ''
     if (isValidModel && !loading && streamerStatus !== StreamerStatus.Connected) {
-      console.log('Auto-launching for model:', modelDefinition.id)
+      console.log('🚀 Auto-launching for model:', modelDefinition.id)
       launch()
     }
   }, [modelDefinition, loading, streamerStatus, launch])
 
   // Debug logging
   useEffect(() => {
-    console.log('Status:', launchStatus.status, '| Streamer:', streamerStatus, '| Video:', videoStream ? 'Yes' : 'No')
+    console.log('📡 Status:', launchStatus.status, '| Streamer:', streamerStatus, '| Video:', videoStream ? 'Yes' : 'No')
   }, [launchStatus.status, streamerStatus, videoStream])
 
-  // Handle disconnect
-  useEffect(() => {
-    if (streamerStatus === StreamerStatus.Failed) {
-      platform.disconnect()
-    }
-  }, [streamerStatus])
-
-  // ==========================================================================
-  // INITIALIZATION - Matching player(2).html window.onload behavior
-  // ==========================================================================
+  // Handle streamer status changes
   useEffect(() => {
     if (streamerStatus === StreamerStatus.Connected) {
-      // Request initial data after connection (matching player(2).html)
+      setConnectionStatus('connected')
+      setRetryCount(0)
+    } else if (streamerStatus === StreamerStatus.Failed) {
+      console.log('❌ Streamer failed, attempting to reconnect...')
+      setConnectionStatus('failed')
+
+      try {
+        platformRef.current?.disconnect()
+      } catch (e) {
+        console.log('Disconnect error (ignored):', e)
+      }
+
+      // Auto-retry on stream failure if we haven't exceeded retries
+      if (retryCount < MAX_RETRIES) {
+        setTimeout(() => {
+          console.log(`🔄 Auto-retry after stream failure (${retryCount + 1}/${MAX_RETRIES})`)
+          setRetryCount(prev => prev + 1)
+          setAvailableModels(undefined)
+          setModelDefinition(new UndefinedModelDefinition())
+          setLoading(false)
+          setInitError(null)
+          initializePlatform(retryCount + 1)
+        }, RETRY_DELAY)
+      }
+    }
+  }, [streamerStatus, retryCount, initializePlatform])
+
+  // ==========================================================================
+  // Initial Data Request (after connection)
+  // ==========================================================================
+
+  useEffect(() => {
+    if (streamerStatus === StreamerStatus.Connected) {
       console.log('📤 Connection established - Requesting initial data from UE5...')
-
       setTimeout(() => {
-        // Send test connection
         training.testConnection()
-
-        // Request waypoint list
         training.refreshWaypoints()
-
-        // Request hierarchical layer list
         training.refreshHierarchicalLayers()
-
         console.log('📤 Initial data requests sent')
       }, 1000)
     }
   }, [streamerStatus])
 
   // ==========================================================================
-  // QUESTION HANDLING (matching player(2).html submitAnswer, hideQuestion)
+  // Question Handlers
   // ==========================================================================
 
-  const handleAnswerSubmit = useCallback(() => {
-    if (selectedAnswer === null || !showingQuestion) return
+  const handleSubmitAnswer = useCallback((selectedAnswer: number) => {
+    return training.submitQuestionAnswer(selectedAnswer)
+  }, [training])
 
-    // Submit answer and get result
-    const result = training.submitQuestionAnswer(selectedAnswer)
-
-    if (result?.correct) {
-      setAnswerFeedback({
-        correct: true,
-        message: 'Correct! ' + showingQuestion.explanation
-      })
-
-      // For Q6, don't auto-close - user must click Close button
-      // Matching player(2).html: "User must manually close Q6 to trigger pressure test"
-      if (showingQuestion.id !== 'Q6') {
-        // Auto-close after showing correct feedback (except Q6)
-        setTimeout(() => {
-          handleCloseQuestion()
-        }, 2500)
-      }
-    } else {
-      setAnswerFeedback({
-        correct: false,
-        message: result?.message || 'Incorrect. Try again!'
-      })
-      setSelectedAnswer(null)
-    }
-  }, [selectedAnswer, showingQuestion, training])
-
-  // Close question handler (matching player(2).html hideQuestion)
   const handleCloseQuestion = useCallback(() => {
-    console.log('Closing question modal')
-
-    // This will trigger the Q6 special handling in the hook
     training.closeQuestion()
-
-    // Clear local state
     setShowingQuestion(null)
-    setSelectedAnswer(null)
-    setAnswerFeedback(null)
   }, [training])
 
   // ==========================================================================
-  // MESSAGE LOG HANDLERS
+  // Message Log Handlers
   // ==========================================================================
 
   const handleSendTestMessage = useCallback((message: string) => {
     training.sendRawMessage(message)
   }, [training])
 
+  // ==========================================================================
+  // Derived State
+  // ==========================================================================
+
   const isConnected = streamerStatus === StreamerStatus.Connected
 
-  // Error state
+  // ==========================================================================
+  // Walkthrough Handler
+  // ==========================================================================
+
+  const handleWalkthroughComplete = useCallback(() => {
+    localStorage.setItem('hasSeenWalkthrough', 'true')
+    setShowWalkthrough(false)
+    setHasSeenWalkthrough(true)
+  }, [])
+
+  // ==========================================================================
+  // Manual Retry Handler
+  // ==========================================================================
+
+  const handleManualRetry = useCallback(() => {
+    setInitError(null)
+    setRetryCount(0)
+    setAvailableModels(undefined)
+    setModelDefinition(new UndefinedModelDefinition())
+    setLoading(false)
+    setConnectionStatus('initializing')
+    initializePlatform(1)
+  }, [initializePlatform])
+
+  // ==========================================================================
+  // Error State
+  // ==========================================================================
+
   if (initError) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <h2 className="text-xl text-white">Error</h2>
-          <p className="text-gray-400">{initError}</p>
-          <button onClick={() => window.location.reload()} className="px-4 py-2 bg-indigo-600 text-white rounded">
-            Retry
-          </button>
+      <div className={`min-h-screen flex items-center justify-center ${isDark ? 'bg-gray-900' : 'bg-white'}`}>
+        <div className="text-center space-y-4 max-w-md px-4">
+          <div className="w-16 h-16 mx-auto rounded-full bg-red-500/10 flex items-center justify-center">
+            <span className="text-3xl">⚠️</span>
+          </div>
+          <h2 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Connection Failed</h2>
+          <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+            {initError}
+          </p>
+          <p className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+            Attempted {MAX_RETRIES} automatic retries
+          </p>
+          <div className="flex gap-3 justify-center pt-2">
+            <button
+              onClick={handleManualRetry}
+              className="px-6 py-2.5 bg-[#39BEAE] hover:bg-[#2ea89a] text-white rounded-lg transition-colors font-medium"
+            >
+              Try Again
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              className={`px-6 py-2.5 rounded-lg transition-colors font-medium ${
+                isDark
+                  ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                  : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+              }`}
+            >
+              Refresh Page
+            </button>
+          </div>
         </div>
       </div>
     )
   }
 
-  // Waiting for models
+  // ==========================================================================
+  // Loading State (waiting for models)
+  // ==========================================================================
+
   if (!availableModels) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+      <div className={`min-h-screen flex items-center justify-center ${isDark ? 'bg-gray-900' : 'bg-white'}`}>
         <div className="text-center space-y-4">
-          <div className="w-12 h-12 mx-auto border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-400">Connecting to Stream...</p>
+          <div className="w-14 h-14 mx-auto border-4 border-[#39BEAE] border-t-transparent rounded-full animate-spin" />
+          <p className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
+            {isRetrying ? 'Reconnecting...' : 'Connecting to Stream...'}
+          </p>
+          {retryCount > 0 && (
+            <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+              Retry attempt {retryCount}/{MAX_RETRIES}
+            </p>
+          )}
+          <p className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+            This may take a few moments
+          </p>
         </div>
       </div>
     )
   }
 
-  // Main view
+  // ==========================================================================
+  // Main Render - Using New Modular Components
+  // ==========================================================================
+
   return (
-    <div className="h-screen w-screen bg-gray-950 relative overflow-hidden">
-      {/* Control Panel - Updated Props matching player(2).html flow */}
+    <div className={`h-screen w-screen relative overflow-hidden ${isDark ? 'bg-gray-900' : 'bg-gray-100'}`}>
+      {/* Walkthrough Overlay - Shows for first-time users */}
+      {showWalkthrough && (
+        <TrainingWalkthrough
+          onComplete={handleWalkthroughComplete}
+          onSkip={handleWalkthroughComplete}
+        />
+      )}
+
+      {/* Theme Toggle Button */}
+      <button
+        onClick={toggleTheme}
+        className="fixed top-5 left-5 z-50 w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all"
+        style={{
+          zIndex: 2147483647,
+          backgroundColor: isDark ? '#374151' : '#e5e7eb'
+        }}
+        title={`Switch to ${isDark ? 'light' : 'dark'} mode`}
+      >
+        {isDark ? (
+          <span className="text-yellow-400 text-lg">☀️</span>
+        ) : (
+          <span className="text-gray-700 text-lg">🌙</span>
+        )}
+      </button>
+
+      {/* Help Button - Show Walkthrough Again */}
+      {hasSeenWalkthrough && !showWalkthrough && (
+        <button
+          onClick={() => setShowWalkthrough(true)}
+          className="fixed top-5 left-18 z-50 px-3 py-2 rounded-full text-sm font-medium shadow-lg transition-all"
+          style={{
+            zIndex: 2147483647,
+            left: '4.5rem',
+            backgroundColor: '#39BEAE',
+            color: 'white'
+          }}
+          title="Show tutorial"
+        >
+          ?
+        </button>
+      )}
+
+      {/* Status Bar - New Component */}
+      <StatusBar
+        isConnected={isConnected}
+        mode={training.state.mode}
+        phase={training.state.phase}
+        progress={training.state.progress}
+        isDark={isDark}
+      />
+
+      {/* Control Panel - New Modular Version with Tabs */}
       <ControlPanel
         state={training.state}
         isConnected={training.isConnected || isConnected}
-        // Training Control
+        isDark={isDark}
         onStartTraining={training.startTraining}
         onPauseTraining={training.pauseTraining}
         onResetTraining={training.resetTraining}
-        // Tool Selection (matching player(2).html selectTool)
         onSelectTool={training.selectTool}
-        // Pipe Selection (matching player(2).html selectPipe)
         onSelectPipe={training.selectPipe}
-        // Pressure Testing (matching player(2).html selectPressureTest)
         onSelectPressureTest={training.selectPressureTest}
-        // Camera Control
         onSetCameraPerspective={training.setCameraPerspective}
         onToggleAutoOrbit={training.toggleAutoOrbit}
         onResetCamera={training.resetCamera}
-        // Explosion Control
         onSetExplosionLevel={training.setExplosionLevel}
         onExplodeBuilding={training.explodeBuilding}
         onAssembleBuilding={training.assembleBuilding}
-        // Waypoint Control
         onRefreshWaypoints={training.refreshWaypoints}
         onActivateWaypoint={training.activateWaypoint}
         onDeactivateWaypoint={training.deactivateWaypoint}
-        // Layer Control
         onRefreshLayers={training.refreshLayers}
         onRefreshHierarchicalLayers={training.refreshHierarchicalLayers}
         onToggleLayer={training.toggleLayer}
@@ -328,11 +495,10 @@ export default function Home() {
         onHideAllLayers={training.hideAllLayers}
         onToggleMainGroup={training.toggleMainGroup}
         onToggleChildGroup={training.toggleChildGroup}
-        // Application Control
         onQuitApplication={training.quitApplication}
       />
 
-      {/* Message Log - for debugging bidirectional communication */}
+      {/* Message Log */}
       <MessageLog
         messages={training.messageLog}
         lastMessage={training.lastMessage}
@@ -340,28 +506,17 @@ export default function Home() {
         onSendTest={handleSendTestMessage}
         isConnected={training.isConnected || isConnected}
         connectionStatus={training.isConnected ? 'connected' : isConnected ? 'connected' : 'connecting'}
+        isDark={isDark}
       />
 
-      {/* Loading overlay - shown when not connected */}
-      {streamerStatus !== StreamerStatus.Connected && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-gray-950">
-          <div className="text-center space-y-4">
-            <div className="w-12 h-12 mx-auto border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-            <p className="text-gray-400">
-              {launchStatus.status === LaunchStatusType.Queued ? 'In queue...' :
-               launchStatus.status === LaunchStatusType.Requested ? 'Starting stream...' :
-               streamerStatus === StreamerStatus.New ? 'Initializing...' :
-               streamerStatus === StreamerStatus.Checking ? 'Connecting...' :
-               'Loading...'}
-            </p>
-            <p className="text-gray-600 text-xs">
-              Launch: {launchStatus.status} | Stream: {streamerStatus}
-            </p>
-          </div>
-        </div>
-      )}
+      {/* Loading Overlay - New Component */}
+      <LoadingOverlay
+        streamerStatus={streamerStatus}
+        launchStatus={launchStatus.status}
+        isVisible={!isConnected}
+      />
 
-      {/* VideoStream - ALWAYS render it like my-app does */}
+      {/* Video Stream */}
       <div style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
         <VideoStream
           VideoRef={videoRef}
@@ -373,125 +528,24 @@ export default function Home() {
         />
       </div>
 
-      {/* Question Modal - Matching player(2).html question handling */}
-      {showingQuestion && (
-        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="bg-[#16213e] rounded-2xl p-6 max-w-lg w-full mx-4 border border-[#2c3e50] shadow-2xl">
-            {/* Question Header */}
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
-                <span className="text-blue-400 font-bold text-lg">{showingQuestion.id}</span>
-              </div>
-              <div>
-                <h3 className="text-white font-semibold text-lg">Assessment Question</h3>
-                <p className="text-gray-500 text-xs">
-                  Attempt {training.state.questionTryCount} - Select the correct answer
-                </p>
-              </div>
-            </div>
+      {/* Question Modal - New Component */}
+      <QuestionModal
+        question={showingQuestion}
+        tryCount={training.state.questionTryCount}
+        onSubmitAnswer={handleSubmitAnswer}
+        onClose={handleCloseQuestion}
+      />
 
-            {/* Question Text */}
-            <p className="text-white text-lg mb-6">{showingQuestion.text}</p>
+      {/* Completion Popup - New Component */}
+      <CompletionPopup
+        isVisible={showCompletionPopup}
+        totalTasks={training.state.totalTasks}
+        progress={training.state.progress}
+        onReset={training.resetTraining}
+        onClose={() => setShowCompletionPopup(false)}
+      />
 
-            {/* Answer Options */}
-            <div className="space-y-2 mb-4">
-              {showingQuestion.options.map((option, index) => (
-                <button
-                  key={index}
-                  onClick={() => setSelectedAnswer(index)}
-                  disabled={answerFeedback?.correct}
-                  className={`w-full p-4 text-left rounded-lg border-2 transition-all ${
-                    selectedAnswer === index
-                      ? answerFeedback
-                        ? answerFeedback.correct
-                          ? 'bg-green-500/20 border-green-500 text-green-300'
-                          : 'bg-red-500/20 border-red-500 text-red-300'
-                        : 'bg-blue-500/20 border-blue-500 text-white'
-                      : 'bg-[#1e2a4a] border-[#2c3e50] text-white hover:bg-[#2c3e50] hover:border-blue-500'
-                  }`}
-                >
-                  <span className="text-blue-400 font-bold mr-3">{String.fromCharCode(65 + index)}.</span>
-                  {option}
-                </button>
-              ))}
-            </div>
-
-            {/* Feedback Message */}
-            {answerFeedback && (
-              <div className={`p-3 rounded-lg mb-4 ${
-                answerFeedback.correct
-                  ? 'bg-green-500/20 border border-green-500/50 text-green-300'
-                  : 'bg-red-500/20 border border-red-500/50 text-red-300'
-              }`}>
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">{answerFeedback.correct ? '✓' : '✗'}</span>
-                  <span className="text-sm">{answerFeedback.message}</span>
-                </div>
-              </div>
-            )}
-
-            {/* Q6 Special Notice */}
-            {showingQuestion.id === 'Q6' && answerFeedback?.correct && (
-              <div className="bg-yellow-500/20 border border-yellow-500/50 text-yellow-300 p-3 rounded-lg mb-4">
-                <div className="text-sm font-bold">⚠️ Click "Close" to start pressure testing!</div>
-                <div className="text-xs opacity-80">The pressure test will begin when you close this question.</div>
-              </div>
-            )}
-
-            {/* Action Buttons */}
-            <div className="flex gap-3">
-              {!answerFeedback?.correct ? (
-                <button
-                  onClick={handleAnswerSubmit}
-                  disabled={selectedAnswer === null}
-                  className={`flex-1 py-3 rounded-lg font-bold transition-all ${
-                    selectedAnswer !== null
-                      ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 cursor-pointer'
-                      : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                  }`}
-                >
-                  Submit Answer
-                </button>
-              ) : (
-                <button
-                  onClick={handleCloseQuestion}
-                  className="flex-1 py-3 rounded-lg font-bold bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 transition-all"
-                >
-                  {showingQuestion.id === 'Q6' ? '✓ Close & Start Pressure Test' : '✓ Continue'}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Training Completion Popup */}
-      {showCompletionPopup && (
-        <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-          <div className="bg-gradient-to-br from-green-600 to-green-800 rounded-2xl p-8 max-w-md w-full mx-4 text-center shadow-2xl">
-            <div className="text-6xl mb-4">🎉</div>
-            <h2 className="text-3xl font-bold text-white mb-2">Training Complete!</h2>
-            <p className="text-green-100 text-lg mb-6">
-              Congratulations! You have successfully completed all {training.state.totalTasks} training tasks.
-            </p>
-            <div className="bg-white/20 rounded-lg p-4 mb-6">
-              <div className="text-green-100 text-sm">Final Progress</div>
-              <div className="text-white text-4xl font-bold">{training.state.progress.toFixed(0)}%</div>
-            </div>
-            <button
-              onClick={() => {
-                setShowCompletionPopup(false)
-                training.resetTraining()
-              }}
-              className="px-8 py-3 bg-white text-green-700 rounded-lg font-bold hover:bg-green-50 transition-colors"
-            >
-              Start Over
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* CSS to make video fill container */}
+      {/* Video Styles */}
       <style jsx global>{`
         video {
           width: 100% !important;
@@ -502,39 +556,6 @@ export default function Home() {
           left: 0;
         }
       `}</style>
-
-      {/* Top overlay - Status Bar */}
-      <div className="absolute top-4 left-4 right-24 flex justify-between items-center pointer-events-none z-20">
-        <div className="flex items-center gap-3 px-3 py-2 bg-black/50 backdrop-blur-sm rounded-lg pointer-events-auto">
-          <span className="text-white/80 text-sm font-medium">OP SkillSim</span>
-          <div className="flex items-center gap-1.5 ml-2 pl-2 border-l border-white/20">
-            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'}`} />
-            <span className="text-xs text-gray-400">{isConnected ? 'Live' : 'Connecting'}</span>
-          </div>
-          <div className="flex items-center gap-1.5 ml-2 pl-2 border-l border-white/20">
-            <span className="text-xs text-gray-500">Mode:</span>
-            <span className="text-xs text-white">{training.state.mode}</span>
-          </div>
-          {training.state.progress > 0 && (
-            <div className="flex items-center gap-1.5 ml-2 pl-2 border-l border-white/20">
-              <span className="text-xs text-indigo-400">{training.state.progress.toFixed(0)}%</span>
-            </div>
-          )}
-          {training.state.mode === 'training' && (
-            <div className="flex items-center gap-1.5 ml-2 pl-2 border-l border-white/20">
-              <span className="text-xs text-green-400">{training.state.phase}</span>
-            </div>
-          )}
-        </div>
-        <button
-          onClick={() => document.documentElement.requestFullscreen()}
-          className="p-2 bg-black/50 backdrop-blur-sm rounded-lg text-white/70 hover:text-white pointer-events-auto"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-          </svg>
-        </button>
-      </div>
     </div>
   )
 }
