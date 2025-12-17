@@ -17,7 +17,7 @@ try {
   PRIVATE_KEY = fs.readFileSync(privateKeyPath!, 'utf8')
   PUBLIC_KEY = fs.readFileSync(publicKeyPath!, 'utf8')
 } catch (err) {
-  logger.error(err, 'Failed to read keys:')
+  logger.error({ error: err instanceof Error ? err.message : String(err) }, 'Failed to read keys:')
   throw err
 }
 
