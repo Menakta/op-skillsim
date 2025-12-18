@@ -6,7 +6,6 @@ import type { ToolName, PipeType, CameraPerspective } from '@/app/lib/messageTyp
 import { TASK_SEQUENCE } from '@/app/lib/messageTypes'
 import {
   GraduationCap,
-  Wrench,
   Camera,
   Layers,
   Film,
@@ -15,7 +14,6 @@ import {
 
 // Import tab components
 import { TrainingTab } from './TrainingTab'
-import { ToolsTab } from './ToolsTab'
 import { CameraTab } from './CameraTab'
 import { LayersTab } from './LayersTab'
 import { CinematicTab } from './CinematicTab'
@@ -24,6 +22,8 @@ import { CinematicTab } from './CinematicTab'
 import { MapDropdown } from './MapDropdown'
 import { CameraDropdown } from './CameraDropdown'
 import { TrainingControls } from './TrainingControls'
+import { TaskTools } from './TaskTools'
+import { ToolBar } from './ToolBar'
 
 // =============================================================================
 // Props Interface
@@ -88,12 +88,11 @@ interface ControlPanelProps {
 // Tab Type
 // =============================================================================
 
-type TabType = 'training' | 'tools' | 'camera' | 'layers' | 'cinematic'
+type TabType = 'training' | 'camera' | 'layers' | 'cinematic'
 
-// Tab configuration with icons
+// Tab configuration with icons (Tools removed - now in separate ToolBar)
 const tabConfig = [
   { id: 'training' as TabType, label: 'Training', icon: GraduationCap },
-  { id: 'tools' as TabType, label: 'Tools', icon: Wrench },
   { id: 'camera' as TabType, label: 'Camera', icon: Camera },
   { id: 'layers' as TabType, label: 'Layers', icon: Layers },
   { id: 'cinematic' as TabType, label: 'Cinematic', icon: Film },
@@ -160,31 +159,6 @@ export function ControlPanel({
           <TrainingTab
             isDark={isDark}
             state={state}
-          />
-        )
-      case 'tools':
-        return (
-          <ToolsTab
-            state={state}
-            onSelectTool={(tool) => {
-              onSelectTool(tool)
-              if (tool !== 'PipeConnection' && tool !== 'PressureTester') {
-                handleClosePanel()
-                onPanelClose?.()
-              }
-            }}
-            onSelectPipe={(pipe) => {
-              onSelectPipe(pipe)
-              handleClosePanel()
-              onPanelClose?.()
-            }}
-            onSelectPressureTest={(testType) => {
-              onSelectPressureTest(testType)
-              if (testType === 'conduct-test') {
-                handleClosePanel()
-                onPanelClose?.()
-              }
-            }}
           />
         )
       case 'camera':
@@ -258,11 +232,11 @@ export function ControlPanel({
 
   return (
     <>
-      {/* Toggle Button - Only show when closed */}
+      {/* Toggle Button - Only show when closed (positioned above ToolBar) */}
       {!isOpen && (
         <button
           onClick={handleToggle}
-          className="fixed bottom-5 right-5 z-50 w-12 h-12 rounded-full text-white flex items-center justify-center shadow-lg transition-all hover:scale-105"
+          className="fixed bottom-24 right-5 z-50 w-12 h-12 rounded-full text-white flex items-center justify-center shadow-lg transition-all hover:scale-105"
           style={{ zIndex: 2147483647, backgroundColor: colors.accent }}
         >
           ☰
@@ -290,9 +264,22 @@ export function ControlPanel({
         />
       </div>
 
-      {/* Icon Bar - Bottom Center */}
+      {/* Left Side - Task Tools (shows only for pipe/pressure test selection) */}
+      <TaskTools
+        state={state}
+        onSelectPipe={onSelectPipe}
+        onSelectPressureTest={onSelectPressureTest}
+      />
+
+      {/* Tool Bar - Always visible at bottom */}
+      <ToolBar
+        state={state}
+        onSelectTool={onSelectTool}
+      />
+
+      {/* Icon Bar - Bottom Center (above ToolBar) */}
       <div
-        className={`fixed bottom-5 left-1/2 -translate-x-1/2 flex items-center gap-2 p-3 rounded-full bg-gray-700/50 shadow-xl transform transition-all duration-300 ${
+        className={`fixed bottom-24 left-1/2 -translate-x-1/2 flex items-center gap-2 p-3 rounded-full bg-gray-700/50 shadow-xl transform transition-all duration-300 ${
           isOpen ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0 pointer-events-none'
         }`}
         style={{ zIndex: 2147483646 }}
@@ -342,10 +329,10 @@ export function ControlPanel({
 
       {/* Panel - Shows when a tab is active */}
       <div
-        className={`fixed bottom-24 left-1/2 -translate-x-1/2 w-[90%] max-w-lg bg-[#1A1A1A]/60 rounded-xl shadow-2xl border ${colors.border} overflow-hidden transform transition-all duration-300 ${
+        className={`fixed bottom-40 left-1/2 -translate-x-1/2 w-[90%] max-w-lg bg-[#1A1A1A]/60 rounded-xl shadow-2xl border ${colors.border} overflow-hidden transform transition-all duration-300 ${
           activeTab ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0 pointer-events-none'
         }`}
-        style={{ zIndex: 2147483645, maxHeight: '60vh' }}
+        style={{ zIndex: 2147483645, maxHeight: '50vh' }}
       >
         {/* Panel Header */}
         <div className="flex items-center justify-between p-2 border-b border-gray-400">
