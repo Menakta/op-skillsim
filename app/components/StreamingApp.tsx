@@ -14,9 +14,6 @@ import {
   VideoStream
 } from '@pureweb/platform-sdk-react'
 
-// Theme support
-import { useTheme } from '../context/ThemeContext'
-
 // Feature imports - New modular components
 import { QuestionModal } from '../features/questions'
 import { CompletionPopup } from '../features/training'
@@ -24,7 +21,6 @@ import { LoadingOverlay } from '../features/streaming'
 import { StatusBar } from '../components/layout'
 import ControlPanel from '../components/ControlPanel'
 import MessageLog from '../components/MessageLog'
-import { TrainingWalkthrough } from '../components/ui/WalkThrough/TrainingWalkthrough'
 
 // New composite hook that uses all the modular hooks
 import { useTrainingMessagesComposite } from '../hooks/useTrainingMessagesComposite'
@@ -50,8 +46,7 @@ const streamerOptions = DefaultStreamerOptions
 
 export default function StreamingApp() {
   const videoRef = useRef<HTMLVideoElement>(null)
-  const { theme, toggleTheme } = useTheme()
-  const isDark = theme === 'dark'
+  const isDark = true // Default to dark theme
 
   // Platform ref - persists across renders
   const platformRef = useRef<PlatformNext | null>(null)
@@ -76,18 +71,6 @@ export default function StreamingApp() {
   // UI state
   const [showingQuestion, setShowingQuestion] = useState<QuestionData | null>(null)
   const [showCompletionPopup, setShowCompletionPopup] = useState(false)
-  const [showWalkthrough, setShowWalkthrough] = useState(false)
-  const [hasSeenWalkthrough, setHasSeenWalkthrough] = useState(false)
-
-  // Check if user has seen walkthrough before
-  useEffect(() => {
-    const seen = localStorage.getItem('hasSeenWalkthrough')
-    if (!seen) {
-      setShowWalkthrough(true)
-    } else {
-      setHasSeenWalkthrough(true)
-    }
-  }, [])
 
   // ==========================================================================
   // Platform Initialization with Retry Logic
@@ -322,16 +305,6 @@ export default function StreamingApp() {
   const isConnected = streamerStatus === StreamerStatus.Connected
 
   // ==========================================================================
-  // Walkthrough Handler
-  // ==========================================================================
-
-  const handleWalkthroughComplete = useCallback(() => {
-    localStorage.setItem('hasSeenWalkthrough', 'true')
-    setShowWalkthrough(false)
-    setHasSeenWalkthrough(true)
-  }, [])
-
-  // ==========================================================================
   // Manual Retry Handler
   // ==========================================================================
 
@@ -417,48 +390,6 @@ export default function StreamingApp() {
 
   return (
     <div className={`h-screen w-screen relative overflow-hidden ${isDark ? 'bg-gray-900' : 'bg-gray-100'}`}>
-      {/* Walkthrough Overlay - Shows for first-time users */}
-      {showWalkthrough && (
-        <TrainingWalkthrough
-          onComplete={handleWalkthroughComplete}
-          onSkip={handleWalkthroughComplete}
-        />
-      )}
-
-      {/* Theme Toggle Button */}
-      <button
-        onClick={toggleTheme}
-        className="fixed top-5 left-5 z-50 w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all"
-        style={{
-          zIndex: 2147483647,
-          backgroundColor: isDark ? '#374151' : '#e5e7eb'
-        }}
-        title={`Switch to ${isDark ? 'light' : 'dark'} mode`}
-      >
-        {isDark ? (
-          <span className="text-yellow-400 text-lg">☀️</span>
-        ) : (
-          <span className="text-gray-700 text-lg">🌙</span>
-        )}
-      </button>
-
-      {/* Help Button - Show Walkthrough Again */}
-      {hasSeenWalkthrough && !showWalkthrough && (
-        <button
-          onClick={() => setShowWalkthrough(true)}
-          className="fixed top-5 left-18 z-50 px-3 py-2 rounded-full text-sm font-medium shadow-lg transition-all"
-          style={{
-            zIndex: 2147483647,
-            left: '4.5rem',
-            backgroundColor: '#39BEAE',
-            color: 'white'
-          }}
-          title="Show tutorial"
-        >
-          ?
-        </button>
-      )}
-
       {/* Status Bar - New Component */}
      
       {/* Control Panel - New Modular Version with Tabs */}

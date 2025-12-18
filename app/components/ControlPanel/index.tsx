@@ -23,6 +23,7 @@ import { CinematicTab } from './CinematicTab'
 // Import dropdown components
 import { MapDropdown } from './MapDropdown'
 import { CameraDropdown } from './CameraDropdown'
+import { TrainingControls } from './TrainingControls'
 
 // =============================================================================
 // Props Interface
@@ -159,9 +160,6 @@ export function ControlPanel({
           <TrainingTab
             isDark={isDark}
             state={state}
-            onStartTraining={onStartTraining}
-            onPauseTraining={onPauseTraining}
-            onResetTraining={onResetTraining}
           />
         )
       case 'tools':
@@ -270,6 +268,16 @@ export function ControlPanel({
           ☰
         </button>
       )}
+
+      {/* Top Left Button - Training Controls */}
+      <div className="fixed top-5 left-5 flex items-start gap-3" style={{ zIndex: 2147483647 }}>
+        <TrainingControls
+          state={state}
+          onStartTraining={onStartTraining}
+          onPauseTraining={onPauseTraining}
+          onResetTraining={onResetTraining}
+        />
+      </div>
 
       {/* Top Right Buttons - Map and Camera Dropdowns */}
       <div className="fixed top-5 right-5 flex items-start gap-3" style={{ zIndex: 2147483647 }}>
