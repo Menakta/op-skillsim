@@ -44,11 +44,12 @@ export interface TrainingMessageCallbacks {
     isActive: boolean
   }) => void
   onToolChange?: (toolName: ToolName) => void
-  onTaskCompleted?: (taskId: string) => void
+  onTaskCompleted?: (taskId: string, nextTaskIndex: number) => void
   onTaskStart?: (toolName: string) => void
   onQuestionRequest?: (questionId: string, question: QuestionData) => void
   onTrainingComplete?: (progress: number, currentTask: number, totalTasks: number) => void
   onMessage?: (message: { type: string; dataString: string }) => void
+  onAutoAdvance?: (nextTool: ToolName, nextTaskIndex: number) => void
 }
 
 export interface UseTrainingMessagesConfig {
@@ -125,7 +126,8 @@ export function useTrainingMessagesComposite(
   })
 
   const toolSelection = useToolSelection(messageBus, {
-    onToolChange: callbacks.onToolChange
+    onToolChange: callbacks.onToolChange,
+    onAutoAdvance: callbacks.onAutoAdvance
   })
 
   const questionFlow = useQuestionFlow(messageBus, {
@@ -232,6 +234,9 @@ export function useTrainingMessagesComposite(
 
     // Pressure Testing
     selectPressureTest: toolSelection.selectPressureTest,
+
+    // Auto Advance
+    autoAdvanceToNextTask: toolSelection.autoAdvanceToNextTask,
 
     // Question Handling
     submitQuestionAnswer: questionFlow.submitQuestionAnswer,

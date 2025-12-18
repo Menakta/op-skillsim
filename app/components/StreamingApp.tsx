@@ -460,14 +460,7 @@ export default function StreamingApp() {
       )}
 
       {/* Status Bar - New Component */}
-      <StatusBar
-        isConnected={isConnected}
-        mode={training.state.mode}
-        phase={training.state.phase}
-        progress={training.state.progress}
-        isDark={isDark}
-      />
-
+     
       {/* Control Panel - New Modular Version with Tabs */}
       <ControlPanel
         state={training.state}

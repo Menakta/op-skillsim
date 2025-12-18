@@ -22,6 +22,7 @@ export interface ToolStateData {
 
 export interface ToolSelectionCallbacks {
   onToolChange?: (toolName: ToolName) => void
+  onAutoAdvance?: (nextTool: ToolName, nextTaskIndex: number) => void
 }
 
 // =============================================================================
@@ -45,6 +46,7 @@ export interface UseToolSelectionReturn {
   selectPipe: (pipe: PipeType) => void
   selectPressureTest: (testType: 'air-plug' | 'conduct-test') => void
   resetToolState: () => void
+  autoAdvanceToNextTask: (nextTaskIndex: number) => void
 }
 
 // =============================================================================
@@ -196,12 +198,50 @@ export function useToolSelection(
     setState(initialState)
   }, [])
 
+  // ==========================================================================
+  // Auto Advance to Next Task
+  // ==========================================================================
+
+  const autoAdvanceToNextTask = useCallback((nextTaskIndex: number) => {
+    const nextTask = TASK_SEQUENCE[nextTaskIndex]
+
+    if (!nextTask) {
+      console.log('🎉 All tasks completed - no more tasks to advance to')
+      return
+    }
+
+    const nextTool = nextTask.tool
+    console.log('🔄 Auto-advancing to next task:', nextTaskIndex, '- Tool:', nextTool)
+
+    // Update UI with the next tool
+    setState(prev => ({
+      ...prev,
+      selectedTool: nextTool,
+      currentTool: nextTool,
+      selectedPipe: null,
+      airPlugSelected: false
+    }))
+
+    // Send tool selection to UE
+    messageBus.sendMessage(WEB_TO_UE_MESSAGES.TOOL_SELECT, nextTool)
+
+    // For tools that don't need sub-selection, start the task immediately
+    if (nextTool !== 'PipeConnection' && nextTool !== 'PressureTester') {
+      console.log('🚀 Auto-starting task with tool:', nextTool)
+      messageBus.sendMessage(WEB_TO_UE_MESSAGES.TASK_START, nextTool)
+    }
+
+    // Notify callback
+    callbacksRef.current.onAutoAdvance?.(nextTool, nextTaskIndex)
+  }, [messageBus])
+
   return {
     state,
     selectTool,
     selectPipe,
     selectPressureTest,
-    resetToolState
+    resetToolState,
+    autoAdvanceToNextTask
   }
 }
 

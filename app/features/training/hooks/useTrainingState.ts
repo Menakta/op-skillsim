@@ -35,7 +35,7 @@ export interface TrainingStateCallbacks {
     isActive: boolean
   }) => void
   onTrainingComplete?: (progress: number, currentTask: number, totalTasks: number) => void
-  onTaskCompleted?: (taskId: string) => void
+  onTaskCompleted?: (taskId: string, nextTaskIndex: number) => void
   onTaskStart?: (toolName: string) => void
 }
 
@@ -136,10 +136,11 @@ export function useTrainingState(
           console.log('=== TASK COMPLETED MESSAGE ===')
           console.log('Completed task ID:', taskId)
 
-          callbacksRef.current.onTaskCompleted?.(taskId)
-
           setState(prev => {
             const nextIndex = prev.currentTaskIndex + 1
+
+            // Call callback with next task index for auto-advance
+            callbacksRef.current.onTaskCompleted?.(taskId, nextIndex)
 
             if (nextIndex >= TASK_SEQUENCE.length) {
               return {
