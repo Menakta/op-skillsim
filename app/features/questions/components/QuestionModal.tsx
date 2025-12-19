@@ -25,13 +25,22 @@ export function QuestionModal({
   onClose
 }: QuestionModalProps) {
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
+  const [wrongAnswer, setWrongAnswer] = useState<number | null>(null)
   const [answerFeedback, setAnswerFeedback] = useState<{ correct: boolean; message: string } | null>(null)
 
   // Reset state when question changes
   useEffect(() => {
     setSelectedAnswer(null)
+    setWrongAnswer(null)
     setAnswerFeedback(null)
   }, [question?.id])
+
+  // When user selects a new answer, clear the wrong state
+  const handleSelectAnswer = useCallback((index: number) => {
+    setSelectedAnswer(index)
+    setWrongAnswer(null)
+    setAnswerFeedback(null)
+  }, [])
 
   const handleAnswerSubmit = useCallback(() => {
     if (selectedAnswer === null || !question) return
@@ -51,16 +60,17 @@ export function QuestionModal({
         }, 2500)
       }
     } else {
+      setWrongAnswer(selectedAnswer)
       setAnswerFeedback({
         correct: false,
         message: result?.message || 'Incorrect. Try again!'
       })
-      setSelectedAnswer(null)
     }
   }, [selectedAnswer, question, onSubmitAnswer])
 
   const handleClose = useCallback(() => {
     setSelectedAnswer(null)
+    setWrongAnswer(null)
     setAnswerFeedback(null)
     onClose()
   }, [onClose])
@@ -69,79 +79,113 @@ export function QuestionModal({
   if (!question) return null
 
   return (
-    <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-      <div className="bg-[#16213e] rounded-2xl p-6 max-w-lg w-full mx-4 border border-[#2c3e50] shadow-2xl">
+    <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/20 backdrop-blur-sm">
+      <div
+        className="bg-[#000000]/40 backdrop-blur-md rounded-2xl max-w-[660px] w-full mx-4 shadow-2xl border border-gray-700/50"
+        style={{
+          animation: 'modalFadeIn 0.3s ease-out'
+        }}
+      >
         {/* Question Header */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
-            <span className="text-blue-400 font-bold text-lg">{question.id}</span>
-          </div>
-          <div>
-            <h3 className="text-white font-semibold text-lg">Assessment Question</h3>
-            <p className="text-gray-500 text-xs">
-              Attempt {tryCount} - Select the correct answer
-            </p>
+        <div className="flex items-center justify-between pb-4 border-b border-gray-400 px-2 py-4">
+          <div className="flex items-center gap-3">
+            <div>
+              <h3 className="text-white font-small text-base">{question.name}</h3>
+            </div>
           </div>
         </div>
 
-        {/* Question Text */}
-        <p className="text-white text-lg mb-6">{question.text}</p>
+        {/* Content Area - Image on left, Question/Answers on right */}
+        <div className="flex gap-5 px-2.5 py-5">
+          {/* Left Side - Image Placeholder */}
+          <div
+            className="flex-shrink-0 bg-white rounded-xl hidden md:flex items-center justify-center"
+            style={{ width: '256px', height: '294px' }}
+          >
+            <span className="text-gray-400 text-sm">Image</span>
+          </div>
 
-        {/* Answer Options */}
-        <div className="space-y-2 mb-4">
-          {question.options.map((option, index) => (
-            <button
-              key={index}
-              onClick={() => setSelectedAnswer(index)}
-              disabled={answerFeedback?.correct}
-              className={`w-full p-4 text-left rounded-lg border-2 transition-all ${
-                selectedAnswer === index
-                  ? answerFeedback
-                    ? answerFeedback.correct
-                      ? 'bg-green-500/20 border-green-500 text-green-300'
-                      : 'bg-red-500/20 border-red-500 text-red-300'
-                    : 'bg-blue-500/20 border-blue-500 text-white'
-                  : 'bg-[#1e2a4a] border-[#2c3e50] text-white hover:bg-[#2c3e50] hover:border-blue-500'
-              }`}
-            >
-              <span className="text-blue-400 font-bold mr-3">{String.fromCharCode(65 + index)}.</span>
-              {option}
-            </button>
-          ))}
+          {/* Right Side - Question and Answers */}
+          <div className="flex-1">
+            {/* Question Text */}
+            <p className="text-gray-300 text-sm text-base mb-5 leading-relaxed">{question.text}</p>
+
+            {/* Answer Options */}
+            <div className="space-y-2">
+              {question.options.map((option, index) => {
+                const isSelected = selectedAnswer === index
+                const isCorrectAnswer = answerFeedback?.correct && isSelected
+                const isWrongAnswer = wrongAnswer === index
+
+                return (
+                  <button
+                    key={index}
+                    onClick={() => handleSelectAnswer(index)}
+                    disabled={answerFeedback?.correct}
+                    className={`w-full p-3 text-left rounded-xl transition-all duration-200 flex items-center gap-3 ${
+                      isCorrectAnswer
+                        ? 'text-green-300'
+                        : isWrongAnswer
+                        ? 'bg-red-500/20 border border-red-500/50 text-red-300'
+                        : isSelected
+                        ? 'text-white'
+                        : 'text-gray-200 hover:bg-[#000000]/30 hover:border-[#39BEAE]/50'
+                    }`}
+                  >
+                    {/* Radio Button */}
+                    <div
+                      className={`w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0 transition-all duration-200 ${
+                        isCorrectAnswer
+                          ? 'border-green-400'
+                          : isWrongAnswer
+                          ? 'border-red-400 bg-red-400'
+                          : isSelected
+                          ? 'border-gray-300'
+                          : 'border-gray-500'
+                      }`}
+                    >
+                      {(isSelected || isWrongAnswer) && (
+                        <div className="w-2 h-2 rounded-full bg-white transition-all duration-200" />
+                      )}
+                    </div>
+                    <span>{option}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
         </div>
 
-        {/* Feedback Message */}
+        {/* Feedback Message - Full Width */}
         {answerFeedback && (
-          <div className={`p-3 rounded-lg mb-4 ${
+          <div className={`p-3 rounded-xl mb-4 mx-2.5 ${
             answerFeedback.correct
-              ? 'bg-green-500/20 border border-green-500/50 text-green-300'
-              : 'bg-red-500/20 border border-red-500/50 text-red-300'
+              ? 'bg-green-500/20 border border-green-500/40 text-green-300'
+              : 'bg-red-500/20 border border-red-500/40 text-red-300'
           }`}>
             <div className="flex items-center gap-2">
-              <span className="text-lg">{answerFeedback.correct ? '✓' : '✗'}</span>
               <span className="text-sm">{answerFeedback.message}</span>
             </div>
           </div>
         )}
 
-        {/* Q6 Special Notice */}
+        {/* Q6 Special Notice - Full Width */}
         {question.id === 'Q6' && answerFeedback?.correct && (
-          <div className="bg-yellow-500/20 border border-yellow-500/50 text-yellow-300 p-3 rounded-lg mb-4">
-            <div className="text-sm font-bold">Warning: Click "Close" to start pressure testing!</div>
-            <div className="text-xs opacity-80">The pressure test will begin when you close this question.</div>
+          <div className="text-white p-3 rounded-xl mb-4 mx-2.5">
+            <div className="text-xs opacity-80">Note: This is the last question.</div>
           </div>
         )}
 
         {/* Action Buttons */}
-        <div className="flex gap-3">
+        <div className="flex items-center justify-center gap-3 px-5 pb-6 border-t border-gray-400 py-4">
           {!answerFeedback?.correct ? (
             <button
               onClick={handleAnswerSubmit}
               disabled={selectedAnswer === null}
-              className={`flex-1 py-3 rounded-lg font-bold transition-all ${
+              className={`py-2 px-4 rounded-full font-medium transition-all duration-200 ${
                 selectedAnswer !== null
-                  ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 cursor-pointer'
-                  : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                  ? 'bg-[#44CF8A] text-white hover:bg-[#2ea89a] cursor-pointer shadow-lg shadow-[#39BEAE]/20'
+                  : 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
               }`}
             >
               Submit Answer
@@ -149,13 +193,26 @@ export function QuestionModal({
           ) : (
             <button
               onClick={handleClose}
-              className="flex-1 py-3 rounded-lg font-bold bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 transition-all"
+              className="py-2 px-4 rounded-full font-medium bg-[#39BEAE] text-white hover:bg-[#2ea89a] transition-all duration-200 shadow-lg shadow-[#39BEAE]/20"
             >
-              {question.id === 'Q6' ? '✓ Close & Start Pressure Test' : '✓ Continue'}
+              Continue
             </button>
           )}
         </div>
       </div>
+
+      <style jsx>{`
+        @keyframes modalFadeIn {
+          from {
+            opacity: 0;
+            transform: scale(0.95) translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+          }
+        }
+      `}</style>
     </div>
   )
 }

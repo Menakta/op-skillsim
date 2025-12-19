@@ -17,14 +17,18 @@ import {
 // Feature imports - New modular components
 import { QuestionModal } from '../features/questions'
 import { CompletionPopup } from '../features/training'
-import { LoadingOverlay } from '../features/streaming'
+// LoadingOverlay removed - using LoadingScreen instead
 import { StatusBar } from '../components/layout'
+import { SuccessModal } from '../components/feedbacks/SuccesModal'
+import { ErrorModal } from '../components/feedbacks/ErrorModal'
+import { LoadingScreen } from '../components/feedbacks/LoadingScreen'
 import ControlPanel from '../components/ControlPanel'
 import MessageLog from '../components/MessageLog'
 
 // New composite hook that uses all the modular hooks
 import { useTrainingMessagesComposite } from '../hooks/useTrainingMessagesComposite'
 import type { QuestionData } from '../lib/messageTypes'
+import { TASK_SEQUENCE } from '../lib/messageTypes'
 
 // =============================================================================
 // Configuration
@@ -71,6 +75,9 @@ export default function StreamingApp() {
   // UI state
   const [showingQuestion, setShowingQuestion] = useState<QuestionData | null>(null)
   const [showCompletionPopup, setShowCompletionPopup] = useState(false)
+  const [showPhaseSuccess, setShowPhaseSuccess] = useState(false)
+  const [completedPhase, setCompletedPhase] = useState<{ taskId: string; taskName: string; nextTaskIndex: number } | null>(null)
+  const [showErrorModal, setShowErrorModal] = useState(false)
 
   // ==========================================================================
   // Platform Initialization with Retry Logic
@@ -129,6 +136,7 @@ export default function StreamingApp() {
         setInitError(String(err))
         setConnectionStatus('failed')
         setIsRetrying(false)
+        setShowErrorModal(true)
       }
     }
   }, [])
@@ -186,8 +194,31 @@ export default function StreamingApp() {
       console.log('🎉 Training Complete!', { progress, currentTask, totalTasks })
       setShowCompletionPopup(true)
     },
-    onTaskCompleted: (taskId) => {
-      console.log('✅ Task completed:', taskId)
+    onTaskCompleted: (taskId, nextTaskIndex) => {
+      console.log('✅ Task completed:', taskId, 'Next task index:', nextTaskIndex)
+      console.log('📋 TASK_SEQUENCE:', TASK_SEQUENCE)
+
+      // Find the completed task - try matching by taskId first, then by index
+      let completedTaskDef = TASK_SEQUENCE.find(t => t.taskId === taskId)
+
+      // If not found by taskId, use the previous task index (since nextTaskIndex is already incremented)
+      if (!completedTaskDef && nextTaskIndex > 0 && nextTaskIndex <= TASK_SEQUENCE.length) {
+        completedTaskDef = TASK_SEQUENCE[nextTaskIndex - 1]
+        console.log('📋 Found task by index:', completedTaskDef)
+      }
+
+      // Show modal if we found the task and there are more tasks
+      if (completedTaskDef && nextTaskIndex < TASK_SEQUENCE.length) {
+        console.log('🎉 Showing phase success modal for:', completedTaskDef.name)
+        setCompletedPhase({
+          taskId: completedTaskDef.taskId,
+          taskName: completedTaskDef.name,
+          nextTaskIndex
+        })
+        setShowPhaseSuccess(true)
+      } else {
+        console.log('⚠️ Not showing modal - completedTaskDef:', completedTaskDef, 'nextTaskIndex:', nextTaskIndex, 'total:', TASK_SEQUENCE.length)
+      }
     },
     onTaskStart: (toolName) => {
       console.log('🚀 Task started:', toolName)
@@ -299,6 +330,32 @@ export default function StreamingApp() {
   }, [training])
 
   // ==========================================================================
+  // Phase Success Handlers
+  // ==========================================================================
+
+  const handlePhaseContinue = useCallback(() => {
+    setShowPhaseSuccess(false)
+    // Auto-advance to next task if available
+    if (completedPhase && completedPhase.nextTaskIndex < TASK_SEQUENCE.length) {
+      const nextTask = TASK_SEQUENCE[completedPhase.nextTaskIndex]
+      training.selectTool(nextTask.tool)
+    }
+    setCompletedPhase(null)
+  }, [completedPhase, training])
+
+  const handlePhaseRetry = useCallback(() => {
+    setShowPhaseSuccess(false)
+    // Re-select the same tool to retry the phase
+    if (completedPhase) {
+      const currentTaskDef = TASK_SEQUENCE.find(t => t.taskId === completedPhase.taskId)
+      if (currentTaskDef) {
+        training.selectTool(currentTaskDef.tool)
+      }
+    }
+    setCompletedPhase(null)
+  }, [completedPhase, training])
+
+  // ==========================================================================
   // Derived State
   // ==========================================================================
 
@@ -309,6 +366,7 @@ export default function StreamingApp() {
   // ==========================================================================
 
   const handleManualRetry = useCallback(() => {
+    setShowErrorModal(false)
     setInitError(null)
     setRetryCount(0)
     setAvailableModels(undefined)
@@ -319,70 +377,45 @@ export default function StreamingApp() {
   }, [initializePlatform])
 
   // ==========================================================================
-  // Error State
+  // Error State Handler (for refresh page action)
   // ==========================================================================
 
-  if (initError) {
-    return (
-      <div className={`min-h-screen flex items-center justify-center ${isDark ? 'bg-gray-900' : 'bg-white'}`}>
-        <div className="text-center space-y-4 max-w-md px-4">
-          <div className="w-16 h-16 mx-auto rounded-full bg-red-500/10 flex items-center justify-center">
-            <span className="text-3xl">⚠️</span>
-          </div>
-          <h2 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Connection Failed</h2>
-          <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-            {initError}
-          </p>
-          <p className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
-            Attempted {MAX_RETRIES} automatic retries
-          </p>
-          <div className="flex gap-3 justify-center pt-2">
-            <button
-              onClick={handleManualRetry}
-              className="px-6 py-2.5 bg-[#39BEAE] hover:bg-[#2ea89a] text-white rounded-lg transition-colors font-medium"
-            >
-              Try Again
-            </button>
-            <button
-              onClick={() => window.location.reload()}
-              className={`px-6 py-2.5 rounded-lg transition-colors font-medium ${
-                isDark
-                  ? 'bg-gray-700 hover:bg-gray-600 text-white'
-                  : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
-              }`}
-            >
-              Refresh Page
-            </button>
-          </div>
-        </div>
-      </div>
-    )
+  const handleRefreshPage = useCallback(() => {
+    window.location.reload()
+  }, [])
+
+  // ==========================================================================
+  // Loading Status Message
+  // ==========================================================================
+
+  const getLoadingStatusMessage = () => {
+    if (isRetrying) return 'Reconnecting to stream'
+
+    // Check streamer status first for more accurate messages
+    if (streamerStatus === StreamerStatus.Connected) {
+      return 'Establishing video stream'
+    }
+
+    switch (connectionStatus) {
+      case 'initializing':
+        return 'Initializing connection'
+      case 'connecting':
+        if (availableModels) {
+          return 'Launching stream session'
+        }
+        return 'Connecting to server'
+      case 'retrying':
+        return 'Retrying connection'
+      default:
+        if (loading) {
+          return 'Starting stream'
+        }
+        return 'Loading session'
+    }
   }
 
-  // ==========================================================================
-  // Loading State (waiting for models)
-  // ==========================================================================
-
-  if (!availableModels) {
-    return (
-      <div className={`min-h-screen flex items-center justify-center ${isDark ? 'bg-gray-900' : 'bg-white'}`}>
-        <div className="text-center space-y-4">
-          <div className="w-14 h-14 mx-auto border-4 border-[#39BEAE] border-t-transparent rounded-full animate-spin" />
-          <p className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
-            {isRetrying ? 'Reconnecting...' : 'Connecting to Stream...'}
-          </p>
-          {retryCount > 0 && (
-            <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              Retry attempt {retryCount}/{MAX_RETRIES}
-            </p>
-          )}
-          <p className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
-            This may take a few moments
-          </p>
-        </div>
-      </div>
-    )
-  }
+  // Show loading screen until stream is fully connected
+  const showLoadingScreen = !isConnected && !showErrorModal
 
   // ==========================================================================
   // Main Render - Using New Modular Components
@@ -390,55 +423,51 @@ export default function StreamingApp() {
 
   return (
     <div className={`h-screen w-screen relative overflow-hidden ${isDark ? 'bg-gray-900' : 'bg-gray-100'}`}>
-      {/* Status Bar - New Component */}
-     
-      {/* Control Panel - New Modular Version with Tabs */}
-      <ControlPanel
-        state={training.state}
-        isConnected={training.isConnected || isConnected}
-        isDark={isDark}
-        onStartTraining={training.startTraining}
-        onPauseTraining={training.pauseTraining}
-        onResetTraining={training.resetTraining}
-        onSelectTool={training.selectTool}
-        onSelectPipe={training.selectPipe}
-        onSelectPressureTest={training.selectPressureTest}
-        onSetCameraPerspective={training.setCameraPerspective}
-        onToggleAutoOrbit={training.toggleAutoOrbit}
-        onResetCamera={training.resetCamera}
-        onSetExplosionLevel={training.setExplosionLevel}
-        onExplodeBuilding={training.explodeBuilding}
-        onAssembleBuilding={training.assembleBuilding}
-        onRefreshWaypoints={training.refreshWaypoints}
-        onActivateWaypoint={training.activateWaypoint}
-        onDeactivateWaypoint={training.deactivateWaypoint}
-        onRefreshLayers={training.refreshLayers}
-        onRefreshHierarchicalLayers={training.refreshHierarchicalLayers}
-        onToggleLayer={training.toggleLayer}
-        onShowAllLayers={training.showAllLayers}
-        onHideAllLayers={training.hideAllLayers}
-        onToggleMainGroup={training.toggleMainGroup}
-        onToggleChildGroup={training.toggleChildGroup}
-        onQuitApplication={training.quitApplication}
-      />
+      {/* Control Panel - Only show when stream is connected */}
+      {isConnected && (
+        <ControlPanel
+          state={training.state}
+          isConnected={training.isConnected || isConnected}
+          isDark={isDark}
+          onStartTraining={training.startTraining}
+          onPauseTraining={training.pauseTraining}
+          onResetTraining={training.resetTraining}
+          onSelectTool={training.selectTool}
+          onSelectPipe={training.selectPipe}
+          onSelectPressureTest={training.selectPressureTest}
+          onSetCameraPerspective={training.setCameraPerspective}
+          onToggleAutoOrbit={training.toggleAutoOrbit}
+          onResetCamera={training.resetCamera}
+          onSetExplosionLevel={training.setExplosionLevel}
+          onExplodeBuilding={training.explodeBuilding}
+          onAssembleBuilding={training.assembleBuilding}
+          onRefreshWaypoints={training.refreshWaypoints}
+          onActivateWaypoint={training.activateWaypoint}
+          onDeactivateWaypoint={training.deactivateWaypoint}
+          onRefreshLayers={training.refreshLayers}
+          onRefreshHierarchicalLayers={training.refreshHierarchicalLayers}
+          onToggleLayer={training.toggleLayer}
+          onShowAllLayers={training.showAllLayers}
+          onHideAllLayers={training.hideAllLayers}
+          onToggleMainGroup={training.toggleMainGroup}
+          onToggleChildGroup={training.toggleChildGroup}
+          onQuitApplication={training.quitApplication}
+        />
+      )}
 
-      {/* Message Log */}
-      <MessageLog
-        messages={training.messageLog}
-        lastMessage={training.lastMessage}
-        onClear={training.clearLog}
-        onSendTest={handleSendTestMessage}
-        isConnected={training.isConnected || isConnected}
-        connectionStatus={training.isConnected ? 'connected' : isConnected ? 'connected' : 'connecting'}
-        isDark={isDark}
-      />
+      {/* Message Log - Only show when stream is connected */}
+      {isConnected && (
+        <MessageLog
+          messages={training.messageLog}
+          lastMessage={training.lastMessage}
+          onClear={training.clearLog}
+          onSendTest={handleSendTestMessage}
+          isConnected={training.isConnected || isConnected}
+          connectionStatus={training.isConnected ? 'connected' : isConnected ? 'connected' : 'connecting'}
+          isDark={isDark}
+        />
+      )}
 
-      {/* Loading Overlay - New Component */}
-      <LoadingOverlay
-        streamerStatus={streamerStatus}
-        launchStatus={launchStatus.status}
-        isVisible={!isConnected}
-      />
 
       {/* Video Stream */}
       <div style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
@@ -467,6 +496,43 @@ export default function StreamingApp() {
         progress={training.state.progress}
         onReset={training.resetTraining}
         onClose={() => setShowCompletionPopup(false)}
+      />
+
+      {/* Phase Success Modal */}
+      <SuccessModal
+        isOpen={showPhaseSuccess}
+        title={completedPhase ? completedPhase.taskName + ' Task Completed' : 'Task Completed'}
+        message={completedPhase ? `Success!` : ''}
+        successText={completedPhase ? `${completedPhase.taskName} Task completed successfully!` : 'Phase completed successfully!'}
+        onContinue={handlePhaseContinue}
+        onRetry={handlePhaseRetry}
+        continueButtonText="Continue"
+        retryButtonText="Retry"
+        showRetryButton={true}
+      />
+
+      {/* Stream Error Modal */}
+      <ErrorModal
+        isOpen={showErrorModal}
+        title="Connection Failed"
+        message="Error!"
+        errorText={initError || `Unable to connect to stream. Attempted ${MAX_RETRIES} automatic retries.`}
+        onRetry={handleManualRetry}
+        onClose={handleRefreshPage}
+        retryButtonText="Try Again"
+        closeButtonText="Refresh Page"
+        showCloseButton={true}
+      />
+
+      {/* Loading Screen */}
+      <LoadingScreen
+        isOpen={showLoadingScreen}
+        title="Please Wait!"
+        subtitle="Session is loading"
+        statusMessage={getLoadingStatusMessage()}
+        retryCount={retryCount}
+        maxRetries={MAX_RETRIES}
+        showRetryInfo={retryCount > 0}
       />
 
       {/* Video Styles */}

@@ -136,11 +136,15 @@ export function useTrainingState(
           console.log('=== TASK COMPLETED MESSAGE ===')
           console.log('Completed task ID:', taskId)
 
+          // Get current state to calculate next index
           setState(prev => {
             const nextIndex = prev.currentTaskIndex + 1
 
-            // Call callback with next task index for auto-advance
-            callbacksRef.current.onTaskCompleted?.(taskId, nextIndex)
+            // Schedule callback to run after state update
+            setTimeout(() => {
+              console.log('📢 Calling onTaskCompleted callback with taskId:', taskId, 'nextIndex:', nextIndex)
+              callbacksRef.current.onTaskCompleted?.(taskId, nextIndex)
+            }, 0)
 
             if (nextIndex >= TASK_SEQUENCE.length) {
               return {

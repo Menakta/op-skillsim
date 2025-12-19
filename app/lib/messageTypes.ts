@@ -129,6 +129,7 @@ export const TASK_SEQUENCE: TaskDefinition[] = [
 
 export interface QuestionData {
   id: string
+  name: string
   text: string
   options: string[]
   correctAnswer: number
@@ -138,6 +139,7 @@ export interface QuestionData {
 export const QUESTION_DATABASE: Record<string, QuestionData> = {
   'Q1': {
     id: 'Q1',
+    name:'Scanning',
     text: "What should you do before excavating near existing utilities?",
     options: ["Start digging immediately", "Use XRay scanner to locate pipes", "Call for permits only", "Mark the area with spray paint"],
     correctAnswer: 1,
@@ -145,6 +147,7 @@ export const QUESTION_DATABASE: Record<string, QuestionData> = {
   },
   'Q2': {
     id: 'Q2',
+    name:'Trench Depth',
     text: "What is the minimum excavation depth for toilet waste pipe connections?",
     options: ["200mm", "300mm", "450mm", "600mm"],
     correctAnswer: 2,
@@ -152,6 +155,7 @@ export const QUESTION_DATABASE: Record<string, QuestionData> = {
   },
   'Q3': {
     id: 'Q3',
+    name:'Trench Width',
     text: "What is the standard trench width for 100mm pipes?",
     options: ["200mm", "300mm", "400mm", "500mm"],
     correctAnswer: 2,
@@ -159,6 +163,7 @@ export const QUESTION_DATABASE: Record<string, QuestionData> = {
   },
   'Q4': {
     id: 'Q4',
+    name:'Pipe Slope',
     text: "What is the correct slope for drainage pipes?",
     options: ["1:40", "1:60", "1:80", "1:100"],
     correctAnswer: 1,
@@ -166,6 +171,7 @@ export const QUESTION_DATABASE: Record<string, QuestionData> = {
   },
   'Q5': {
     id: 'Q5',
+    name:'Pressure',
     text: "Maximum pressure for residential water systems?",
     options: ["350 kPa", "500 kPa", "650 kPa", "800 kPa"],
     correctAnswer: 1,
@@ -173,6 +179,7 @@ export const QUESTION_DATABASE: Record<string, QuestionData> = {
   },
   'Q6': {
     id: 'Q6',
+    name:'PSI Level',
     text: "What PSI level confirms a successful air pressure test according to NZS3500?",
     options: ["10 PSI", "15 PSI", "20 PSI", "25 PSI"],
     correctAnswer: 2,
