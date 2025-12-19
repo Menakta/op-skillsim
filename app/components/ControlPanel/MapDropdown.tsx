@@ -58,24 +58,17 @@ export function MapDropdown({ currentTaskIndex }: MapDropdownProps) {
                 key={task.taskId}
                 className={`flex items-center gap-3 p-2 rounded-full transition-all ${
                   isCurrent
-                    ? 'bg-[#1A1A1A]/20'
-                    : isCompleted
-                    ? ' '
-                    : ' '
+                    ? 'bg-[#1A1A1A]/20':''
                 }`}
               >
-                {isCompleted ? (
-                  <Check className="w-6 h-6 text-white" />
-                ) : (
-                  <div className="w-6 h-6 bg-gray-800 rounded-full" />
-                )}
+               
                 <div className="flex-1">
                   <div
-                    className={`font-medium ${
-                      isCurrent ? 'text-white' : isCompleted ? 'text-white' : 'text-gray-300'
+                    className={`font-small flex items-center gap-2 ${
+                      isCurrent ? 'text-white' : isCompleted ? 'text-white' : 'text-gray-200'
                     }`}
                   >
-                    {task.name}
+                    {isCompleted ? <Check size={16} />: isCurrent ? "": <X size={16} />} {task.name} 
                   </div>
                 </div>
                 {isCurrent && (

@@ -22,6 +22,8 @@ import { StatusBar } from '../components/layout'
 import { SuccessModal } from '../components/feedbacks/SuccesModal'
 import { ErrorModal } from '../components/feedbacks/ErrorModal'
 import { LoadingScreen } from '../components/feedbacks/LoadingScreen'
+import { StarterScreen } from '../components/feedbacks/StarterScreen'
+import { NavigationWalkthrough } from '../components/feedbacks/NavigationWalkthrough'
 import ControlPanel from '../components/ControlPanel'
 import MessageLog from '../components/MessageLog'
 
@@ -78,6 +80,9 @@ export default function StreamingApp() {
   const [showPhaseSuccess, setShowPhaseSuccess] = useState(false)
   const [completedPhase, setCompletedPhase] = useState<{ taskId: string; taskName: string; nextTaskIndex: number } | null>(null)
   const [showErrorModal, setShowErrorModal] = useState(false)
+  const [showStarterScreen, setShowStarterScreen] = useState(true)
+  const [showNavigationWalkthrough, setShowNavigationWalkthrough] = useState(false)
+  const [streamStarted, setStreamStarted] = useState(false)
 
   // ==========================================================================
   // Platform Initialization with Retry Logic
@@ -141,9 +146,23 @@ export default function StreamingApp() {
     }
   }, [])
 
+  // Only initialize platform when stream is started by user
   useEffect(() => {
-    initializePlatform(1)
-  }, [initializePlatform])
+    if (streamStarted) {
+      initializePlatform(1)
+    }
+  }, [streamStarted, initializePlatform])
+
+  // Handler for closing navigation walkthrough
+  const handleCloseNavigationWalkthrough = useCallback(() => {
+    setShowNavigationWalkthrough(false)
+  }, [])
+
+  // Handler for starting the stream
+  const handleStartStream = useCallback(() => {
+    setShowStarterScreen(false)
+    setStreamStarted(true)
+  }, [])
 
   // ==========================================================================
   // Model Selection
@@ -267,6 +286,8 @@ export default function StreamingApp() {
     if (streamerStatus === StreamerStatus.Connected) {
       setConnectionStatus('connected')
       setRetryCount(0)
+      // Show navigation walkthrough when stream is connected
+      setShowNavigationWalkthrough(true)
     } else if (streamerStatus === StreamerStatus.Failed) {
       console.log('❌ Streamer failed, attempting to reconnect...')
       setConnectionStatus('failed')
@@ -356,6 +377,39 @@ export default function StreamingApp() {
   }, [completedPhase, training])
 
   // ==========================================================================
+  // Training Complete Handler - Reset to Starter Screen
+  // ==========================================================================
+
+  const handleTrainingCompleteReset = useCallback(() => {
+    setShowCompletionPopup(false)
+    training.resetTraining()
+
+    // Reset to starter screen
+    setShowNavigationWalkthrough(false)
+    setShowStarterScreen(true)
+    setStreamStarted(false)
+
+    // Reset connection state
+    setAvailableModels(undefined)
+    setModelDefinition(new UndefinedModelDefinition())
+    setLoading(false)
+    setConnectionStatus('initializing')
+    setRetryCount(0)
+    setInitError(null)
+
+    // Disconnect platform
+    try {
+      platformRef.current?.disconnect()
+    } catch (e) {
+      console.log('Disconnect error (ignored):', e)
+    }
+
+    // Reinitialize platform for next session
+    platformRef.current = new PlatformNext()
+    platformRef.current.initialize({ endpoint: 'https://api.pureweb.io' })
+  }, [training])
+
+  // ==========================================================================
   // Derived State
   // ==========================================================================
 
@@ -398,10 +452,10 @@ export default function StreamingApp() {
 
     switch (connectionStatus) {
       case 'initializing':
-        return 'Initializing connection'
+        return 'Initializing'
       case 'connecting':
         if (availableModels) {
-          return 'Launching stream session'
+          return 'Launching session'
         }
         return 'Connecting to server'
       case 'retrying':
@@ -414,15 +468,15 @@ export default function StreamingApp() {
     }
   }
 
-  // Show loading screen until stream is fully connected
-  const showLoadingScreen = !isConnected && !showErrorModal
+  // Show loading screen after user starts stream and until fully connected
+  const showLoadingScreen = streamStarted && !isConnected && !showErrorModal
 
   // ==========================================================================
   // Main Render - Using New Modular Components
   // ==========================================================================
 
   return (
-    <div className={`h-screen w-screen relative overflow-hidden ${isDark ? 'bg-gray-900' : 'bg-gray-100'}`}>
+    <div className={`h-screen w-screen relative overflow-hidden ${isDark ? 'bg-[#1E1E1E]' : 'bg-gray-100'}`}>
       {/* Control Panel - Only show when stream is connected */}
       {isConnected && (
         <ControlPanel
@@ -494,8 +548,8 @@ export default function StreamingApp() {
         isVisible={showCompletionPopup}
         totalTasks={training.state.totalTasks}
         progress={training.state.progress}
-        onReset={training.resetTraining}
-        onClose={() => setShowCompletionPopup(false)}
+        onReset={handleTrainingCompleteReset}
+        onClose={handleTrainingCompleteReset}
       />
 
       {/* Phase Success Modal */}
@@ -524,7 +578,22 @@ export default function StreamingApp() {
         showCloseButton={true}
       />
 
-      {/* Loading Screen */}
+      {/* Navigation Walkthrough - Show first when app opens */}
+      <NavigationWalkthrough
+        isOpen={showNavigationWalkthrough}
+        onClose={handleCloseNavigationWalkthrough}
+      />
+
+      {/* Starter Screen - Show after navigation walkthrough is closed */}
+      <StarterScreen
+        isOpen={showStarterScreen}
+        title="Start exercise"
+        subtitle="Click the button below to begin your training session"
+        onStart={handleStartStream}
+        buttonText="Start Session"
+      />
+
+      {/* Loading Screen - Show after user clicks start until stream is connected */}
       <LoadingScreen
         isOpen={showLoadingScreen}
         title="Please Wait!"

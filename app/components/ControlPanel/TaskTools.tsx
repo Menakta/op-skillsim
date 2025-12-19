@@ -4,7 +4,6 @@ import { useState } from 'react'
 import Image from 'next/image'
 import type { TrainingState } from '@/app/hooks/useTrainingMessagesComposite'
 import type { PipeType } from '@/app/lib/messageTypes'
-import { GitMerge } from 'lucide-react'
 
 // =============================================================================
 // Constants
@@ -13,8 +12,7 @@ import { GitMerge } from 'lucide-react'
 const PIPE_TYPES: { id: PipeType; label: string; icon: string }[] = [
   { id: 'y-junction', label: 'Y-Junction', icon: '/icons/y-junction.png' },
   { id: 'elbow', label: '90° Elbow', icon: '/icons/pipe-90-deg.png' },
-  { id: '100mm', label: '100mm', icon: '/icons/pipe-2.png' },
-  { id: '150mm', label: '150mm', icon: '/icons/pipe-3.png' }
+
 ]
 
 // =============================================================================

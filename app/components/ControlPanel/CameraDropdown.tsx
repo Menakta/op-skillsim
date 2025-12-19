@@ -82,14 +82,9 @@ export function CameraDropdown({
                   isActive ? 'bg-[#1A1A1A]/20' : 'hover:bg-[#1A1A1A]/10'
                 }`}
               >
-                {isActive ? (
-                  <Check className="w-6 h-6 text-white" />
-                ) : (
-                  <div className="w-6 h-6 bg-gray-800 rounded-full" />
-                )}
-                <div className="flex-1">
-                  <div className={`font-medium ${isActive ? 'text-white' : 'text-gray-300'}`}>
-                    {cam.label}
+                <div className="flex-1 ">
+                  <div className={`font-medium flex items-center gap-2 ${isActive ? 'text-white' : 'text-gray-300'}`}>
+                    <Image src={'/icons/view.png'} width={18} height={17} alt='View Icon' /> {cam.label}
                   </div>
                 </div>
                 {isActive && (
