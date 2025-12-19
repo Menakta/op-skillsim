@@ -1,18 +1,8 @@
 'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
-import {
-  PlatformNext,
-  ModelDefinition,
-  UndefinedModelDefinition,
-  DefaultStreamerOptions,
-  StreamerStatus
-} from '@pureweb/platform-sdk'
-import {
-  useStreamer,
-  useLaunchRequest,
-  VideoStream
-} from '@pureweb/platform-sdk-react'
+import {PlatformNext,ModelDefinition, UndefinedModelDefinition,DefaultStreamerOptions,StreamerStatus} from '@pureweb/platform-sdk'
+import {useStreamer,useLaunchRequest,VideoStream} from '@pureweb/platform-sdk-react'
 
 // Feature imports - New modular components
 import { QuestionModal } from '../features/questions'
@@ -21,9 +11,9 @@ import { CompletionPopup } from '../features/training'
 import { StatusBar } from '../components/layout'
 import { SuccessModal } from '../components/feedbacks/SuccesModal'
 import { ErrorModal } from '../components/feedbacks/ErrorModal'
-import { LoadingScreen } from '../components/feedbacks/LoadingScreen'
-import { StarterScreen } from '../components/feedbacks/StarterScreen'
-import { NavigationWalkthrough } from '../components/feedbacks/NavigationWalkthrough'
+import { LoadingScreen } from './helper-screens/LoadingScreen'
+import { StarterScreen } from './helper-screens/StarterScreen'
+import { NavigationWalkthrough } from './helper-screens/NavigationWalkthrough'
 import ControlPanel from '../components/ControlPanel'
 import MessageLog from '../components/MessageLog'
 

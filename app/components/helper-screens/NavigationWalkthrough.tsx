@@ -24,9 +24,9 @@ export function NavigationWalkthrough({
   if (!isOpen) return null
 
   return (
-    <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/20 backdrop-blur-sm">
       <div
-        className="bg-[#3a3a3a] rounded-2xl max-w-[750px] w-full mx-4 shadow-2xl overflow-hidden"
+        className="bg-black/40 rounded-2xl max-w-[750px] w-full mx-4 shadow-2xl overflow-hidden"
         style={{
           animation: 'modalFadeIn 0.3s ease-out'
         }}
