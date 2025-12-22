@@ -1,7 +1,8 @@
 'use client'
 
-import type { TrainingState } from '@/app/hooks/useTrainingMessagesComposite'
 import type { CameraPerspective } from '@/app/lib/messageTypes'
+import { useAppSelector } from '@/app/store/hooks'
+import { selectCameraState } from '@/app/store/selectors'
 
 // =============================================================================
 // Constants
@@ -20,11 +21,10 @@ const CAMERA_PERSPECTIVES: { id: CameraPerspective; label: string }[] = [
 ]
 
 // =============================================================================
-// Props Interface
+// Props Interface - Only actions, state from Redux
 // =============================================================================
 
 interface CameraTabProps {
-  state: TrainingState
   onSetCameraPerspective: (perspective: CameraPerspective) => void
   onToggleAutoOrbit: () => void
   onResetCamera: () => void
@@ -35,11 +35,12 @@ interface CameraTabProps {
 // =============================================================================
 
 export function CameraTab({
-  state,
   onSetCameraPerspective,
   onToggleAutoOrbit,
   onResetCamera
 }: CameraTabProps) {
+  // Get state from Redux
+  const { cameraMode, cameraPerspective, cameraDistance } = useAppSelector(selectCameraState)
   return (
     <div className="space-y-4">
       <div className="bg-[#1e2a4a] rounded-lg p-4 border border-[#2c3e50]">
@@ -52,7 +53,7 @@ export function CameraTab({
               key={cam.id}
               onClick={() => onSetCameraPerspective(cam.id)}
               className={`p-2 rounded text-xs font-medium transition-colors ${
-                state.cameraPerspective === cam.id
+                cameraPerspective === cam.id
                   ? 'bg-blue-500 text-white'
                   : 'bg-gray-600 text-white hover:bg-gray-500'
               }`}
@@ -67,12 +68,12 @@ export function CameraTab({
           <button
             onClick={onToggleAutoOrbit}
             className={`p-2 rounded text-sm font-medium transition-colors ${
-              state.cameraMode === 'Orbit'
+              cameraMode === 'Orbit'
                 ? 'bg-blue-500 text-white'
                 : 'bg-gray-600 text-white hover:bg-gray-500'
             }`}
           >
-            {state.cameraMode === 'Orbit' ? '⏹ Stop Orbit' : '🔄 Auto Orbit'}
+            {cameraMode === 'Orbit' ? '⏹ Stop Orbit' : '🔄 Auto Orbit'}
           </button>
           <button
             onClick={onResetCamera}
@@ -84,9 +85,9 @@ export function CameraTab({
 
         {/* Camera Status */}
         <div className="text-xs text-gray-400 mt-3 space-y-1">
-          <div>Mode: <span className="text-white">{state.cameraMode}</span></div>
-          <div>Perspective: <span className="text-white">{state.cameraPerspective}</span></div>
-          <div>Distance: <span className="text-white">{state.cameraDistance}</span></div>
+          <div>Mode: <span className="text-white">{cameraMode}</span></div>
+          <div>Perspective: <span className="text-white">{cameraPerspective}</span></div>
+          <div>Distance: <span className="text-white">{cameraDistance}</span></div>
         </div>
       </div>
     </div>

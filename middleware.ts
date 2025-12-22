@@ -16,17 +16,21 @@ import { NextRequest, NextResponse } from 'next/server'
 // Route Configuration
 // ============================================================================
 
-// Routes that require authentication
+// Routes that require authentication (uses startsWith matching)
 const PROTECTED_ROUTES = [
-  '/dashboard',
-  '/dashboard/student',
-  '/dashboard/teacher'
+  '/dashboard'
 ]
 
 // Routes that should redirect authenticated users to dashboard
 const AUTH_ROUTES = [
   '/login',
-  '/test-login'
+  '/test-login',
+  '/dashboard/teacher/login'
+]
+
+// Routes that bypass authentication (login pages within protected areas)
+const PUBLIC_ROUTES = [
+  '/dashboard/teacher/login'
 ]
 
 // ============================================================================
@@ -53,6 +57,11 @@ export async function middleware(req: NextRequest) {
 
   const isAuthenticated = !!token
 
+  // Check if current route is a public route (bypasses protection)
+  const isPublicRoute = PUBLIC_ROUTES.some(route =>
+    pathname === route || pathname.startsWith(route)
+  )
+
   // Check if current route is protected
   const isProtectedRoute = PROTECTED_ROUTES.some(route =>
     pathname.startsWith(route)
@@ -64,8 +73,11 @@ export async function middleware(req: NextRequest) {
   )
 
   // 1. Redirect unauthenticated users from protected routes to login
-  if (isProtectedRoute && !isAuthenticated) {
-    const loginUrl = new URL('/login', req.url)
+  // (but allow public routes like teacher login page)
+  if (isProtectedRoute && !isAuthenticated && !isPublicRoute) {
+    // Redirect to appropriate login page
+    const isTeacherRoute = pathname.startsWith('/dashboard/teacher')
+    const loginUrl = new URL(isTeacherRoute ? '/dashboard/teacher/login' : '/login', req.url)
     loginUrl.searchParams.set('returnUrl', pathname)
     return NextResponse.redirect(loginUrl)
   }

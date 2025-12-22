@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState, useRef } from 'react'
 import type { ParsedMessage, LayerData, HierarchicalLayerData, WaypointData } from '@/app/lib/messageTypes'
 import { WEB_TO_UE_MESSAGES } from '@/app/lib/messageTypes'
 import type { UseMessageBusReturn } from '@/app/features/messaging/hooks/useMessageBus'
+import { eventBus } from '@/app/lib/events'
+import { useThrottledCallback } from '@/app/lib/performance'
 
 // =============================================================================
 // Layer State Type
@@ -197,49 +199,73 @@ export function useLayerControl(
   }, [messageBus])
 
   // ==========================================================================
-  // Layer Actions
+  // Layer Actions (with throttling to prevent rapid clicks)
   // ==========================================================================
 
-  const refreshLayers = useCallback(() => {
+  const refreshLayersInternal = useCallback(() => {
     console.log('Refreshing layer list')
     messageBus.sendMessage(WEB_TO_UE_MESSAGES.LAYER_CONTROL, 'list')
   }, [messageBus])
 
-  const refreshHierarchicalLayers = useCallback(() => {
+  const refreshHierarchicalLayersInternal = useCallback(() => {
     console.log('Refreshing hierarchical layer list')
     messageBus.sendMessage(WEB_TO_UE_MESSAGES.HIERARCHICAL_CONTROL, 'list')
   }, [messageBus])
 
-  const toggleLayer = useCallback((index: number) => {
+  // Throttle refresh actions to 500ms
+  const refreshLayers = useThrottledCallback(refreshLayersInternal, 500)
+  const refreshHierarchicalLayers = useThrottledCallback(refreshHierarchicalLayersInternal, 500)
+
+  const toggleLayerInternal = useCallback((index: number) => {
+    const layer = state.layers.find(l => l.index === index)
     console.log('Toggling layer:', index)
     messageBus.sendMessage(WEB_TO_UE_MESSAGES.LAYER_CONTROL, `toggle:${index}`)
+    if (layer) {
+      eventBus.emit('layer:toggled', { layerName: layer.name, visible: !layer.visible })
+    }
     setTimeout(() => {
       messageBus.sendMessage(WEB_TO_UE_MESSAGES.LAYER_CONTROL, 'list')
     }, 200)
-  }, [messageBus])
+  }, [messageBus, state.layers])
 
-  const isolateLayer = useCallback((index: number) => {
+  // Throttle layer toggle to 300ms
+  const toggleLayer = useThrottledCallback(toggleLayerInternal, 300)
+
+  const isolateLayerInternal = useCallback((index: number) => {
+    const layer = state.layers.find(l => l.index === index)
     console.log('Isolating layer:', index)
     messageBus.sendMessage(WEB_TO_UE_MESSAGES.LAYER_CONTROL, `isolate:${index}`)
-  }, [messageBus])
+    if (layer) {
+      eventBus.emit('layer:isolated', { layerName: layer.name })
+    }
+  }, [messageBus, state.layers])
 
-  const showAllLayers = useCallback(() => {
+  // Throttle isolate to 300ms
+  const isolateLayer = useThrottledCallback(isolateLayerInternal, 300)
+
+  const showAllLayersInternal = useCallback(() => {
     console.log('Showing all layers')
     messageBus.sendMessage(WEB_TO_UE_MESSAGES.HIERARCHICAL_CONTROL, 'show_all')
+    eventBus.emit('layer:allShown', undefined)
     setTimeout(() => {
       messageBus.sendMessage(WEB_TO_UE_MESSAGES.HIERARCHICAL_CONTROL, 'list')
     }, 200)
   }, [messageBus])
 
-  const hideAllLayers = useCallback(() => {
+  const hideAllLayersInternal = useCallback(() => {
     console.log('Hiding all layers')
     messageBus.sendMessage(WEB_TO_UE_MESSAGES.HIERARCHICAL_CONTROL, 'hide_all')
+    eventBus.emit('layer:allHidden', undefined)
     setTimeout(() => {
       messageBus.sendMessage(WEB_TO_UE_MESSAGES.HIERARCHICAL_CONTROL, 'list')
     }, 200)
   }, [messageBus])
 
-  const toggleMainGroup = useCallback((groupName: string) => {
+  // Throttle show/hide all to 500ms
+  const showAllLayers = useThrottledCallback(showAllLayersInternal, 500)
+  const hideAllLayers = useThrottledCallback(hideAllLayersInternal, 500)
+
+  const toggleMainGroupInternal = useCallback((groupName: string) => {
     console.log('Toggling main group:', groupName)
     messageBus.sendMessage(WEB_TO_UE_MESSAGES.HIERARCHICAL_CONTROL, `toggle_main:${groupName}`)
     setTimeout(() => {
@@ -247,13 +273,17 @@ export function useLayerControl(
     }, 200)
   }, [messageBus])
 
-  const toggleChildGroup = useCallback((parentName: string, childIndex: number) => {
+  const toggleChildGroupInternal = useCallback((parentName: string, childIndex: number) => {
     console.log('Toggling child group:', parentName, childIndex)
     messageBus.sendMessage(WEB_TO_UE_MESSAGES.HIERARCHICAL_CONTROL, `toggle_child:${parentName}:${childIndex}`)
     setTimeout(() => {
       messageBus.sendMessage(WEB_TO_UE_MESSAGES.HIERARCHICAL_CONTROL, 'list')
     }, 200)
   }, [messageBus])
+
+  // Throttle group toggles to 300ms
+  const toggleMainGroup = useThrottledCallback(toggleMainGroupInternal, 300)
+  const toggleChildGroup = useThrottledCallback(toggleChildGroupInternal, 300)
 
   // ==========================================================================
   // Waypoint Actions

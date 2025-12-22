@@ -1,26 +1,27 @@
 'use client'
 
-import type { TrainingState } from '@/app/hooks/useTrainingMessagesComposite'
-import { TASK_SEQUENCE, TOOL_INFO } from '@/app/lib/messageTypes'
+import { TASK_SEQUENCE, TOOL_INFO } from '@/app/config'
+import { useAppSelector } from '@/app/store/hooks'
+import { selectTrainingProgress, selectCurrentTool } from '@/app/store/slices/trainingSlice'
 
 // =============================================================================
-// Props Interface
+// Props Interface - Only theme, state from Redux
 // =============================================================================
 
 interface TrainingTabProps {
   isDark?: boolean
-  state: TrainingState
 }
- 
 
 // =============================================================================
 // Component
 // =============================================================================
 
 export function TrainingTab({
-  isDark = true,
-  state
+  isDark = true
 }: TrainingTabProps) {
+  // Get state from Redux
+  const { progress, taskName, phase, currentTaskIndex, totalTasks } = useAppSelector(selectTrainingProgress)
+  const currentTool = useAppSelector(selectCurrentTool)
 
   const colors = {
     bg: isDark ? 'bg-gray-700/50' : 'bg-gray-300/50',
@@ -36,16 +37,16 @@ export function TrainingTab({
       <div className={`${colors.bg} rounded-lg p-4 shadow`}>
         <h3 className={`${colors.text} text-lg font-medium border-b border-gray-400 pb-2 mb-3`}>Training Progress</h3>
         <div className={`${colors.text} text-sm font-medium mb-2`} >
-          Task {Math.min(state.currentTaskIndex + 1, state.totalTasks)} of {state.totalTasks}
+          Task {Math.min(currentTaskIndex + 1, totalTasks)} of {totalTasks}
         </div>
         <div className="w-full h-3 bg-gray-500 rounded-full overflow-hidden mb-2">
           <div
             className="h-full bg-gradient-to-r from-blue-600 to-blue-900 transition-all duration-300"
-            style={{ width: `${state.progress}%` }}
+            style={{ width: `${progress}%` }}
           />
         </div>
-        <div className={`${colors.text} text-sm font-medium mb-2`}>{state.taskName}</div>
-        <div className="text-gray-400 text-xs">Phase: {state.phase}</div>
+        <div className={`${colors.text} text-sm font-medium mb-2`}>{taskName}</div>
+        <div className="text-gray-400 text-xs">Phase: {phase}</div>
       </div>
 
       {/* Current Tool Widget */}
@@ -53,11 +54,11 @@ export function TrainingTab({
         <h3 className="text-blue-400 text-sm font-medium border-b border-[#2c3e50] pb-2 mb-3">Current Tool</h3>
         <div className="flex items-center gap-3 p-3 bg-[#2c3e50] rounded-lg">
           <div className="w-8 h-8 bg-blue-400 rounded flex items-center justify-center text-lg">
-            {TOOL_INFO[state.currentTool]?.icon || 'N'}
+            {TOOL_INFO[currentTool]?.icon || 'N'}
           </div>
           <div>
-            <div className="text-white text-sm">{TOOL_INFO[state.currentTool]?.name || 'None'}</div>
-            <div className="text-gray-400 text-xs">{TOOL_INFO[state.currentTool]?.description || 'No tool selected'}</div>
+            <div className="text-white text-sm">{TOOL_INFO[currentTool]?.name || 'None'}</div>
+            <div className="text-gray-400 text-xs">{TOOL_INFO[currentTool]?.description || 'No tool selected'}</div>
           </div>
         </div>
       </div>
@@ -70,9 +71,9 @@ export function TrainingTab({
             <div
               key={task.taskId}
               className={`p-2 rounded flex items-center gap-2 ${
-                index < state.currentTaskIndex
+                index < currentTaskIndex
                   ? 'bg-green-500/20 text-green-400'
-                  : index === state.currentTaskIndex
+                  : index === currentTaskIndex
                   ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50'
                   : 'bg-gray-800/50 text-gray-500'
               }`}
@@ -82,8 +83,8 @@ export function TrainingTab({
                 <div className="text-xs font-medium">{task.name}</div>
                 <div className="text-xs opacity-70">{task.tool}</div>
               </div>
-              {index < state.currentTaskIndex && <span className="text-green-400">✓</span>}
-              {index === state.currentTaskIndex && <span className="text-blue-400">→</span>}
+              {index < currentTaskIndex && <span className="text-green-400">✓</span>}
+              {index === currentTaskIndex && <span className="text-blue-400">→</span>}
             </div>
           ))}
         </div>

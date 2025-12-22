@@ -15,6 +15,10 @@ import {
 } from '@pureweb/platform-sdk-react'
 import type { InputEmitter } from '@pureweb/platform-sdk'
 import type { Subject } from 'rxjs'
+import { eventBus } from '@/app/lib/events'
+import { getLogger } from '@/app/lib/logger'
+
+const log = getLogger('StreamContext')
 
 // =============================================================================
 // Context Types
@@ -105,26 +109,28 @@ export function StreamProvider({
 
     async function init() {
       try {
-        console.log('Initializing with project:', projectId)
+        log.info({ projectId }, 'Initializing stream')
+        eventBus.emit('stream:connecting', undefined)
 
         await platform.launchRequestAccess({
           projectId,
           modelId
         })
 
-        console.log('Agent Connected:', platform.agent?.id)
+        log.info({ agentId: platform.agent?.id }, 'Agent connected')
 
         if (platform.agent?.serviceCredentials?.iceServers) {
           streamerOptions.iceServers = platform.agent.serviceCredentials.iceServers as RTCIceServer[]
         }
 
         const models = await platform.getModels()
-        console.log('Available models:', models)
+        log.debug({ modelCount: models.length }, 'Available models loaded')
         setAvailableModels(models)
 
       } catch (err) {
-        console.error('Init error:', err)
+        log.error({ error: err }, 'Stream init error')
         setError(String(err))
+        eventBus.emit('stream:error', { error: String(err) })
       }
     }
     init()
@@ -193,11 +199,18 @@ export function StreamProvider({
   }, [modelDefinition, isLoading, streamerStatus, launch, autoLaunch])
 
   // ==========================================================================
-  // Debug Logging
+  // Debug Logging & Connection Events
   // ==========================================================================
 
   useEffect(() => {
-    console.log('Status:', launchStatus.status, '| Streamer:', streamerStatus, '| Video:', videoStream ? 'Yes' : 'No')
+    log.debug({ launchStatus: launchStatus.status, streamerStatus, hasVideo: !!videoStream }, 'Stream status update')
+
+    // Emit connection events
+    if (streamerStatus === StreamerStatus.Connected) {
+      eventBus.emit('stream:connected', { environmentId: platform.agent?.id || '' })
+    } else if (streamerStatus === StreamerStatus.Failed) {
+      eventBus.emit('stream:disconnected', { reason: 'Stream failed' })
+    }
   }, [launchStatus.status, streamerStatus, videoStream])
 
   // ==========================================================================

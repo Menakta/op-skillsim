@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, useRef } from 'react'
 import type { ParsedMessage, QuestionData } from '@/app/lib/messageTypes'
 import { QUESTION_DATABASE, WEB_TO_UE_MESSAGES } from '@/app/lib/messageTypes'
 import type { UseMessageBusReturn } from '@/app/features/messaging/hooks/useMessageBus'
+import { eventBus } from '@/app/lib/events'
 
 // =============================================================================
 // Question State Type
@@ -76,6 +77,7 @@ export function useQuestionFlow(
             questionTryCount: 1,
             questionAnsweredCorrectly: false
           })
+          eventBus.emit('question:asked', { questionId })
           callbacksRef.current.onQuestionRequest?.(questionId, question)
         } else {
           console.error('Question not found in database:', questionId)
@@ -98,6 +100,7 @@ export function useQuestionFlow(
 
     if (isCorrect) {
       setState(prev => ({ ...prev, questionAnsweredCorrectly: true }))
+      eventBus.emit('question:answered', { questionId: question.id, correct: true, attempts: state.questionTryCount })
 
       const answerMessage = `${question.id}:${state.questionTryCount}:true`
       messageBus.sendMessage(WEB_TO_UE_MESSAGES.QUESTION_ANSWER, answerMessage)

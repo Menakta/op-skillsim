@@ -2,8 +2,11 @@
 
 import { useCallback, useEffect, useState, useRef } from 'react'
 import type { ParsedMessage } from '@/app/lib/messageTypes'
-import { TASK_SEQUENCE, WEB_TO_UE_MESSAGES } from '@/app/lib/messageTypes'
+import { WEB_TO_UE_MESSAGES } from '@/app/lib/messageTypes'
+import { TASK_SEQUENCE } from '@/app/config'
 import type { UseMessageBusReturn } from '@/app/features/messaging/hooks/useMessageBus'
+import { eventBus } from '@/app/lib/events'
+import { trainingService } from '@/app/services'
 
 // =============================================================================
 // Training State Type
@@ -50,7 +53,7 @@ const initialState: TrainingStateData = {
   taskName: 'Not Started',
   phase: 'NotStarted',
   currentTaskIndex: 0,
-  totalTasks: TASK_SEQUENCE.length,
+  totalTasks: trainingService.getTotalTasks(),
   isActive: false,
   trainingStarted: false
 }
@@ -123,11 +126,16 @@ export function useTrainingState(
             isActive
           })
 
-          // Check for training completion
-          if (currentTask >= totalTasks || progress >= 100) {
+          // Check for training completion using service
+          if (trainingService.isTrainingComplete(currentTask) || progress >= 100) {
             console.log(`🎉 TRAINING COMPLETED! Tasks: ${currentTask}/${totalTasks}, Progress: ${progress}%`)
             callbacksRef.current.onTrainingComplete?.(progress, currentTask, totalTasks)
+            // Emit event for other parts of the app
+            eventBus.emit('training:completed', { totalTasks })
           }
+
+          // Emit progress update event
+          eventBus.emit('training:progressUpdated', { progress, currentTask, totalTasks })
           break
         }
 
@@ -146,7 +154,7 @@ export function useTrainingState(
               callbacksRef.current.onTaskCompleted?.(taskId, nextIndex)
             }, 0)
 
-            if (nextIndex >= TASK_SEQUENCE.length) {
+            if (trainingService.isTrainingComplete(nextIndex)) {
               return {
                 ...prev,
                 currentTaskIndex: nextIndex,
@@ -191,6 +199,8 @@ export function useTrainingState(
       trainingStarted: false
     }))
     messageBus.sendMessage(WEB_TO_UE_MESSAGES.TRAINING_CONTROL, 'start')
+    // Emit event
+    eventBus.emit('training:started', { taskIndex: 0 })
   }, [messageBus])
 
   const pauseTraining = useCallback(() => {

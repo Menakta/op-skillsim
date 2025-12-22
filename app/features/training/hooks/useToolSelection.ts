@@ -2,8 +2,11 @@
 
 import { useCallback, useEffect, useState, useRef } from 'react'
 import type { ParsedMessage, ToolName, PipeType } from '@/app/lib/messageTypes'
-import { TASK_SEQUENCE, WEB_TO_UE_MESSAGES } from '@/app/lib/messageTypes'
+import { WEB_TO_UE_MESSAGES } from '@/app/lib/messageTypes'
+import { TASK_SEQUENCE } from '@/app/config'
 import type { UseMessageBusReturn } from '@/app/features/messaging/hooks/useMessageBus'
+import { eventBus } from '@/app/lib/events'
+import { trainingService } from '@/app/services'
 
 // =============================================================================
 // Tool State Type
@@ -59,7 +62,9 @@ export function useToolSelection(
 ): UseToolSelectionReturn {
   const [state, setState] = useState<ToolStateData>(initialState)
   const callbacksRef = useRef(callbacks)
+  const stateRef = useRef(state)
   callbacksRef.current = callbacks
+  stateRef.current = state
 
   // ==========================================================================
   // Message Handler
@@ -76,6 +81,7 @@ export function useToolSelection(
           console.log('Tool change confirmed by UE:', toolName)
           setState(prev => ({ ...prev, currentTool: toolName }))
           callbacksRef.current.onToolChange?.(toolName)
+          eventBus.emit('tool:selected', { toolName, previousTool: stateRef.current.currentTool })
           break
         }
 
@@ -109,16 +115,19 @@ export function useToolSelection(
     console.log('Tool clicked:', toolName)
     console.log('Current task index:', currentTaskIndex)
 
-    const expectedTool = TASK_SEQUENCE[currentTaskIndex]?.tool
-    console.log('Expected tool:', expectedTool)
+    // Use trainingService to validate tool selection
+    const isValidTool = trainingService.validateToolSelection(toolName, currentTaskIndex)
+    const taskInfo = trainingService.getTaskInfo(currentTaskIndex)
+    console.log('Expected tool:', taskInfo?.toolName)
 
     // Check if correct tool
-    if (toolName !== expectedTool) {
-      console.log('WRONG TOOL - Expected:', expectedTool, 'Got:', toolName)
+    if (!isValidTool) {
+      console.log('WRONG TOOL - Expected:', taskInfo?.toolName, 'Got:', toolName)
       return false
     }
 
     console.log('CORRECT TOOL SELECTED!')
+    eventBus.emit('tool:selected', { toolName })
 
     // Update UI with selected tool
     setState(prev => ({
@@ -156,6 +165,7 @@ export function useToolSelection(
 
   const selectPipe = useCallback((pipeType: PipeType) => {
     console.log('Pipe selected:', pipeType)
+    eventBus.emit('debug:log', { message: `Pipe selected: ${pipeType}`, level: 'info' })
 
     setState(prev => ({ ...prev, selectedPipe: pipeType }))
 
@@ -203,14 +213,15 @@ export function useToolSelection(
   // ==========================================================================
 
   const autoAdvanceToNextTask = useCallback((nextTaskIndex: number) => {
-    const nextTask = TASK_SEQUENCE[nextTaskIndex]
+    // Use trainingService to get next task info
+    const nextTaskInfo = trainingService.getTaskInfo(nextTaskIndex)
 
-    if (!nextTask) {
+    if (!nextTaskInfo) {
       console.log('🎉 All tasks completed - no more tasks to advance to')
       return
     }
 
-    const nextTool = nextTask.tool
+    const nextTool = nextTaskInfo.toolName
     console.log('🔄 Auto-advancing to next task:', nextTaskIndex, '- Tool:', nextTool)
 
     // Update UI with the next tool

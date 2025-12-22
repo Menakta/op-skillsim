@@ -1,13 +1,13 @@
 'use client'
 
-import type { TrainingState } from '@/app/hooks/useTrainingMessagesComposite'
+import { useAppSelector } from '@/app/store/hooks'
+import { selectExplosionState, selectTrainingMode } from '@/app/store/slices/trainingSlice'
 
 // =============================================================================
-// Props Interface
+// Props Interface - Only actions, state from Redux
 // =============================================================================
 
 interface CinematicTabProps {
-  state: TrainingState
   onSetExplosionLevel: (level: number) => void
   onExplodeBuilding: () => void
   onAssembleBuilding: () => void
@@ -19,13 +19,15 @@ interface CinematicTabProps {
 // =============================================================================
 
 export function CinematicTab({
-  state,
   onSetExplosionLevel,
   onExplodeBuilding,
   onAssembleBuilding,
   onStartTraining
 }: CinematicTabProps) {
-  const isCinematicMode = state.mode === 'cinematic'
+  // Get state from Redux
+  const { explosionValue, isAnimating } = useAppSelector(selectExplosionState)
+  const mode = useAppSelector(selectTrainingMode)
+  const isCinematicMode = mode === 'cinematic'
 
   return (
     <div className="space-y-4">
@@ -36,13 +38,13 @@ export function CinematicTab({
         <div className="mb-4">
           <div className="flex justify-between text-xs text-gray-400 mb-1">
             <span>Explosion Level</span>
-            <span>{Math.round(state.explosionValue)}%</span>
+            <span>{Math.round(explosionValue)}%</span>
           </div>
           <input
             type="range"
             min="0"
             max="100"
-            value={state.explosionValue}
+            value={explosionValue}
             onChange={(e) => onSetExplosionLevel(parseInt(e.target.value))}
             className="w-full h-2 bg-[#2c3e50] rounded appearance-none cursor-pointer accent-blue-400"
           />
@@ -65,7 +67,7 @@ export function CinematicTab({
         </div>
 
         {/* Animation Status */}
-        {state.isAnimating && (
+        {isAnimating && (
           <div className="text-yellow-400 text-xs mt-3 animate-pulse text-center">
             🔄 Animating...
           </div>

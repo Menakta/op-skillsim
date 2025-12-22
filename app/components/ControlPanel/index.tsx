@@ -1,9 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import type { TrainingState } from '@/app/hooks/useTrainingMessagesComposite'
 import type { ToolName, PipeType, CameraPerspective } from '@/app/lib/messageTypes'
-import { TASK_SEQUENCE } from '@/app/lib/messageTypes'
+import { TASK_SEQUENCE } from '@/app/config'
 import {
   GraduationCap,
   Camera,
@@ -11,6 +10,10 @@ import {
   Film,
   X
 } from 'lucide-react'
+
+// Redux imports
+import { useAppSelector } from '@/app/store/hooks'
+import { selectTrainingState } from '@/app/store/slices/trainingSlice'
 
 // Import tab components
 import { TrainingTab } from './TrainingTab'
@@ -26,46 +29,39 @@ import { TaskTools } from './TaskTools'
 import { ToolBar } from './ToolBar'
 
 // =============================================================================
-// Props Interface
+// Props Interface - Reduced props, state comes from Redux
 // =============================================================================
 
 interface ControlPanelProps {
-  // State from hook
-  state: TrainingState
-
-  // Theme
+  // Theme (optional, defaults handled internally)
   isDark?: boolean
 
-  // Training Control
+  // Training Control Actions
   onStartTraining: () => void
   onPauseTraining: () => void
   onResetTraining: () => void
 
-  // Tool Selection
+  // Tool Selection Actions
   onSelectTool: (tool: ToolName) => void
-
-  // Pipe Selection
   onSelectPipe: (pipe: PipeType) => void
-
-  // Pressure Testing
   onSelectPressureTest: (testType: 'air-plug' | 'conduct-test') => void
 
-  // Camera Control
+  // Camera Control Actions
   onSetCameraPerspective: (perspective: CameraPerspective) => void
   onToggleAutoOrbit: () => void
   onResetCamera: () => void
 
-  // Explosion Control
+  // Explosion Control Actions
   onSetExplosionLevel: (level: number) => void
   onExplodeBuilding: () => void
   onAssembleBuilding: () => void
 
-  // Waypoint Control
+  // Waypoint Control Actions
   onRefreshWaypoints: () => void
   onActivateWaypoint: (index: number) => void
   onDeactivateWaypoint: () => void
 
-  // Layer Control
+  // Layer Control Actions
   onRefreshLayers: () => void
   onRefreshHierarchicalLayers: () => void
   onToggleLayer: (index: number) => void
@@ -76,12 +72,6 @@ interface ControlPanelProps {
 
   // Application Control
   onQuitApplication: () => void
-
-  // Connection status
-  isConnected?: boolean
-
-  // Panel control (for auto-close)
-  onPanelClose?: () => void
 }
 
 // =============================================================================
@@ -103,7 +93,6 @@ const tabConfig = [
 // =============================================================================
 
 export function ControlPanel({
-  state,
   isDark = true,
   onStartTraining,
   onPauseTraining,
@@ -128,9 +117,9 @@ export function ControlPanel({
   onToggleMainGroup,
   onToggleChildGroup,
   onQuitApplication,
-  isConnected = false,
-  onPanelClose
 }: ControlPanelProps) {
+  // Get state from Redux instead of props
+  const state = useAppSelector(selectTrainingState)
   const [isOpen, setIsOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<TabType | null>(null)
   const [hoveredTab, setHoveredTab] = useState<TabType | null>(null)
@@ -158,13 +147,11 @@ export function ControlPanel({
         return (
           <TrainingTab
             isDark={isDark}
-            state={state}
           />
         )
       case 'camera':
         return (
           <CameraTab
-            state={state}
             onSetCameraPerspective={onSetCameraPerspective}
             onToggleAutoOrbit={onToggleAutoOrbit}
             onResetCamera={onResetCamera}
@@ -173,7 +160,6 @@ export function ControlPanel({
       case 'layers':
         return (
           <LayersTab
-            state={state}
             onRefreshWaypoints={onRefreshWaypoints}
             onActivateWaypoint={onActivateWaypoint}
             onDeactivateWaypoint={onDeactivateWaypoint}
@@ -189,7 +175,6 @@ export function ControlPanel({
       case 'cinematic':
         return (
           <CinematicTab
-            state={state}
             onSetExplosionLevel={onSetExplosionLevel}
             onExplodeBuilding={onExplodeBuilding}
             onAssembleBuilding={onAssembleBuilding}

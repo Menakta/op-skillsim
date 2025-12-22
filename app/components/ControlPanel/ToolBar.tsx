@@ -5,7 +5,7 @@ import Image from 'next/image'
 import { ChevronUp } from 'lucide-react'
 import type { TrainingState } from '@/app/hooks/useTrainingMessagesComposite'
 import type { ToolName } from '@/app/lib/messageTypes'
-import { TASK_SEQUENCE } from '@/app/lib/messageTypes'
+import { TASK_SEQUENCE } from '@/app/config'
 
 // =============================================================================
 // Constants

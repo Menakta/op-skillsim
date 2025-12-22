@@ -106,22 +106,9 @@ export type CameraMode = 'Manual' | 'Orbit'
 export type TrainingControlAction = 'start' | 'pause' | 'reset' | 'test'
 
 /**
- * Task sequence for training flow
+ * Task sequence and TaskDefinition are now in @/app/config/tasks.config.ts
+ * Import from '@/app/config' instead
  */
-export interface TaskDefinition {
-  tool: ToolName
-  name: string
-  taskId: string
-}
-
-export const TASK_SEQUENCE: TaskDefinition[] = [
-  { tool: 'XRay', name: 'Pipe Location Scanning', taskId: 'XRAY_MAIN' },
-  { tool: 'Shovel', name: 'Excavation', taskId: 'SHOVEL_MAIN' },
-  { tool: 'Measuring', name: 'Pipe Measuring', taskId: 'MEASURING_MAIN' },
-  { tool: 'PipeConnection', name: 'Pipe Connection', taskId: 'PIPE_CONNECTION_MAIN' },
-  { tool: 'Glue', name: 'Glue Application', taskId: 'GLUE_MAIN' },
-  { tool: 'PressureTester', name: 'Pressure Testing', taskId: 'PRESSURE_TEST_MAIN' }
-]
 
 // =============================================================================
 // Question Database (Q1-Q6)

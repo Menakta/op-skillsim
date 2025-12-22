@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import type { TrainingState } from '@/app/hooks/useTrainingMessagesComposite'
 import type { ToolName, PipeType } from '@/app/lib/messageTypes'
-import { TASK_SEQUENCE, TOOL_INFO } from '@/app/lib/messageTypes'
+import { TASK_SEQUENCE, TOOL_INFO } from '@/app/config'
 
 // =============================================================================
 // Constants

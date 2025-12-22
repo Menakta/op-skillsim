@@ -9,18 +9,18 @@ import { QuestionModal } from '../features/questions'
 import { CompletionPopup } from '../features/training'
 // LoadingOverlay removed - using LoadingScreen instead
 import { StatusBar } from '../components/layout'
-import { SuccessModal } from '../components/feedbacks/SuccesModal'
-import { ErrorModal } from '../components/feedbacks/ErrorModal'
-import { LoadingScreen } from './helper-screens/LoadingScreen'
-import { StarterScreen } from './helper-screens/StarterScreen'
-import { NavigationWalkthrough } from './helper-screens/NavigationWalkthrough'
+import {SessionModal,SuccessModal,ErrorModal} from '../features'
+import { LoadingScreen ,StarterScreen,NavigationWalkthrough} from '../features'
 import ControlPanel from '../components/ControlPanel'
 import MessageLog from '../components/MessageLog'
 
 // New composite hook that uses all the modular hooks
 import { useTrainingMessagesComposite } from '../hooks/useTrainingMessagesComposite'
 import type { QuestionData } from '../lib/messageTypes'
-import { TASK_SEQUENCE } from '../lib/messageTypes'
+import { TASK_SEQUENCE } from '../config'
+
+// Redux sync - bridges hook state to Redux store
+import { useReduxSync } from '../store/useReduxSync'
 
 // =============================================================================
 // Configuration
@@ -241,6 +241,10 @@ export default function StreamingApp() {
   }, {
     debug: true
   })
+
+  // Sync training state to Redux store
+  // This allows child components to use Redux selectors instead of props
+  useReduxSync(training)
 
   // ==========================================================================
   // Launch
@@ -468,10 +472,9 @@ export default function StreamingApp() {
   return (
     <div className={`h-screen w-screen relative overflow-hidden ${isDark ? 'bg-[#1E1E1E]' : 'bg-gray-100'}`}>
       {/* Control Panel - Only show when stream is connected */}
+      {/* State is now read from Redux via useReduxSync above */}
       {isConnected && (
         <ControlPanel
-          state={training.state}
-          isConnected={training.isConnected || isConnected}
           isDark={isDark}
           onStartTraining={training.startTraining}
           onPauseTraining={training.pauseTraining}

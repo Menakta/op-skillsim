@@ -1,0 +1,136 @@
+/**
+ * Redux Slices Index
+ *
+ * Re-exports all slice actions and selectors for convenient imports.
+ */
+
+// Training Slice
+export {
+  trainingSlice,
+  setTrainingProgress,
+  setMode,
+  setUiMode,
+  setTrainingStarted,
+  setCurrentTaskIndex,
+  setCurrentTool,
+  setSelectedTool,
+  setSelectedPipe,
+  setAirPlugSelected,
+  setCurrentQuestion,
+  setQuestionTryCount,
+  incrementQuestionTryCount,
+  setQuestionAnsweredCorrectly,
+  resetQuestionState,
+  setCameraMode,
+  setCameraPerspective,
+  setCameraDistance,
+  setCameraState,
+  setExplosionValue,
+  setIsAnimating,
+  setExplosionState,
+  setLayers,
+  setHierarchicalGroups,
+  setWaypoints,
+  setActiveWaypoint,
+  syncFromHook,
+  resetTraining,
+  // Selectors
+  selectTrainingMode,
+  selectUiMode,
+  selectProgress,
+  selectTaskName,
+  selectPhase,
+  selectCurrentTaskIndex,
+  selectTotalTasks,
+  selectIsActive,
+  selectTrainingStarted,
+  selectCurrentTool,
+  selectSelectedTool,
+  selectSelectedPipe,
+  selectAirPlugSelected,
+  selectCurrentQuestion,
+  selectQuestionTryCount,
+  selectQuestionAnsweredCorrectly,
+  selectCameraMode,
+  selectCameraPerspective,
+  selectCameraDistance,
+  selectExplosionValue,
+  selectIsAnimating,
+  selectLayers,
+  selectHierarchicalGroups,
+  selectWaypoints,
+  selectActiveWaypointIndex,
+  selectActiveWaypointName,
+  selectTrainingState,
+} from './trainingSlice'
+
+export type { TrainingSliceState } from './trainingSlice'
+
+// UI Slice
+export {
+  uiSlice,
+  setIsDark,
+  toggleTheme,
+  setShowStarterScreen,
+  setShowLoadingScreen,
+  setShowNavigationWalkthrough,
+  openQuestionModal,
+  closeQuestionModal,
+  setShowCompletionPopup,
+  openPhaseSuccess,
+  closePhaseSuccess,
+  openErrorModal,
+  closeErrorModal,
+  setStreamStarted,
+  startStreamFlow,
+  resetToStarterScreen,
+  resetUi,
+  // Selectors
+  selectIsDark,
+  selectShowStarterScreen,
+  selectShowLoadingScreen,
+  selectShowNavigationWalkthrough,
+  selectShowQuestionModal,
+  selectCurrentQuestionData,
+  selectShowCompletionPopup,
+  selectShowPhaseSuccess,
+  selectCompletedPhase,
+  selectShowErrorModal,
+  selectErrorMessage,
+  selectStreamStarted,
+  selectUiState,
+} from './uiSlice'
+
+export type { UiSliceState, CompletedPhase } from './uiSlice'
+
+// Connection Slice
+export {
+  connectionSlice,
+  setConnectionStatus,
+  setIsConnected,
+  setRetryCount,
+  incrementRetryCount,
+  resetRetryCount,
+  setIsRetrying,
+  setInitError,
+  addMessageToLog,
+  setLastMessage,
+  setMessageLog,
+  clearMessageLog,
+  connectionFailed,
+  startRetry,
+  resetConnection,
+  resetConnectionState,
+  // Selectors
+  selectConnectionStatus,
+  selectIsConnected,
+  selectIsRetrying,
+  selectRetryCount,
+  selectMaxRetries,
+  selectInitError,
+  selectMessageLog,
+  selectLastMessage,
+  selectConnectionState,
+} from './connectionSlice'
+
+export type { ConnectionSliceState, ConnectionStatus } from './connectionSlice'

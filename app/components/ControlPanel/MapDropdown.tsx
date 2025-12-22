@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import { X, Check } from 'lucide-react'
-import { TASK_SEQUENCE } from '@/app/lib/messageTypes'
+import { TASK_SEQUENCE } from '@/app/config'
 
 interface MapDropdownProps {
   currentTaskIndex: number
