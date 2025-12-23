@@ -1,26 +1,22 @@
 /**
- * Email/Password Login Endpoint
+ * Teacher/Admin Login Endpoint
  *
- * Handles authentication for external users (demos, trials) who log in
- * with email and password instead of through LTI.
+ * Simple Supabase authentication - no session management.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { logger } from '@/app/lib/logger'
-import { signTokenWithRole } from '@/app/auth'
-import {
-  findExternalUserByEmail,
-  validateExternalUserPassword
-} from '@/app/lib/database'
 
-export async function POST(req: NextRequest) {
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!
+)
+
+export async function POST(request: NextRequest) {
   try {
-    const body = await req.json()
-    const { email, password } = body
+    const { email, password } = await request.json()
 
-    logger.info({ email }, 'External login attempt')
-
-    // Validate required fields
     if (!email || !password) {
       return NextResponse.json(
         { error: 'Email and password are required' },
@@ -28,90 +24,53 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Find user by email
-    const user = await findExternalUserByEmail(email)
+    logger.info({ email }, 'Login attempt')
 
-    if (!user) {
-      logger.warn({ email }, 'Login failed - user not found')
+    // Authenticate with Supabase
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+
+    if (authError || !authData.user) {
+      logger.warn({ email, error: authError?.message }, 'Login failed')
       return NextResponse.json(
-        { error: 'Invalid email or password' },
+        { error: 'Invalid credentials' },
         { status: 401 }
       )
     }
 
-    // Validate password
-    const isValidPassword = await validateExternalUserPassword(user, password)
+    // Get teacher/admin profile
+    const { data: profile, error: profileError } = await supabase
+      .from('teacher_profiles')
+      .select('*')
+      .eq('id', authData.user.id)
+      .single()
 
-    if (!isValidPassword) {
-      logger.warn({ email }, 'Login failed - invalid password')
+    if (profileError || !profile) {
+      logger.warn({ email }, 'Not a teacher/admin')
       return NextResponse.json(
-        { error: 'Invalid email or password' },
-        { status: 401 }
+        { error: 'Access denied. Teacher or admin account required.' },
+        { status: 403 }
       )
     }
 
-    // Generate JWT token with role
-    const token = signTokenWithRole(user.id, user.role)
+    logger.info({ userId: authData.user.id, role: profile.role }, 'Login successful')
 
-    // Determine redirect URL based on role
-    const redirectUrl = getRedirectUrl(user.role)
-
-    // Create response
-    const response = NextResponse.json({
-      status: 'ok',
+    return NextResponse.json({
+      success: true,
       user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role
+        id: authData.user.id,
+        email: authData.user.email,
+        name: profile.full_name,
+        role: profile.role,
       },
-      redirectUrl
     })
-
-    // Set HttpOnly cookie for auth
-    response.cookies.set('access_token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 20 * 60 // 20 minutes
-    })
-
-    // Set non-httpOnly cookie for client-side role access
-    response.cookies.set('user_role', user.role, {
-      httpOnly: false,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 20 * 60
-    })
-
-    logger.info({
-      userId: user.id,
-      email: user.email,
-      role: user.role
-    }, 'External login successful')
-
-    return response
   } catch (error) {
-    logger.error({ error }, 'External login error')
+    logger.error({ error }, 'Login error')
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Login failed' },
       { status: 500 }
     )
-  }
-}
-
-/**
- * Get redirect URL based on user role
- */
-function getRedirectUrl(role: string): string {
-  switch (role) {
-    case 'teacher':
-    case 'admin':
-      return '/dashboard/teacher'
-    case 'student':
-    default:
-      return '/dashboard/student'
   }
 }

@@ -1,1 +1,369 @@
 @import "tailwindcss";
+
+/* =============================================================================
+   Global Theme System
+
+   All theme colors are defined here using CSS custom properties.
+   Change colors in one place to update the entire application.
+   ============================================================================= */
+
+:root {
+  /* -------------------------------------------------------------------------
+     Base Colors - Light Theme
+     ------------------------------------------------------------------------- */
+
+  /* Background colors */
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f9fafb;
+  --color-bg-tertiary: #f3f4f6;
+  --color-bg-elevated: #ffffff;
+  --color-bg-hover: #f3f4f6;
+  --color-bg-active: #e5e7eb;
+
+  /* Text colors */
+  --color-text-primary: #111827;
+  --color-text-secondary: #4b5563;
+  --color-text-tertiary: #6b7280;
+  --color-text-muted: #9ca3af;
+  --color-text-inverted: #ffffff;
+
+  /* Border colors */
+  --color-border-primary: #e5e7eb;
+  --color-border-secondary: #d1d5db;
+  --color-border-focus: #a855f7;
+
+  /* Brand colors */
+  --color-brand-primary: #a855f7;
+  --color-brand-secondary: #9333ea;
+  --color-brand-hover: #7e22ce;
+  --color-brand-muted: rgba(168, 85, 247, 0.1);
+
+  /* Accent color (teal) */
+  --color-accent: #39BEAE;
+  --color-accent-hover: #2da99a;
+  --color-accent-muted: rgba(57, 190, 174, 0.1);
+
+  /* Status colors */
+  --color-success: #22c55e;
+  --color-success-bg: rgba(34, 197, 94, 0.1);
+  --color-success-border: rgba(34, 197, 94, 0.3);
+
+  --color-error: #ef4444;
+  --color-error-bg: rgba(239, 68, 68, 0.1);
+  --color-error-border: rgba(239, 68, 68, 0.3);
+
+  --color-warning: #f59e0b;
+  --color-warning-bg: rgba(245, 158, 11, 0.1);
+  --color-warning-border: rgba(245, 158, 11, 0.3);
+
+  --color-info: #3b82f6;
+  --color-info-bg: rgba(59, 130, 246, 0.1);
+  --color-info-border: rgba(59, 130, 246, 0.3);
+
+  /* Component specific */
+  --color-card-bg: #ffffff;
+  --color-card-border: #e5e7eb;
+  --color-input-bg: #ffffff;
+  --color-input-border: #d1d5db;
+  --color-sidebar-bg: #e2e2e2;
+  --color-header-bg: #ffffff;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+/* -------------------------------------------------------------------------
+   Dark Theme
+   ------------------------------------------------------------------------- */
+
+.dark {
+  /* Background colors */
+  --color-bg-primary: #111827;
+  --color-bg-secondary: #1f2937;
+  --color-bg-tertiary: #374151;
+  --color-bg-elevated: #1f2937;
+  --color-bg-hover: #374151;
+  --color-bg-active: #4b5563;
+
+  /* Text colors */
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #e5e7eb;
+  --color-text-tertiary: #d1d5db;
+  --color-text-muted: #9ca3af;
+  --color-text-inverted: #111827;
+
+  /* Border colors */
+  --color-border-primary: #374151;
+  --color-border-secondary: #4b5563;
+  --color-border-focus: #a855f7;
+
+  /* Brand colors - slightly brighter for dark mode */
+  --color-brand-primary: #a855f7;
+  --color-brand-secondary: #9333ea;
+  --color-brand-hover: #c084fc;
+  --color-brand-muted: rgba(168, 85, 247, 0.2);
+
+  /* Accent color */
+  --color-accent: #39BEAE;
+  --color-accent-hover: #4dd4c4;
+  --color-accent-muted: rgba(57, 190, 174, 0.2);
+
+  /* Status colors - adjusted for dark mode */
+  --color-success: #4ade80;
+  --color-success-bg: rgba(74, 222, 128, 0.2);
+  --color-success-border: rgba(74, 222, 128, 0.3);
+
+  --color-error: #f87171;
+  --color-error-bg: rgba(248, 113, 113, 0.2);
+  --color-error-border: rgba(248, 113, 113, 0.3);
+
+  --color-warning: #fbbf24;
+  --color-warning-bg: rgba(251, 191, 36, 0.2);
+  --color-warning-border: rgba(251, 191, 36, 0.3);
+
+  --color-info: #60a5fa;
+  --color-info-bg: rgba(96, 165, 250, 0.2);
+  --color-info-border: rgba(96, 165, 250, 0.3);
+
+  /* Component specific */
+  --color-card-bg: #1f2937;
+  --color-card-border: #374151;
+  --color-input-bg: #374151;
+  --color-input-border: #4b5563;
+  --color-sidebar-bg: #1f2937;
+  --color-header-bg: #1f2937;
+
+  /* Shadows - more subtle in dark mode */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+}
+
+/* =============================================================================
+   Theme Utility Classes
+
+   Use these classes instead of conditional isDark checks.
+   Example: className="theme-bg-primary theme-text-primary"
+   ============================================================================= */
+
+/* Background utilities */
+.theme-bg-primary { background-color: var(--color-bg-primary); }
+.theme-bg-secondary { background-color: var(--color-bg-secondary); }
+.theme-bg-tertiary { background-color: var(--color-bg-tertiary); }
+.theme-bg-elevated { background-color: var(--color-bg-elevated); }
+.theme-bg-hover:hover { background-color: var(--color-bg-hover); }
+.theme-bg-card { background-color: var(--color-card-bg); }
+.theme-bg-input { background-color: var(--color-input-bg); }
+.theme-bg-sidebar { background-color: var(--color-sidebar-bg); }
+.theme-bg-header { background-color: var(--color-header-bg); }
+
+/* Text utilities */
+.theme-text-primary { color: var(--color-text-primary); }
+.theme-text-secondary { color: var(--color-text-secondary); }
+.theme-text-tertiary { color: var(--color-text-tertiary); }
+.theme-text-muted { color: var(--color-text-muted); }
+.theme-text-inverted { color: var(--color-text-inverted); }
+
+/* Border utilities */
+.theme-border { border-color: var(--color-border-primary); }
+.theme-border-secondary { border-color: var(--color-border-secondary); }
+.theme-border-focus:focus { border-color: var(--color-border-focus); }
+
+/* Brand utilities */
+.theme-bg-brand { background-color: var(--color-brand-primary); }
+.theme-bg-brand-hover:hover { background-color: var(--color-brand-hover); }
+.theme-bg-brand-muted { background-color: var(--color-brand-muted); }
+.theme-text-brand { color: var(--color-brand-primary); }
+
+/* Accent utilities */
+.theme-bg-accent { background-color: var(--color-accent); }
+.theme-bg-accent-hover:hover { background-color: var(--color-accent-hover); }
+.theme-bg-accent-muted { background-color: var(--color-accent-muted); }
+.theme-text-accent { color: var(--color-accent); }
+.theme-border-accent { border-color: var(--color-accent); }
+
+/* Status utilities */
+.theme-text-success { color: var(--color-success); }
+.theme-bg-success { background-color: var(--color-success-bg); }
+.theme-border-success { border-color: var(--color-success-border); }
+
+.theme-text-error { color: var(--color-error); }
+.theme-bg-error { background-color: var(--color-error-bg); }
+.theme-border-error { border-color: var(--color-error-border); }
+
+.theme-text-warning { color: var(--color-warning); }
+.theme-bg-warning { background-color: var(--color-warning-bg); }
+.theme-border-warning { border-color: var(--color-warning-border); }
+
+.theme-text-info { color: var(--color-info); }
+.theme-bg-info { background-color: var(--color-info-bg); }
+.theme-border-info { border-color: var(--color-info-border); }
+
+/* Shadow utilities */
+.theme-shadow-sm { box-shadow: var(--shadow-sm); }
+.theme-shadow-md { box-shadow: var(--shadow-md); }
+.theme-shadow-lg { box-shadow: var(--shadow-lg); }
+
+/* Divide utilities */
+.theme-divide > * + * { border-color: var(--color-border-primary); }
+
+/* Ring utilities */
+.theme-ring-focus:focus {
+  --tw-ring-color: var(--color-brand-primary);
+  box-shadow: 0 0 0 2px var(--color-brand-primary);
+}
+
+.theme-ring-accent:focus {
+  --tw-ring-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent);
+}
+
+/* =============================================================================
+   Component Classes
+
+   Pre-built component styles for common UI patterns.
+   ============================================================================= */
+
+/* Card component */
+.theme-card {
+  background-color: var(--color-card-bg);
+  border: 1px solid var(--color-card-border);
+  border-radius: 0.75rem;
+}
+
+.theme-card-hover:hover {
+  border-color: var(--color-accent);
+}
+
+/* Input component */
+.theme-input {
+  background-color: var(--color-input-bg);
+  border: 1px solid var(--color-input-border);
+  color: var(--color-text-primary);
+}
+
+.theme-input::placeholder {
+  color: var(--color-text-muted);
+}
+
+.theme-input:focus {
+  border-color: var(--color-brand-primary);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-brand-muted);
+}
+
+/* Button variants */
+.theme-btn-primary {
+  background-color: var(--color-brand-primary);
+  color: white;
+}
+
+.theme-btn-primary:hover {
+  background-color: var(--color-brand-hover);
+}
+
+.theme-btn-secondary {
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+}
+
+.theme-btn-secondary:hover {
+  background-color: var(--color-bg-hover);
+}
+
+.theme-btn-ghost {
+  background-color: transparent;
+  color: var(--color-text-secondary);
+}
+
+.theme-btn-ghost:hover {
+  background-color: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+/* Badge variants */
+.theme-badge {
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+}
+
+.theme-badge-brand {
+  background-color: var(--color-brand-muted);
+  color: var(--color-brand-primary);
+}
+
+.theme-badge-success {
+  background-color: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.theme-badge-error {
+  background-color: var(--color-error-bg);
+  color: var(--color-error);
+}
+
+.theme-badge-warning {
+  background-color: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.theme-badge-info {
+  background-color: var(--color-info-bg);
+  color: var(--color-info);
+}
+
+/* Table styles */
+.theme-table-header {
+  background-color: var(--color-bg-secondary);
+}
+
+.theme-table-row:hover {
+  background-color: var(--color-bg-hover);
+}
+
+.theme-table-cell {
+  border-color: var(--color-border-primary);
+}
+
+/* Modal/Overlay */
+.theme-overlay {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+.theme-modal {
+  background-color: var(--color-card-bg);
+  border: 1px solid var(--color-card-border);
+}
+
+/* Scrollbar styling */
+.theme-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.theme-scrollbar::-webkit-scrollbar-track {
+  background: var(--color-bg-secondary);
+}
+
+.theme-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--color-border-secondary);
+  border-radius: 4px;
+}
+
+.theme-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
+/* =============================================================================
+   Transition utilities
+   ============================================================================= */
+
+.theme-transition {
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.theme-transition-fast {
+  transition: all 0.15s ease;
+}

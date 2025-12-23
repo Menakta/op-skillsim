@@ -1,41 +1,46 @@
 'use client'
 
+/**
+ * Login Page
+ *
+ * Simple login page - redirects to dashboard on success.
+ */
+
 import { useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { useTheme } from '../context/ThemeContext'
-import { sessionService } from '@/app/services'
 
 export default function LoginPage() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const returnUrl = searchParams.get('returnUrl') || '/dashboard'
   const { theme, toggleTheme } = useTheme()
-
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setError('')
     setLoading(true)
+    setError(null)
 
     try {
-      // Use sessionService for login
-      const result = await sessionService.login(email, password)
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
 
-      if (!result.success) {
-        setError(result.error)
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.error || 'Login failed')
+        setLoading(false)
         return
       }
 
-      // Redirect to the appropriate dashboard
-      router.push(result.data.redirectUrl || returnUrl)
-    } catch {
-      setError('An error occurred. Please try again.')
-    } finally {
+      // Redirect to dashboard
+      window.location.href = '/admin'
+    } catch (err) {
+      setError('Network error. Please try again.')
       setLoading(false)
     }
   }
@@ -74,15 +79,6 @@ export default function LoginPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4 md:pr-20">
-             <div className='my-6'>
-              <input
-                type="text"
-                id="name"
-                className={`w-full px-8 py-2 border-2  rounded-md focus:outline-none focus:ring-1 ${isDark ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:ring-gray-500' : 'bg-[#D9D9D9] border-[#848484] text-black placeholder-gray-900 focus:ring-gray-800'}`}
-                placeholder="Name"
-                required
-              />
-            </div>
             <div className='my-6'>
               <input
                 type="email"

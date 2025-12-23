@@ -1,13 +1,19 @@
 /**
  * LTI 1.0 Launch Endpoint for iQualify
- * * Updated with Absolute HTTPS Redirects for Ngrok compatibility.
+ *
+ * Authentication Flow:
+ * - Students: LTI launch → SessionManager creates session → redirect to / (training)
+ * - Teachers/Admins: LTI launch → set role cookie → redirect to /login (Supabase auth required)
+ *
+ * Updated with Absolute HTTPS Redirects for Ngrok compatibility.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createHmac } from 'crypto'
 import { logger } from '@/app/lib/logger'
-import { signTokenWithRole } from '@/app/auth'
+import { sessionManager } from '@/app/lib/sessions'
 import { findOrCreateLtiUser, LtiPayload } from '@/app/lib/database'
+import type { UserRole } from '@/app/types'
 
 // =============================================================================
 // Types
@@ -60,7 +66,7 @@ function getConsumerCredentials(): { key: string; secret: string } | null {
 }
 
 const usedNonces = new Set<string>()
-const NONCE_EXPIRY_MS = 10 * 60 * 1000 
+const NONCE_EXPIRY_MS = 10 * 60 * 1000
 
 function checkNonce(nonce: string, timestamp: string): boolean {
   const nonceKey = `${nonce}:${timestamp}`
@@ -72,8 +78,11 @@ function checkNonce(nonce: string, timestamp: string): boolean {
 
 function encodeRFC3986(str: string): string {
   return encodeURIComponent(str)
-    .replace(/!/g, '%21').replace(/\*/g, '%2A').replace(/'/g, '%27')
-    .replace(/\(/g, '%28').replace(/\)/g, '%29')
+    .replace(/!/g, '%21')
+    .replace(/\*/g, '%2A')
+    .replace(/'/g, '%27')
+    .replace(/\(/g, '%28')
+    .replace(/\)/g, '%29')
 }
 
 function createParameterString(params: LtiLaunchParams): string {
@@ -85,10 +94,19 @@ function createParameterString(params: LtiLaunchParams): string {
     .join('&')
 }
 
-function calculateOAuthSignature(method: string, url: string, params: LtiLaunchParams, consumerSecret: string): string {
+function calculateOAuthSignature(
+  method: string,
+  url: string,
+  params: LtiLaunchParams,
+  consumerSecret: string
+): string {
   const baseUrl = url.split('?')[0]
   const paramString = createParameterString(params)
-  const signatureBase = [method.toUpperCase(), encodeRFC3986(baseUrl), encodeRFC3986(paramString)].join('&')
+  const signatureBase = [
+    method.toUpperCase(),
+    encodeRFC3986(baseUrl),
+    encodeRFC3986(paramString),
+  ].join('&')
   const signingKey = `${encodeURIComponent(consumerSecret)}&`
   const hmac = createHmac('sha1', signingKey)
   hmac.update(signatureBase)
@@ -102,25 +120,26 @@ function timingSafeEqual(a: string, b: string): boolean {
   return result === 0
 }
 
-/**
- * FIXED: Uses x-forwarded headers to ensure we generate an HTTPS URL for signature matching
- */
 function getLaunchUrl(req: NextRequest): string {
   const protocol = req.headers.get('x-forwarded-proto') || 'https'
   const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:3000'
   return `${protocol}://${host}/api/lti/launch`
 }
 
-function mapLtiRole(ltiRoles: string | undefined): 'student' | 'teacher' | 'admin' {
+function mapLtiRole(ltiRoles: string | undefined): UserRole {
   if (!ltiRoles) return 'student'
   const roles = ltiRoles.toLowerCase()
-  if (roles.includes('instructor') || roles.includes('teacher') || roles.includes('staff')) return 'teacher'
+  if (roles.includes('instructor') || roles.includes('teacher') || roles.includes('staff')) {
+    return 'teacher'
+  }
   if (roles.includes('admin')) return 'admin'
   return 'student'
 }
 
-function getRedirectPath(role: string): string {
-  return role === 'teacher' || role === 'admin' ? '/dashboard/teacher' : '/'
+function getRedirectPath(role: UserRole): string {
+  // Students: Go directly to training (auto-login via session)
+  // Teachers/Admins: Must authenticate via Supabase login page
+  return role === 'student' ? '/' : '/login'
 }
 
 // =============================================================================
@@ -130,12 +149,16 @@ function getRedirectPath(role: string): string {
 export async function POST(req: NextRequest) {
   try {
     const credentials = getConsumerCredentials()
-    if (!credentials) return NextResponse.json({ error: 'LTI not configured' }, { status: 500 })
+    if (!credentials) {
+      return NextResponse.json({ error: 'LTI not configured' }, { status: 500 })
+    }
 
     // Parse Form Data
     const text = await req.text()
-    const params: any = {}
-    new URLSearchParams(text).forEach((value, key) => { params[key] = value })
+    const params: LtiLaunchParams = {} as LtiLaunchParams
+    new URLSearchParams(text).forEach((value, key) => {
+      ;(params as Record<string, string>)[key] = value
+    })
 
     const launchUrl = getLaunchUrl(req)
 
@@ -148,47 +171,92 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
     }
 
-    // Auth & User Logic
+    // Extract user data from LTI params
     const ltiPayload: LtiPayload = {
       user_id: params.user_id || `user-${Date.now()}`,
       roles: params.roles || 'Learner',
       context_title: params.context_title,
-      resource_link_id: params.resource_link_id
+      resource_link_id: params.resource_link_id,
     }
-    
+
     const user = await findOrCreateLtiUser(ltiPayload)
     const appRole = mapLtiRole(params.roles)
-    const token = signTokenWithRole(user.id, appRole)
     const redirectPath = getRedirectPath(appRole)
 
-    /**
-     * FIX: ABSOLUTE REDIRECT TO PREVENT SSL_PROTOCOL_ERROR
-     * We force 'https' and use the host from headers so ngrok works inside iframes.
-     */
+    // Build absolute redirect URL
     const host = req.headers.get('x-forwarded-host') || req.headers.get('host')
-    const protocol = 'https' 
+    const protocol = 'https'
     const absoluteRedirectUrl = new URL(redirectPath, `${protocol}://${host}`)
 
     const response = NextResponse.redirect(absoluteRedirectUrl.toString(), 307)
 
-    /**
-     * FIX: COOKIE SECURITY FOR IFRAMES
-     * Must be secure: true and sameSite: 'none' for the browser to accept them inside iQualify.
-     */
+    // Cookie options for iframe compatibility (iQualify)
     const cookieOptions = {
       httpOnly: true,
-      secure: true,      // Required for SameSite=None
-      sameSite: 'none' as const, 
+      secure: true,
+      sameSite: 'none' as const,
       path: '/',
-      maxAge: 60 * 60
+      maxAge: 60 * 60 * 24, // 24 hours
     }
 
-    response.cookies.set('access_token', token, cookieOptions)
-    response.cookies.set('user_role', appRole, { ...cookieOptions, httpOnly: false })
+    // ==========================================================================
+    // Student Flow: Create session with SessionManager
+    // ==========================================================================
+    if (appRole === 'student') {
+      const ltiData = {
+        userId: user.id,
+        email: params.lis_person_contact_email_primary || `${user.id}@lti.local`,
+        fullName: params.lis_person_name_full,
+        courseId: params.context_id || '',
+        courseName: params.context_title || 'Unknown Course',
+        resourceId: params.resource_link_id,
+        institution: params.tool_consumer_instance_name || 'Unknown Institution',
+        returnUrl: params.launch_presentation_return_url,
+      }
 
-    logger.info({ userId: user.id, redirect: absoluteRedirectUrl.toString() }, 'LTI Launch Success')
+      // Get request info for session tracking
+      const requestInfo = await sessionManager.getRequestInfo()
+
+      // Create student session
+      const { sessionId, token } = await sessionManager.createStudentSession(ltiData, requestInfo)
+
+      // Create training session
+      try {
+        await sessionManager.createTrainingSession(
+          sessionId,
+          ltiData.courseId,
+          ltiData.courseName
+        )
+      } catch (error) {
+        logger.warn({ error }, 'Failed to create training session - continuing without it')
+      }
+
+      // Set session token cookie
+      response.cookies.set('session_token', token, cookieOptions)
+
+      logger.info({
+        userId: user.id,
+        sessionId,
+        role: appRole,
+        redirect: absoluteRedirectUrl.toString(),
+      }, 'LTI Student Launch Success')
+    }
+    // ==========================================================================
+    // Teacher/Admin Flow: Set role cookie, redirect to login
+    // ==========================================================================
+    else {
+      // Set role cookie so login page knows they came from LTI
+      response.cookies.set('lti_role', appRole, { ...cookieOptions, httpOnly: false })
+      response.cookies.set('lti_user_id', user.id, cookieOptions)
+
+      logger.info({
+        userId: user.id,
+        role: appRole,
+        redirect: absoluteRedirectUrl.toString(),
+      }, 'LTI Teacher/Admin Launch - Redirecting to login')
+    }
+
     return response
-
   } catch (error) {
     logger.error({ error }, 'LTI POST Error')
     return NextResponse.json({ error: 'Launch failed' }, { status: 500 })

@@ -6,6 +6,37 @@
  */
 
 // =============================================================================
+// Session Types
+// =============================================================================
+
+export type {
+  UserRole,
+  SessionType,
+  LtiContext,
+  BaseSession,
+  StudentSession,
+  TeacherSession,
+  AdminSession,
+  UserSession,
+  SessionValidationResponse,
+  SessionJwtPayload,
+  TeacherPermissions,
+  AdminPermissions,
+} from './session.types'
+
+export {
+  DEFAULT_TEACHER_PERMISSIONS,
+  DEFAULT_ADMIN_PERMISSIONS,
+  isStudentSession,
+  isTeacherSession,
+  isAdminSession,
+  isStaffSession,
+  canAccessAdmin,
+  canEditQuestionnaires,
+  canManageUsers,
+} from './session.types'
+
+// =============================================================================
 // Training Types
 // =============================================================================
 

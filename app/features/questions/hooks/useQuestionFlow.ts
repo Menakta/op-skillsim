@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useState, useRef } from 'react'
 import type { ParsedMessage, QuestionData } from '@/app/lib/messageTypes'
-import { QUESTION_DATABASE, WEB_TO_UE_MESSAGES } from '@/app/lib/messageTypes'
+import { WEB_TO_UE_MESSAGES } from '@/app/lib/messageTypes'
 import type { UseMessageBusReturn } from '@/app/features/messaging/hooks/useMessageBus'
 import { eventBus } from '@/app/lib/events'
+import { useQuestions } from '../context/QuestionsContext'
 
 // =============================================================================
 // Question State Type
@@ -57,6 +58,9 @@ export function useQuestionFlow(
   const callbacksRef = useRef(callbacks)
   callbacksRef.current = callbacks
 
+  // Get questions from context (loaded from Supabase)
+  const { isLoading: questionsLoading, getQuestion } = useQuestions()
+
   // ==========================================================================
   // Message Handler
   // ==========================================================================
@@ -68,10 +72,17 @@ export function useQuestionFlow(
 
       if (type === 'question_request') {
         const questionId = parts[0] || 'Q1'
-        const question = QUESTION_DATABASE[questionId]
+
+        // Don't process if questions haven't loaded yet
+        if (questionsLoading) {
+          console.warn('Questions still loading, request queued:', questionId)
+          return
+        }
+
+        const question = getQuestion(questionId)
 
         if (question) {
-          console.log('Question requested:', questionId)
+          console.log('Question requested:', questionId, '(from Supabase)')
           setState({
             currentQuestion: question,
             questionTryCount: 1,
@@ -86,7 +97,7 @@ export function useQuestionFlow(
     })
 
     return unsubscribe
-  }, [messageBus])
+  }, [messageBus, questionsLoading, getQuestion])
 
   // ==========================================================================
   // Submit Answer
