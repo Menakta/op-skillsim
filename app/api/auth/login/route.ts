@@ -5,13 +5,20 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { logger } from '@/app/lib/logger'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!
-)
+let _supabase: SupabaseClient | null = null
+
+function getSupabase(): SupabaseClient {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!
+    )
+  }
+  return _supabase
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,6 +34,7 @@ export async function POST(request: NextRequest) {
     logger.info({ email }, 'Login attempt')
 
     // Authenticate with Supabase
+    const supabase = getSupabase()
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
