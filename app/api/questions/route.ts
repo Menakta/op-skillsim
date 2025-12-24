@@ -227,17 +227,3 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-/**
- * GET all questions with raw Supabase format (for admin)
- */
-export async function getQuestionsRaw(): Promise<SupabaseQuestion[]> {
-  const supabase = await createServerSupabaseClient()
-
-  const { data, error } = await supabase
-    .from('questionnaires')
-    .select('*')
-    .order('question_id')
-
-  if (error) throw error
-  return data as SupabaseQuestion[]
-}
