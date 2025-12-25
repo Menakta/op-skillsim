@@ -142,14 +142,10 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * 1. Match your protected routes explicitly
+     * Only match protected routes explicitly.
+     * All other routes (including /api/lti/*) pass through without middleware.
      */
     '/admin/:path*',
     '/api/admin/:path*',
-    /*
-     * 2. Use a negative lookahead to exclude LTI and static files
-     * This ensures /api/lti/launch is NEVER touched by this middleware
-     */
-    '/((?!api/lti|_next/static|_next/image|favicon.ico).*)',
   ],
 }
