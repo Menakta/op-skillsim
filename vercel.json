@@ -1,3 +1,14 @@
 {
-    "trailingSlash": false
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/api/lti/launch",
+      "has": [
+        {
+          "type": "method",
+          "value": "POST"
+        }
+      ]
+    }
+  ]
 }
