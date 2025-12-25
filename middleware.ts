@@ -141,11 +141,11 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Only match protected routes explicitly.
-     * All other routes (including /api/lti/*) pass through without middleware.
-     */
+    // Match admin pages
     '/admin/:path*',
+    // Match admin API routes
     '/api/admin/:path*',
+    // Skip static files and images
+    '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 }

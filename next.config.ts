@@ -1,7 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output:'standalone',
   // Allow cross-origin requests from LTI providers (ngrok, SaLTire, iQualify)
   allowedDevOrigins: [
     'saltire.lti.app',
