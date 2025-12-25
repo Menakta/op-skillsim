@@ -1,3 +1,8 @@
 {
-  "trailingSlash": false
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/api/lti/launch"
+    }
+  ]
 }
