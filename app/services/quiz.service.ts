@@ -2,15 +2,18 @@
  * Quiz Service
  *
  * Handles quiz response submission and retrieval.
- * Abstracts API calls for quiz-related operations.
+ * New approach: Accumulate answers in memory, submit all at once at the end.
  */
 
 import type {
-  SubmitQuizAnswerRequest,
-  SubmitQuizAnswerResponse,
+  SubmitQuizResultsRequest,
+  SubmitQuizResultsResponse,
   QuizResponse,
   QuizStatistics,
+  QuizAnswerState,
+  QuestionDataMap,
 } from '@/app/types'
+import { buildQuestionDataMap, calculateScorePercentage } from '@/app/types'
 
 // =============================================================================
 // Types
@@ -26,12 +29,30 @@ export type ServiceResult<T> =
 
 export const quizService = {
   /**
-   * Submit a quiz answer
+   * Submit all quiz results at once
+   * Call this when the quiz is complete
    */
-  async submitAnswer(
-    request: SubmitQuizAnswerRequest
+  async submitResults(
+    answers: QuizAnswerState[],
+    totalQuestions: number
   ): Promise<ServiceResult<QuizResponse>> {
     try {
+      console.log('📝 [quizService] submitResults called with:', { answers, totalQuestions })
+
+      const questionData = buildQuestionDataMap(answers)
+      const finalScorePercentage = calculateScorePercentage(questionData)
+
+      console.log('📝 [quizService] Built questionData:', questionData)
+      console.log('📝 [quizService] Calculated score:', finalScorePercentage)
+
+      const request: SubmitQuizResultsRequest = {
+        questionData,
+        totalQuestions,
+        finalScorePercentage,
+      }
+
+      console.log('📝 [quizService] Sending request to /api/quiz/response:', request)
+
       const response = await fetch('/api/quiz/response', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -39,12 +60,58 @@ export const quizService = {
         body: JSON.stringify(request),
       })
 
-      const data: SubmitQuizAnswerResponse = await response.json()
+      const data: SubmitQuizResultsResponse = await response.json()
+      console.log('📝 [quizService] Response:', { status: response.status, data })
 
       if (!response.ok || !data.success) {
         return {
           success: false,
-          error: data.error || 'Failed to submit answer',
+          error: data.error || 'Failed to submit quiz results',
+        }
+      }
+
+      return {
+        success: true,
+        data: data.response!,
+      }
+    } catch (error) {
+      console.error('📝 [quizService] Error:', error)
+      return {
+        success: false,
+        error: 'Network error: Failed to submit quiz results',
+      }
+    }
+  },
+
+  /**
+   * Submit quiz results with pre-built question data map
+   */
+  async submitQuestionData(
+    questionData: QuestionDataMap,
+    totalQuestions: number
+  ): Promise<ServiceResult<QuizResponse>> {
+    try {
+      const finalScorePercentage = calculateScorePercentage(questionData)
+
+      const request: SubmitQuizResultsRequest = {
+        questionData,
+        totalQuestions,
+        finalScorePercentage,
+      }
+
+      const response = await fetch('/api/quiz/response', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(request),
+      })
+
+      const data: SubmitQuizResultsResponse = await response.json()
+
+      if (!response.ok || !data.success) {
+        return {
+          success: false,
+          error: data.error || 'Failed to submit quiz results',
         }
       }
 
@@ -56,15 +123,15 @@ export const quizService = {
       console.error('Quiz service error:', error)
       return {
         success: false,
-        error: 'Network error: Failed to submit answer',
+        error: 'Network error: Failed to submit quiz results',
       }
     }
   },
 
   /**
-   * Get all quiz responses for current session
+   * Get quiz results for current session
    */
-  async getSessionResponses(): Promise<ServiceResult<QuizResponse[]>> {
+  async getSessionResults(): Promise<ServiceResult<QuizResponse | null>> {
     try {
       const response = await fetch('/api/quiz/response', {
         method: 'GET',
@@ -76,52 +143,53 @@ export const quizService = {
       if (!response.ok || !data.success) {
         return {
           success: false,
-          error: data.error || 'Failed to fetch responses',
+          error: data.error || 'Failed to fetch quiz results',
         }
       }
 
       return {
         success: true,
-        data: data.responses || [],
+        data: data.response || null,
       }
     } catch (error) {
       console.error('Quiz service error:', error)
       return {
         success: false,
-        error: 'Network error: Failed to fetch responses',
+        error: 'Network error: Failed to fetch quiz results',
       }
     }
   },
 
   /**
-   * Get quiz statistics for current session
+   * Calculate statistics from question data
    */
-  async getSessionStatistics(): Promise<ServiceResult<QuizStatistics>> {
-    try {
-      const response = await fetch('/api/quiz/statistics', {
-        method: 'GET',
-        credentials: 'include',
-      })
+  calculateStatistics(questionData: QuestionDataMap): QuizStatistics {
+    const entries = Object.values(questionData)
+    const totalQuestions = entries.length
 
-      const data = await response.json()
-
-      if (!response.ok || !data.success) {
-        return {
-          success: false,
-          error: data.error || 'Failed to fetch statistics',
-        }
-      }
-
+    if (totalQuestions === 0) {
       return {
-        success: true,
-        data: data.statistics,
+        totalQuestions: 0,
+        correctAnswers: 0,
+        incorrectAnswers: 0,
+        averageAttempts: 0,
+        averageTimeMs: 0,
+        completionRate: 0,
       }
-    } catch (error) {
-      console.error('Quiz service error:', error)
-      return {
-        success: false,
-        error: 'Network error: Failed to fetch statistics',
-      }
+    }
+
+    const correctAnswers = entries.filter(e => e.correct).length
+    const incorrectAnswers = totalQuestions - correctAnswers
+    const totalAttempts = entries.reduce((sum, e) => sum + e.attempts, 0)
+    const totalTime = entries.reduce((sum, e) => sum + e.time, 0)
+
+    return {
+      totalQuestions,
+      correctAnswers,
+      incorrectAnswers,
+      averageAttempts: totalAttempts / totalQuestions,
+      averageTimeMs: totalTime / totalQuestions,
+      completionRate: (correctAnswers / totalQuestions) * 100,
     }
   },
 }

@@ -7,6 +7,7 @@ import type { UseMessageBusReturn } from '@/app/features/messaging/hooks/useMess
 import { eventBus } from '@/app/lib/events'
 import { useQuestions } from '../context/QuestionsContext'
 import { quizService } from '@/app/services'
+import type { QuizAnswerState } from '@/app/types'
 
 // =============================================================================
 // Question State Type
@@ -24,6 +25,7 @@ export interface QuestionStateData {
 
 export interface QuestionFlowCallbacks {
   onQuestionRequest?: (questionId: string, question: QuestionData) => void
+  onQuizComplete?: (answers: QuizAnswerState[], totalQuestions: number) => void
 }
 
 // =============================================================================
@@ -42,9 +44,12 @@ const initialState: QuestionStateData = {
 
 export interface UseQuestionFlowReturn {
   state: QuestionStateData
+  answers: QuizAnswerState[]
   submitQuestionAnswer: (selectedAnswer: number) => { correct: boolean; message: string } | undefined
   closeQuestion: () => void
   resetQuestionState: () => void
+  submitQuizResults: (totalQuestions: number) => Promise<boolean>
+  clearAnswers: () => void
 }
 
 // =============================================================================
@@ -56,8 +61,14 @@ export function useQuestionFlow(
   callbacks: QuestionFlowCallbacks = {}
 ): UseQuestionFlowReturn {
   const [state, setState] = useState<QuestionStateData>(initialState)
+  const [answers, setAnswers] = useState<QuizAnswerState[]>([])
   const callbacksRef = useRef(callbacks)
   callbacksRef.current = callbacks
+
+  // Debug: Log when answers change
+  useEffect(() => {
+    console.log('📝 [useQuestionFlow] answers state changed:', answers)
+  }, [answers])
 
   // Track when question was displayed for time_to_answer
   const questionStartTimeRef = useRef<number | null>(null)
@@ -106,7 +117,7 @@ export function useQuestionFlow(
   }, [messageBus, questionsLoading, getQuestion])
 
   // ==========================================================================
-  // Submit Answer
+  // Submit Answer (accumulates in memory, does NOT save to DB)
   // ==========================================================================
 
   const submitQuestionAnswer = useCallback((selectedAnswer: number) => {
@@ -118,19 +129,36 @@ export function useQuestionFlow(
     // Calculate time to answer
     const timeToAnswer = questionStartTimeRef.current
       ? Date.now() - questionStartTimeRef.current
-      : undefined
+      : 0
 
-    // Save response to Supabase (fire and forget - don't block UI)
-    quizService.submitAnswer({
+    // Store answer in memory (store on every attempt, update when correct)
+    const answerState: QuizAnswerState = {
       questionId: question.id,
       selectedAnswer,
       isCorrect,
       attemptCount: state.questionTryCount,
       timeToAnswer,
-    }).then(result => {
-      if (!result.success) {
-        console.warn('Failed to save quiz response:', result.error)
+    }
+
+    console.log('📝 [useQuestionFlow] Storing answer:', answerState)
+
+    setAnswers(prev => {
+      // Replace if already answered this question, otherwise add
+      const existing = prev.findIndex(a => a.questionId === question.id)
+      if (existing >= 0) {
+        // Only update if this is correct OR if the existing one was also incorrect
+        // This ensures we keep the final correct answer if achieved
+        if (isCorrect || !prev[existing].isCorrect) {
+          const updated = [...prev]
+          updated[existing] = answerState
+          console.log('📝 [useQuestionFlow] Updated answers array:', updated)
+          return updated
+        }
+        return prev
       }
+      const newAnswers = [...prev, answerState]
+      console.log('📝 [useQuestionFlow] New answers array:', newAnswers)
+      return newAnswers
     })
 
     if (isCorrect) {
@@ -157,6 +185,43 @@ export function useQuestionFlow(
       return { correct: false, message: 'Incorrect. Try again!' }
     }
   }, [state.currentQuestion, state.questionTryCount, messageBus])
+
+  // ==========================================================================
+  // Submit All Quiz Results to Supabase
+  // ==========================================================================
+
+  const submitQuizResults = useCallback(async (totalQuestions: number): Promise<boolean> => {
+    console.log('📝 [useQuestionFlow] submitQuizResults called with:', {
+      answersLength: answers.length,
+      answers,
+      totalQuestions
+    })
+
+    if (answers.length === 0) {
+      console.warn('📝 [useQuestionFlow] No answers to submit - answers array is empty!')
+      return false
+    }
+
+    console.log('📝 [useQuestionFlow] Calling quizService.submitResults...')
+    const result = await quizService.submitResults(answers, totalQuestions)
+
+    if (result.success) {
+      console.log('📝 [useQuestionFlow] Quiz results saved to Supabase:', result.data)
+      callbacksRef.current.onQuizComplete?.(answers, totalQuestions)
+      return true
+    } else {
+      console.error('📝 [useQuestionFlow] Failed to save quiz results:', result.error)
+      return false
+    }
+  }, [answers])
+
+  // ==========================================================================
+  // Clear Answers
+  // ==========================================================================
+
+  const clearAnswers = useCallback(() => {
+    setAnswers([])
+  }, [])
 
   // ==========================================================================
   // Close Question
@@ -187,9 +252,12 @@ export function useQuestionFlow(
 
   return {
     state,
+    answers,
     submitQuestionAnswer,
     closeQuestion,
-    resetQuestionState
+    resetQuestionState,
+    submitQuizResults,
+    clearAnswers
   }
 }
 

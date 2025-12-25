@@ -128,7 +128,11 @@ export interface CompletePhaseRequest {
 }
 
 export interface CompleteTrainingRequest {
-  finalResults: TrainingFinalResults
+  finalResults?: TrainingFinalResults
+  totalTimeMs?: number
+  phasesCompleted?: number
+  quizData?: Record<string, { answer: string; attempts: number; time: number; correct: boolean }>
+  totalQuestions?: number
 }
 
 // =============================================================================

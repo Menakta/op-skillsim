@@ -152,16 +152,23 @@ export type {
 
 export type {
   AnswerOption,
+  QuestionDataEntry,
+  QuestionDataMap,
   QuizResponse,
   QuizResponseInsert,
-  SubmitQuizAnswerRequest,
-  SubmitQuizAnswerResponse,
+  SubmitQuizResultsRequest,
+  SubmitQuizResultsResponse,
+  QuizAnswerState,
   QuizStatistics,
 } from './quiz.types'
 
 export {
   indexToAnswer,
   answerToIndex,
+  questionIdToKey,
+  keyToQuestionId,
+  buildQuestionDataMap,
+  calculateScorePercentage,
 } from './quiz.types'
 
 // =============================================================================

@@ -145,7 +145,7 @@ export const config = {
     '/admin/:path*',
     // Match admin API routes
     '/api/admin/:path*',
-    // Skip static files and images
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    // Match root path for training page auth check
+    '/',
   ],
 }

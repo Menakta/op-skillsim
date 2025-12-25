@@ -241,6 +241,9 @@ export function useTrainingMessagesComposite(
     // Question Handling
     submitQuestionAnswer: questionFlow.submitQuestionAnswer,
     closeQuestion: questionFlow.closeQuestion,
+    quizAnswers: questionFlow.answers,
+    submitQuizResults: questionFlow.submitQuizResults,
+    clearQuizAnswers: questionFlow.clearAnswers,
 
     // Camera Control
     setCameraPerspective: cameraControl.setCameraPerspective,

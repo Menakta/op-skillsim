@@ -5,7 +5,7 @@ import {PlatformNext,ModelDefinition, UndefinedModelDefinition,DefaultStreamerOp
 import {useStreamer,useLaunchRequest,VideoStream} from '@pureweb/platform-sdk-react'
 
 // Feature imports - New modular components
-import { QuestionModal } from '../features/questions'
+import { QuestionModal, useQuestions } from '../features/questions'
 import { CompletionPopup } from '../features/training'
 // LoadingOverlay removed - using LoadingScreen instead
 import { StatusBar } from '../components/layout'
@@ -44,6 +44,9 @@ export default function StreamingApp() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const isDark = true // Default to dark theme
 
+  // Questions context - for getting total question count
+  const { questionCount } = useQuestions()
+
   // Platform ref - persists across renders
   const platformRef = useRef<PlatformNext | null>(null)
 
@@ -67,6 +70,7 @@ export default function StreamingApp() {
   // UI state
   const [showingQuestion, setShowingQuestion] = useState<QuestionData | null>(null)
   const [showCompletionPopup, setShowCompletionPopup] = useState(false)
+  const [sessionStartTime] = useState<number>(() => Date.now()) // Track when session started
   const [showPhaseSuccess, setShowPhaseSuccess] = useState(false)
   const [completedPhase, setCompletedPhase] = useState<{ taskId: string; taskName: string; nextTaskIndex: number } | null>(null)
   const [showErrorModal, setShowErrorModal] = useState(false)
@@ -322,6 +326,55 @@ export default function StreamingApp() {
       }, 1000)
     }
   }, [streamerStatus])
+
+  // ==========================================================================
+  // Submit Quiz Results when training completes
+  // ==========================================================================
+
+  useEffect(() => {
+    console.log('📝 [StreamingApp] Quiz submit effect triggered:', {
+      showCompletionPopup,
+      quizAnswersLength: training.quizAnswers.length,
+      quizAnswers: training.quizAnswers,
+      questionCount
+    })
+
+    if (showCompletionPopup) {
+      // Submit quiz results to quiz_responses table
+      if (training.quizAnswers.length > 0) {
+        console.log('📝 [StreamingApp] Submitting quiz results...')
+        training.submitQuizResults(questionCount).then(saved => {
+          if (saved) {
+            console.log('✅ [StreamingApp] Quiz results saved to Supabase')
+          } else {
+            console.warn('⚠️ [StreamingApp] Failed to save quiz results')
+          }
+        })
+      }
+
+      // Also complete training session with all data
+      import('@/app/services').then(({ trainingSessionService }) => {
+        import('@/app/types').then(({ buildQuestionDataMap }) => {
+          const quizData = training.quizAnswers.length > 0
+            ? buildQuestionDataMap(training.quizAnswers)
+            : undefined
+
+          trainingSessionService.completeTraining({
+            totalTimeMs: Date.now() - (sessionStartTime || Date.now()),
+            phasesCompleted: training.state.totalTasks,
+            quizData,
+            totalQuestions: questionCount,
+          }).then(result => {
+            if (result.success) {
+              console.log('✅ [StreamingApp] Training session completed in database')
+            } else {
+              console.warn('⚠️ [StreamingApp] Failed to complete training session:', result.error)
+            }
+          })
+        })
+      })
+    }
+  }, [showCompletionPopup, training.quizAnswers.length, questionCount, training, sessionStartTime])
 
   // ==========================================================================
   // Question Handlers

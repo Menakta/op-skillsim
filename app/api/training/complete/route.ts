@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { jwtVerify } from 'jose'
 import { getSupabaseAdmin } from '@/app/lib/supabase/admin'
 import { logger } from '@/app/lib/logger'
-import type { TrainingFinalResults } from '@/app/types'
+import type { TrainingFinalResults, QuestionDataMap } from '@/app/types'
 
 const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'your-super-secret-jwt-key-min-32-chars'
@@ -44,6 +44,18 @@ async function getSessionFromRequest(request: NextRequest): Promise<SessionPaylo
 }
 
 // =============================================================================
+// Request body type
+// =============================================================================
+
+interface CompleteTrainingBody {
+  finalResults?: TrainingFinalResults
+  totalTimeMs?: number
+  phasesCompleted?: number
+  quizData?: QuestionDataMap
+  totalQuestions?: number
+}
+
+// =============================================================================
 // POST - Complete training session
 // =============================================================================
 
@@ -58,8 +70,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const body = await request.json()
-    const { finalResults } = body as { finalResults?: TrainingFinalResults }
+    const body: CompleteTrainingBody = await request.json()
+    const { finalResults, totalTimeMs, phasesCompleted, quizData, totalQuestions } = body
 
     const supabase = getSupabaseAdmin()
 
@@ -80,26 +92,66 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Build final results if not provided
-    const results: TrainingFinalResults = finalResults || {
-      completedAt: new Date().toISOString(),
-      totalTimeMs: currentSession.total_time_spent * 1000,
-      phaseScores: [],
-      quizPerformance: {
-        totalQuestions: 0,
-        correctFirstTry: 0,
-        totalAttempts: 0,
-        averageTimeMs: 0,
-      },
-      overallGrade: calculateGrade(currentSession.total_score, currentSession.phases_completed),
+    // Calculate quiz performance from quiz data
+    let quizPerformance = {
+      totalQuestions: 0,
+      correctFirstTry: 0,
+      totalAttempts: 0,
+      averageTimeMs: 0,
+    }
+    let totalScore = 0
+    let quizAttempts: Record<string, { attempts: number; correct: boolean }> = {}
+
+    if (quizData && Object.keys(quizData).length > 0) {
+      const entries = Object.entries(quizData)
+      quizPerformance.totalQuestions = totalQuestions || entries.length
+      quizPerformance.correctFirstTry = entries.filter(([, v]) => v.correct && v.attempts === 1).length
+      quizPerformance.totalAttempts = entries.reduce((sum, [, v]) => sum + v.attempts, 0)
+      quizPerformance.averageTimeMs = Math.round(
+        entries.reduce((sum, [, v]) => sum + v.time, 0) / entries.length
+      )
+
+      // Calculate score: 100 points per correct answer, minus 10 per extra attempt
+      totalScore = entries.reduce((sum, [, v]) => {
+        if (v.correct) {
+          return sum + Math.max(100 - (v.attempts - 1) * 10, 50) // Min 50 points if correct
+        }
+        return sum
+      }, 0)
+
+      // Build quiz attempts object
+      for (const [key, value] of entries) {
+        quizAttempts[key] = {
+          attempts: value.attempts,
+          correct: value.correct
+        }
+      }
     }
 
+    // Calculate total time spent in seconds
+    const totalTimeSpent = totalTimeMs ? Math.floor(totalTimeMs / 1000) : 0
+
+    // Build final results
+    const results: TrainingFinalResults = finalResults || {
+      completedAt: new Date().toISOString(),
+      totalTimeMs: totalTimeMs || 0,
+      phaseScores: [],
+      quizPerformance,
+      overallGrade: calculateGrade(totalScore, phasesCompleted || 6),
+    }
+
+    // Update training session with all data
     const { data: updatedSession, error: updateError } = await supabase
       .from('training_sessions')
       .update({
         status: 'completed',
         completion_percentage: 100,
+        overall_progress: 100,
         end_time: new Date().toISOString(),
+        total_time_spent: totalTimeSpent,
+        phases_completed: phasesCompleted || 6,
+        total_score: totalScore,
+        quiz_attempts: quizAttempts,
         final_results: results,
         updated_at: new Date().toISOString(),
       })
@@ -117,8 +169,10 @@ export async function POST(request: NextRequest) {
 
     logger.info({
       sessionId: currentSession.id,
-      totalScore: currentSession.total_score,
-      phasesCompleted: currentSession.phases_completed,
+      totalScore,
+      phasesCompleted: phasesCompleted || 6,
+      totalTimeSpent,
+      quizQuestionsAnswered: Object.keys(quizAttempts).length,
     }, 'Training session completed')
 
     return NextResponse.json({

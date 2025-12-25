@@ -16,6 +16,7 @@ import type { QuestionData } from '@/app/lib/messageTypes'
 
 interface QuestionsContextValue {
   questions: Record<string, QuestionData>
+  questionCount: number
   isLoading: boolean
   error: string | null
   getQuestion: (id: string) => QuestionData | undefined
@@ -59,7 +60,7 @@ export function QuestionsProvider({ children }: QuestionsProviderProps) {
       }
 
       setQuestions(data.questions)
-      console.log(`Loaded ${data.count} questions from database`)
+      console.log(`📚 Loaded ${data.count} questions from database:`, Object.keys(data.questions))
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load questions'
       console.error('Error loading questions:', message)
@@ -85,6 +86,7 @@ export function QuestionsProvider({ children }: QuestionsProviderProps) {
     <QuestionsContext.Provider
       value={{
         questions,
+        questionCount: Object.keys(questions).length,
         isLoading,
         error,
         getQuestion,
