@@ -16,6 +16,7 @@ import { SearchInput } from '../components/ui/SearchInput'
 import { EmptyState } from '../components/ui/EmptyState'
 import { mockResults, mockQuestionnaires } from '../data/mockData'
 import type { StudentResult } from '../types'
+import { StatCard } from '../components'
 
 type ResultFilter = 'all' | 'passed' | 'failed'
 
@@ -83,8 +84,8 @@ export default function ResultsPage() {
         <CardContent className="py-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-400 text-sm">Average Score Across All Assessments</p>
-              <p className="text-4xl font-bold text-white mt-1">{avgScore}%</p>
+              <p className="theme-text-muted text-sm">Average Score Across All Assessments</p>
+              <p className="text-4xl font-bold theme-text-primary mt-1">{avgScore}%</p>
             </div>
             <div className="w-32 h-32 relative">
               <svg className="w-32 h-32 -rotate-90" viewBox="0 0 100 100">
@@ -92,7 +93,7 @@ export default function ResultsPage() {
                   cx="50"
                   cy="50"
                   r="40"
-                  stroke="#374151"
+                  stroke="#ffffffff"
                   strokeWidth="8"
                   fill="none"
                 />
@@ -108,7 +109,7 @@ export default function ResultsPage() {
                 />
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-2xl font-bold text-white">{avgScore}%</span>
+                <span className="text-2xl font-bold theme-text-primary">{avgScore}%</span>
               </div>
             </div>
           </div>
@@ -127,7 +128,7 @@ export default function ResultsPage() {
             />
             <div className="flex flex-wrap gap-2">
               {/* Result Filter */}
-              <div className="flex gap-1 bg-gray-700 rounded-lg p-1">
+              <div className="flex gap-1 theme-bg-secondary rounded-lg p-1">
                 <FilterButton active={resultFilter === 'all'} onClick={() => setResultFilter('all')}>
                   All
                 </FilterButton>
@@ -143,7 +144,7 @@ export default function ResultsPage() {
               <select
                 value={quizFilter}
                 onChange={(e) => setQuizFilter(e.target.value)}
-                className="px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                className="px-4 py-2 bg-[#181818] border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
               >
                 <option value="all">All Quizzes</option>
                 {mockQuestionnaires.map((quiz) => (
@@ -154,7 +155,7 @@ export default function ResultsPage() {
               </select>
 
               {/* Export Button */}
-              <button className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors">
+              <button className="flex items-center gap-2 px-4 py-2 bg-[#39BEAE] text-white rounded-lg transition-colors">
                 <Download className="w-4 h-4" />
                 Export
               </button>
@@ -163,8 +164,8 @@ export default function ResultsPage() {
         </CardContent>
       </Card>
 
-      {/* Results Table */}
-      <Card>
+      {/* Results Table - Desktop */}
+      <Card className="hidden md:block">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Assessment Results</CardTitle>
@@ -184,11 +185,11 @@ export default function ResultsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Student</TableHead>
-                  <TableHead>Assessment</TableHead>
+                  <TableHead className="hidden lg:table-cell">Assessment</TableHead>
                   <TableHead>Score</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Time Spent</TableHead>
-                  <TableHead>Completed</TableHead>
+                  <TableHead className="hidden xl:table-cell">Time Spent</TableHead>
+                  <TableHead className="hidden lg:table-cell">Completed</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -200,19 +201,19 @@ export default function ResultsPage() {
                   >
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center flex-shrink-0">
                           <span className="text-white text-xs font-medium">
                             {result.studentName.split(' ').map(n => n[0]).join('')}
                           </span>
                         </div>
-                        <div>
-                          <p className="text-white font-medium">{result.studentName}</p>
-                          <p className="text-gray-500 text-xs">{result.studentEmail}</p>
+                        <div className="min-w-0">
+                          <p className="theme-text-primary font-medium truncate">{result.studentName}</p>
+                          <p className="theme-text-muted text-xs truncate">{result.studentEmail}</p>
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <p className="text-white">{result.questionnaireTitle}</p>
+                    <TableCell className="hidden lg:table-cell">
+                      <p className="theme-text-primary">{result.questionnaireTitle}</p>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -222,7 +223,7 @@ export default function ResultsPage() {
                         }`}>
                           {result.percentage}%
                         </span>
-                        <span className="text-gray-500 text-sm">
+                        <span className="theme-text-muted text-sm hidden sm:inline">
                           ({result.score}/{result.totalPoints})
                         </span>
                       </div>
@@ -232,14 +233,14 @@ export default function ResultsPage() {
                         {result.passed ? 'Passed' : 'Failed'}
                       </Badge>
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2 text-gray-400">
+                    <TableCell className="hidden xl:table-cell">
+                      <div className="flex items-center gap-2 theme-text-secondary">
                         <Clock className="w-4 h-4" />
                         {formatTime(result.timeSpent)}
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <span className="text-gray-400">{formatDate(result.completedAt)}</span>
+                    <TableCell className="hidden lg:table-cell">
+                      <span className="theme-text-secondary">{formatDate(result.completedAt)}</span>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -248,6 +249,66 @@ export default function ResultsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Results Cards - Mobile */}
+      <div className="md:hidden space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <span className="text-sm font-medium theme-text-primary">Assessment Results</span>
+          <span className="text-gray-400 text-sm">{filteredResults.length} results</span>
+        </div>
+        {filteredResults.length === 0 ? (
+          <Card>
+            <EmptyState
+              icon={<Award className="w-8 h-8 text-gray-400" />}
+              title="No results found"
+              description="Try adjusting your search or filter criteria"
+              className="py-12"
+            />
+          </Card>
+        ) : (
+          filteredResults.map((result) => (
+            <Card
+              key={result.id}
+              className="p-4 cursor-pointer"
+              onClick={() => setSelectedResult(result)}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center flex-shrink-0">
+                    <span className="text-white font-medium text-sm">
+                      {result.studentName.split(' ').map(n => n[0]).join('')}
+                    </span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="theme-text-primary font-medium truncate">{result.studentName}</p>
+                    <p className="theme-text-muted text-xs truncate">{result.questionnaireTitle}</p>
+                  </div>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <span className={`text-xl font-bold ${
+                    result.percentage >= 80 ? 'text-green-400' :
+                    result.percentage >= 60 ? 'text-yellow-400' : 'text-red-400'
+                  }`}>
+                    {result.percentage}%
+                  </span>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center justify-between">
+                <Badge variant={result.passed ? 'success' : 'danger'}>
+                  {result.passed ? 'Passed' : 'Failed'}
+                </Badge>
+                <div className="flex items-center gap-3 text-xs theme-text-muted">
+                  <span className="flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    {formatTime(result.timeSpent)}
+                  </span>
+                  <span>{formatDate(result.completedAt)}</span>
+                </div>
+              </div>
+            </Card>
+          ))
+        )}
+      </div>
 
       {/* Result Detail Modal */}
       {selectedResult && (
@@ -271,29 +332,6 @@ interface StatCardProps {
   color: 'purple' | 'green' | 'red' | 'blue'
 }
 
-function StatCard({ label, value, icon, color }: StatCardProps) {
-  const bgColors = {
-    purple: 'bg-purple-600/20',
-    green: 'bg-green-600/20',
-    red: 'bg-red-600/20',
-    blue: 'bg-blue-600/20',
-  }
-
-  return (
-    <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-2xl font-bold text-white">{value}</p>
-          <p className="text-gray-400 text-sm">{label}</p>
-        </div>
-        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${bgColors[color]}`}>
-          {icon}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 interface FilterButtonProps {
   children: React.ReactNode
   active: boolean
@@ -306,7 +344,7 @@ function FilterButton({ children, active, onClick }: FilterButtonProps) {
       onClick={onClick}
       className={`
         px-3 py-1.5 rounded-md text-sm font-medium transition-colors
-        ${active ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'}
+        ${active ? 'bg-[#39BEAE] text-white' : 'theme-bg-tertiary theme-text-primary hover:theme-text-primary hover:theme-bg-hover'}
       `}
     >
       {children}
@@ -322,23 +360,23 @@ interface ResultDetailModalProps {
 function ResultDetailModal({ result, onClose }: ResultDetailModalProps) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30 backdrop-blur-sm sm:p-4"
       onClick={onClose}
     >
       <div
-        className="bg-gray-800 rounded-xl w-full max-w-lg overflow-hidden"
+        className="theme-bg-secondary rounded-t-xl sm:rounded-xl w-full sm:max-w-lg max-h-[90vh] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-6 border-b border-gray-700">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-semibold text-white">Result Details</h2>
-              <p className="text-gray-400 text-sm mt-1">{result.questionnaireTitle}</p>
+        <div className="p-4 sm:p-6 border-b border-gray-700">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-lg sm:text-xl font-semibold theme-text-primary">Result Details</h2>
+              <p className="theme-text-muted text-sm mt-1 truncate">{result.questionnaireTitle}</p>
             </div>
             <button
               onClick={onClose}
-              className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+              className="p-2 theme-text-primary hover:text-white hover:theme-bg-hover cursor-pointer rounded-lg transition-colors text-2xl leading-none flex-shrink-0"
             >
               ×
             </button>
@@ -346,26 +384,26 @@ function ResultDetailModal({ result, onClose }: ResultDetailModalProps) {
         </div>
 
         {/* Content */}
-        <div className="p-6">
+        <div className="p-4 sm:p-6 overflow-y-auto max-h-[60vh]">
           {/* Student Info */}
-          <div className="flex items-center gap-4 mb-6 p-4 bg-gray-900/50 rounded-lg">
-            <div className="w-12 h-12 rounded-full bg-gray-600 flex items-center justify-center">
-              <span className="text-white font-bold">
+          <div className="flex items-center gap-3 sm:gap-4 mb-6 p-3 sm:p-4 theme-bg-tertiary rounded-lg">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-[#39BEAE] flex items-center justify-center flex-shrink-0">
+              <span className="theme-text-primary font-bold text-sm sm:text-base">
                 {result.studentName.split(' ').map(n => n[0]).join('')}
               </span>
             </div>
-            <div>
-              <p className="text-white font-medium">{result.studentName}</p>
-              <p className="text-gray-400 text-sm">{result.studentEmail}</p>
+            <div className="min-w-0">
+              <p className="theme-text-primary font-medium truncate">{result.studentName}</p>
+              <p className="theme-text-muted text-sm truncate">{result.studentEmail}</p>
             </div>
           </div>
 
           {/* Score Display */}
           <div className="text-center mb-6">
-            <div className={`text-6xl font-bold ${result.passed ? 'text-green-400' : 'text-red-400'}`}>
+            <div className={`text-5xl sm:text-6xl font-bold ${result.passed ? 'text-green-400' : 'text-red-400'}`}>
               {result.percentage}%
             </div>
-            <p className="text-gray-400 mt-2">
+            <p className="theme-text-secondary mt-2">
               {result.score} / {result.totalPoints} points
             </p>
             <Badge variant={result.passed ? 'success' : 'danger'} className="mt-3">
@@ -374,34 +412,31 @@ function ResultDetailModal({ result, onClose }: ResultDetailModalProps) {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="p-4 bg-gray-900/50 rounded-lg">
-              <div className="flex items-center gap-2 text-gray-400 mb-1">
-                <Clock className="w-4 h-4" />
-                <span className="text-sm">Time Spent</span>
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            <div className="p-3 sm:p-4 theme-bg-tertiary rounded-lg">
+              <div className="flex items-center gap-2 theme-text-primary mb-1">
+                <Clock className="w-4 h-4 flex-shrink-0" />
+                <span className="text-xs sm:text-sm">Time Spent</span>
               </div>
-              <p className="text-white font-medium">{formatTime(result.timeSpent)}</p>
+              <p className="theme-text-primary font-medium text-sm sm:text-base">{formatTime(result.timeSpent)}</p>
             </div>
-            <div className="p-4 bg-gray-900/50 rounded-lg">
-              <div className="flex items-center gap-2 text-gray-400 mb-1">
-                <Award className="w-4 h-4" />
-                <span className="text-sm">Completed</span>
+            <div className="p-3 sm:p-4 theme-bg-tertiary rounded-lg">
+              <div className="flex items-center gap-2 theme-text-primary mb-1">
+                <Award className="w-4 h-4 flex-shrink-0" />
+                <span className="text-xs sm:text-sm">Completed</span>
               </div>
-              <p className="text-white font-medium">{formatDate(result.completedAt)}</p>
+              <p className="theme-text-primary font-medium text-sm sm:text-base">{formatDate(result.completedAt)}</p>
             </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-gray-700 flex gap-3">
+        <div className="p-4 sm:p-6 border-t border-gray-700">
           <button
             onClick={onClose}
-            className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+            className="w-full py-2.5 bg-[#39BEAE] cursor-pointer text-white rounded-lg transition-colors"
           >
             Close
-          </button>
-          <button className="flex-1 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors">
-            View Details
           </button>
         </div>
       </div>

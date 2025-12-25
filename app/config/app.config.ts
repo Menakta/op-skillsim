@@ -88,8 +88,7 @@ export const API_ENDPOINTS = {
     login: '/api/auth/login',
     logout: '/api/auth/logout',
     validate: '/api/auth/validate',
-    lti: '/api/auth/lti',
-    testLogin: '/api/auth/test-login',
+    ltiLaunch: '/api/lti/launch',
     sessionRequest: '/api/auth/session-request',
   },
   stream: {

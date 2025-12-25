@@ -145,3 +145,53 @@ export type {
   ControlPanelTab,
   TabConfig,
 } from './ui.types'
+
+// =============================================================================
+// Quiz Types
+// =============================================================================
+
+export type {
+  AnswerOption,
+  QuizResponse,
+  QuizResponseInsert,
+  SubmitQuizAnswerRequest,
+  SubmitQuizAnswerResponse,
+  QuizStatistics,
+} from './quiz.types'
+
+export {
+  indexToAnswer,
+  answerToIndex,
+} from './quiz.types'
+
+// =============================================================================
+// Training Session Types (Database)
+// =============================================================================
+
+export type {
+  TrainingSessionStatus,
+  TrainingSession,
+  TrainingFinalResults,
+  PhaseScore,
+  QuizPerformance,
+  TrainingSessionInsert,
+  TrainingSessionUpdate,
+  StartTrainingRequest,
+  UpdateProgressRequest,
+  CompletePhaseRequest,
+  CompleteTrainingRequest,
+  TrainingSessionResponse,
+  TrainingProgressResponse,
+} from './training-session.types'
+
+// =============================================================================
+// Fitting Option Types
+// =============================================================================
+
+export type {
+  FittingOption,
+  FittingOptionInsert,
+  FittingOptionUpdate,
+  FittingOptionsResponse,
+  FittingOptionResponse,
+} from './fitting.types'

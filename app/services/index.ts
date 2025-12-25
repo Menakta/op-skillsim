@@ -26,3 +26,9 @@ export type {
   TaskInfo,
   ProgressInfo,
 } from './training.service'
+
+// Quiz service
+export { quizService } from './quiz.service'
+
+// Training session service
+export { trainingSessionService } from './training-session.service'

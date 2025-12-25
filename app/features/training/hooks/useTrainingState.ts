@@ -6,7 +6,7 @@ import { WEB_TO_UE_MESSAGES } from '@/app/lib/messageTypes'
 import { TASK_SEQUENCE } from '@/app/config'
 import type { UseMessageBusReturn } from '@/app/features/messaging/hooks/useMessageBus'
 import { eventBus } from '@/app/lib/events'
-import { trainingService } from '@/app/services'
+import { trainingService, trainingSessionService } from '@/app/services'
 
 // =============================================================================
 // Training State Type
@@ -22,6 +22,8 @@ export interface TrainingStateData {
   totalTasks: number
   isActive: boolean
   trainingStarted: boolean
+  // Database session tracking
+  dbSessionId: string | null
 }
 
 // =============================================================================
@@ -55,7 +57,8 @@ const initialState: TrainingStateData = {
   currentTaskIndex: 0,
   totalTasks: trainingService.getTotalTasks(),
   isActive: false,
-  trainingStarted: false
+  trainingStarted: false,
+  dbSessionId: null
 }
 
 // =============================================================================
@@ -86,6 +89,33 @@ export function useTrainingState(
   const [state, setState] = useState<TrainingStateData>(initialState)
   const callbacksRef = useRef(callbacks)
   callbacksRef.current = callbacks
+
+  // Track time for periodic saves
+  const sessionStartTimeRef = useRef<number | null>(null)
+  const lastSaveTimeRef = useRef<number>(0)
+  const lastProgressRef = useRef<number>(0)
+  const lastPhaseRef = useRef<string>('NotStarted')
+
+  // ==========================================================================
+  // Initialize/Resume Training Session from Database
+  // ==========================================================================
+
+  useEffect(() => {
+    async function initSession() {
+      const result = await trainingSessionService.getCurrentSession()
+      if (result.success && result.data) {
+        setState(prev => ({
+          ...prev,
+          dbSessionId: result.data!.id,
+          progress: result.data!.overall_progress,
+          phase: result.data!.training_phase,
+        }))
+        lastProgressRef.current = result.data.overall_progress
+        lastPhaseRef.current = result.data.training_phase
+      }
+    }
+    initSession()
+  }, [])
 
   // ==========================================================================
   // Message Handler
@@ -126,12 +156,57 @@ export function useTrainingState(
             isActive
           })
 
+          // Save progress to database (throttled - only if changed significantly)
+          const now = Date.now()
+          const progressChanged = Math.abs(progress - lastProgressRef.current) >= 5
+          const phaseChanged = phase !== lastPhaseRef.current
+          const timeSinceLastSave = now - lastSaveTimeRef.current
+
+          if ((progressChanged || phaseChanged) && timeSinceLastSave > 5000) {
+            lastProgressRef.current = progress
+            lastPhaseRef.current = phase
+            lastSaveTimeRef.current = now
+
+            // Calculate time spent since session start
+            const timeSpentMs = sessionStartTimeRef.current
+              ? now - sessionStartTimeRef.current
+              : 0
+
+            trainingSessionService.updateProgress({
+              phase,
+              progress,
+              timeSpentMs,
+            }).then(result => {
+              if (!result.success) {
+                console.warn('Failed to save training progress:', result.error)
+              }
+            })
+          }
+
           // Check for training completion using service
           if (trainingService.isTrainingComplete(currentTask) || progress >= 100) {
             console.log(`🎉 TRAINING COMPLETED! Tasks: ${currentTask}/${totalTasks}, Progress: ${progress}%`)
             callbacksRef.current.onTrainingComplete?.(progress, currentTask, totalTasks)
             // Emit event for other parts of the app
             eventBus.emit('training:completed', { totalTasks })
+
+            // Complete training in database
+            trainingSessionService.completeTraining({
+              finalResults: {
+                completedAt: new Date().toISOString(),
+                totalTimeMs: sessionStartTimeRef.current
+                  ? Date.now() - sessionStartTimeRef.current
+                  : 0,
+                phaseScores: [],
+                quizPerformance: {
+                  totalQuestions: 0,
+                  correctFirstTry: 0,
+                  totalAttempts: 0,
+                  averageTimeMs: 0,
+                },
+                overallGrade: 'A',
+              },
+            })
           }
 
           // Emit progress update event
@@ -188,26 +263,66 @@ export function useTrainingState(
   // Actions
   // ==========================================================================
 
-  const startTraining = useCallback(() => {
+  const startTraining = useCallback(async () => {
     console.log('Training started')
-    setState(prev => ({
-      ...prev,
-      mode: 'training',
-      uiMode: 'task',
-      phase: 'Tool Selection',
-      currentTaskIndex: 0,
-      trainingStarted: false
-    }))
+
+    // Start session timer
+    sessionStartTimeRef.current = Date.now()
+
+    // Start or get training session in database
+    const result = await trainingSessionService.startSession({
+      courseName: 'VR Pipe Training',
+    })
+
+    if (result.success && result.data) {
+      setState(prev => ({
+        ...prev,
+        mode: 'training',
+        uiMode: 'task',
+        phase: 'Phase A',
+        currentTaskIndex: 0,
+        trainingStarted: false,
+        dbSessionId: result.data!.id,
+      }))
+    } else {
+      setState(prev => ({
+        ...prev,
+        mode: 'training',
+        uiMode: 'task',
+        phase: 'Phase A',
+        currentTaskIndex: 0,
+        trainingStarted: false,
+      }))
+    }
+
     messageBus.sendMessage(WEB_TO_UE_MESSAGES.TRAINING_CONTROL, 'start')
     // Emit event
     eventBus.emit('training:started', { taskIndex: 0 })
   }, [messageBus])
 
-  const pauseTraining = useCallback(() => {
+  const pauseTraining = useCallback(async () => {
+    // Save time spent before pausing
+    if (sessionStartTimeRef.current) {
+      const timeSpentMs = Date.now() - sessionStartTimeRef.current
+      await trainingSessionService.recordTimeSpent(timeSpentMs)
+    }
+
+    // Update status to paused
+    await trainingSessionService.updateStatus('paused')
+
     messageBus.sendMessage(WEB_TO_UE_MESSAGES.TRAINING_CONTROL, 'pause')
   }, [messageBus])
 
-  const resetTraining = useCallback(() => {
+  const resetTraining = useCallback(async () => {
+    // Mark session as abandoned
+    await trainingSessionService.updateStatus('abandoned')
+
+    // Reset timer
+    sessionStartTimeRef.current = null
+    lastSaveTimeRef.current = 0
+    lastProgressRef.current = 0
+    lastPhaseRef.current = 'NotStarted'
+
     messageBus.sendMessage(WEB_TO_UE_MESSAGES.TRAINING_CONTROL, 'reset')
     setState(initialState)
   }, [messageBus])

@@ -37,6 +37,17 @@ export default function LoginPage() {
         return
       }
 
+      // Save user info to localStorage
+      if (data.user) {
+        localStorage.setItem('user', JSON.stringify({
+          id: data.user.id,
+          email: data.user.email,
+          name: data.user.name,
+          role: data.user.role,
+        }))
+        localStorage.setItem('userRole', data.user.role)
+      }
+
       // Redirect to dashboard
       window.location.href = '/admin'
     } catch (err) {

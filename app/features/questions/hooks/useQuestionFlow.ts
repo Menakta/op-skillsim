@@ -6,6 +6,7 @@ import { WEB_TO_UE_MESSAGES } from '@/app/lib/messageTypes'
 import type { UseMessageBusReturn } from '@/app/features/messaging/hooks/useMessageBus'
 import { eventBus } from '@/app/lib/events'
 import { useQuestions } from '../context/QuestionsContext'
+import { quizService } from '@/app/services'
 
 // =============================================================================
 // Question State Type
@@ -58,6 +59,9 @@ export function useQuestionFlow(
   const callbacksRef = useRef(callbacks)
   callbacksRef.current = callbacks
 
+  // Track when question was displayed for time_to_answer
+  const questionStartTimeRef = useRef<number | null>(null)
+
   // Get questions from context (loaded from Supabase)
   const { isLoading: questionsLoading, getQuestion } = useQuestions()
 
@@ -83,6 +87,8 @@ export function useQuestionFlow(
 
         if (question) {
           console.log('Question requested:', questionId, '(from Supabase)')
+          // Start timer for time_to_answer tracking
+          questionStartTimeRef.current = Date.now()
           setState({
             currentQuestion: question,
             questionTryCount: 1,
@@ -109,7 +115,28 @@ export function useQuestionFlow(
 
     const isCorrect = selectedAnswer === question.correctAnswer
 
+    // Calculate time to answer
+    const timeToAnswer = questionStartTimeRef.current
+      ? Date.now() - questionStartTimeRef.current
+      : undefined
+
+    // Save response to Supabase (fire and forget - don't block UI)
+    quizService.submitAnswer({
+      questionId: question.id,
+      selectedAnswer,
+      isCorrect,
+      attemptCount: state.questionTryCount,
+      timeToAnswer,
+    }).then(result => {
+      if (!result.success) {
+        console.warn('Failed to save quiz response:', result.error)
+      }
+    })
+
     if (isCorrect) {
+      // Reset timer on correct answer
+      questionStartTimeRef.current = null
+
       setState(prev => ({ ...prev, questionAnsweredCorrectly: true }))
       eventBus.emit('question:answered', { questionId: question.id, correct: true, attempts: state.questionTryCount })
 
@@ -145,6 +172,8 @@ export function useQuestionFlow(
       messageBus.sendMessage(WEB_TO_UE_MESSAGES.PRESSURE_TEST_START, 'player_closed_q6')
     }
 
+    // Reset timer
+    questionStartTimeRef.current = null
     setState(initialState)
   }, [state.currentQuestion, state.questionAnsweredCorrectly, messageBus])
 

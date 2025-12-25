@@ -26,27 +26,27 @@ export default function TeacherDashboardPage() {
           label="Total Students"
           value={stats.totalStudents}
           color="blue"
-          icon={<Users className="w-6 h-6 theme-text-info" />}
+          icon={<Users className="w-6 h-6" />}
           trend={{ value: 12, isPositive: true }}
         />
         <StatCard
           label="Active Sessions"
           value={stats.activeSessions}
           color="green"
-          icon={<BookOpen className="w-6 h-6 theme-text-success" />}
+          icon={<BookOpen className="w-6 h-6" />}
         />
         <StatCard
           label="Completed Trainings"
           value={stats.completedTrainings}
           color="purple"
-          icon={<Award className="w-6 h-6 theme-text-brand" />}
+          icon={<Award className="w-6 h-6" />}
           trend={{ value: 8, isPositive: true }}
         />
         <StatCard
           label="Avg. Completion Rate"
           value={`${stats.averageCompletionRate}%`}
           color="yellow"
-          icon={<TrendingUp className="w-6 h-6 theme-text-warning" />}
+          icon={<TrendingUp className="w-6 h-6" />}
         />
       </div>
 

@@ -1,12 +1,15 @@
 /**
  * Teacher/Admin Login Endpoint
  *
- * Simple Supabase authentication - no session management.
+ * Authenticates via Supabase and creates a session token for RBAC.
+ * Session expires after 24 hours.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { logger } from '@/app/lib/logger'
+import { sessionManager } from '@/app/lib/sessions'
+import type { UserRole } from '@/app/types'
 
 let _supabase: SupabaseClient | null = null
 
@@ -63,17 +66,57 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    logger.info({ userId: authData.user.id, role: profile.role }, 'Login successful')
+    const role = profile.role as UserRole
+    const requestInfo = await sessionManager.getRequestInfo()
 
-    return NextResponse.json({
+    // Create session based on role
+    let sessionResult: { sessionId: string; token: string }
+
+    if (role === 'admin') {
+      sessionResult = await sessionManager.createAdminSession(
+        authData.user.id,
+        authData.user.email!,
+        profile.full_name,
+        undefined,
+        requestInfo
+      )
+    } else {
+      sessionResult = await sessionManager.createTeacherSession(
+        authData.user.id,
+        authData.user.email!,
+        profile.full_name,
+        undefined,
+        requestInfo
+      )
+    }
+
+    logger.info({
+      userId: authData.user.id,
+      role,
+      sessionId: sessionResult.sessionId
+    }, 'Login successful - session created')
+
+    // Create response with session token cookie
+    const response = NextResponse.json({
       success: true,
       user: {
         id: authData.user.id,
         email: authData.user.email,
         name: profile.full_name,
-        role: profile.role,
+        role: role,
       },
     })
+
+    // Set session token cookie (24 hours, matches SessionManager)
+    response.cookies.set('session_token', sessionResult.token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24, // 24 hours
+    })
+
+    return response
   } catch (error) {
     logger.error({ error }, 'Login error')
     return NextResponse.json(

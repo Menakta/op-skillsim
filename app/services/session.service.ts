@@ -121,43 +121,7 @@ export const sessionService = {
   },
 
   /**
-   * Test login (development only)
-   */
-  async testLogin(username: string, password: string): Promise<ServiceResult<LoginResult>> {
-    try {
-      const response = await fetch('/api/auth/test-login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ username, password }),
-      })
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: 'Login failed' }))
-        return {
-          success: false,
-          error: error.error || 'Login failed',
-        }
-      }
-
-      const data = await response.json()
-      return {
-        success: true,
-        data: {
-          success: true,
-          redirectUrl: data.redirectUrl,
-        },
-      }
-    } catch (error) {
-      return {
-        success: false,
-        error: 'Network error: Failed to login',
-      }
-    }
-  },
-
-  /**
-   * Standard login with email and password
+   * Login with email and password
    */
   async login(email: string, password: string): Promise<ServiceResult<LoginResult>> {
     try {

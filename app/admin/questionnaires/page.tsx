@@ -307,7 +307,7 @@ function QuestionCard({
 
   if (isEditing) {
     return (
-      <div className="p-4 rounded-lg border-2 border-purple-500 theme-bg-secondary">
+      <div className="p-4 rounded-lg border-2 border-green-600 theme-bg-secondary">
         {/* Question ID & Phase (read-only) */}
         <div className="flex items-center gap-2 mb-4">
           <Badge variant="purple">{editData.question_id}</Badge>
@@ -359,7 +359,7 @@ function QuestionCard({
           <label className="block text-sm font-medium mb-1 theme-text-secondary">
             Correct Answer
           </label>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {(['A', 'B', 'C', 'D'] as const).map((letter) => (
               <button
                 key={letter}
@@ -392,12 +392,12 @@ function QuestionCard({
         </div>
 
         {/* Actions */}
-        <div className="flex gap-2 justify-end">
+        <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
           <button
             type="button"
             onClick={onCancel}
             disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors theme-btn-secondary"
+            className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors theme-btn-secondary"
           >
             <X className="w-4 h-4" />
             Cancel
@@ -406,7 +406,7 @@ function QuestionCard({
             type="button"
             onClick={() => onSave(editData)}
             disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors theme-btn-primary disabled:opacity-50"
+            className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors theme-btn-primary disabled:opacity-50"
           >
             <Save className="w-4 h-4" />
             {saving ? 'Saving...' : 'Save Changes'}
@@ -432,7 +432,7 @@ function QuestionCard({
           </p>
 
           {/* Options Grid */}
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {(['A', 'B', 'C', 'D'] as const).map((letter) => {
               const field = `option_${letter.toLowerCase()}` as keyof QuestionFromDB
               const isCorrect = question.correct_answer === letter

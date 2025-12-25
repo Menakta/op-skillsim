@@ -3,8 +3,13 @@
 /* =============================================================================
    Global Theme System
 
-   All theme colors are defined here using CSS custom properties.
-   Change colors in one place to update the entire application.
+   Color Palette:
+   - Teal Primary: #39BEAE
+   - Teal Secondary: #79CFC2
+   - Navy Primary: #0D1D40
+   - Navy Secondary: #3E425F
+   - White shades: #FFFFFF, #F5F5F5, #EBEBEB
+   - Black shades: #000000, #0A0A0A, #141414
    ============================================================================= */
 
 :root {
@@ -12,66 +17,67 @@
      Base Colors - Light Theme
      ------------------------------------------------------------------------- */
 
-  /* Background colors */
-  --color-bg-primary: #ffffff;
-  --color-bg-secondary: #f9fafb;
-  --color-bg-tertiary: #f3f4f6;
-  --color-bg-elevated: #ffffff;
-  --color-bg-hover: #f3f4f6;
-  --color-bg-active: #e5e7eb;
+  /* Background colors (white shades) */
+  --color-bg-primary: #FFFFFF;
+  --color-bg-secondary: #dcdcdc;
+  --color-bg-tertiary: #ffffff;
+  --color-bg-elevated: #FFFFFF;
+  --color-bg-hover: #EBEBEB;
+  --color-bg-active: #E0E0E0;
 
-  /* Text colors */
-  --color-text-primary: #111827;
-  --color-text-secondary: #4b5563;
-  --color-text-tertiary: #6b7280;
-  --color-text-muted: #9ca3af;
-  --color-text-inverted: #ffffff;
+  /* Text colors (navy shades) */
+  --color-text-primary: #000000;
+  --color-text-secondary: #3E425F;
+  --color-text-tertiary: #161822;
+  --color-text-muted: #6B6F8A;
+  --color-text-inverted: #FFFFFF;
 
   /* Border colors */
-  --color-border-primary: #e5e7eb;
-  --color-border-secondary: #d1d5db;
-  --color-border-focus: #a855f7;
+  --color-border-primary: #EBEBEB;
+  --color-border-secondary: #D9D9D9;
+  --color-border-focus: #39BEAE;
 
-  /* Brand colors */
-  --color-brand-primary: #a855f7;
-  --color-brand-secondary: #9333ea;
-  --color-brand-hover: #7e22ce;
-  --color-brand-muted: rgba(168, 85, 247, 0.1);
+  /* Brand colors (teal) */
+  --color-brand-primary: #39BEAE;
+  --color-brand-secondary: #79CFC2;
+  --color-brand-hover: #2EA89A;
+  --color-brand-muted: rgba(57, 190, 174, 0.1);
 
-  /* Accent color (teal) */
-  --color-accent: #39BEAE;
-  --color-accent-hover: #2da99a;
-  --color-accent-muted: rgba(57, 190, 174, 0.1);
+  /* Accent colors (navy) */
+  --color-accent: #0D1D40;
+  --color-accent-secondary: #3E425F;
+  --color-accent-hover: #162850;
+  --color-accent-muted: rgba(13, 29, 64, 0.1);
 
-  /* Status colors */
-  --color-success: #22c55e;
-  --color-success-bg: rgba(34, 197, 94, 0.1);
-  --color-success-border: rgba(34, 197, 94, 0.3);
+  /* Status colors (derived from brand palette) */
+  --color-success: #39BEAE;
+  --color-success-bg: rgba(57, 190, 174, 0.1);
+  --color-success-border: rgba(57, 190, 174, 0.3);
 
-  --color-error: #ef4444;
-  --color-error-bg: rgba(239, 68, 68, 0.1);
-  --color-error-border: rgba(239, 68, 68, 0.3);
+  --color-error: #C45C5C;
+  --color-error-bg: rgba(196, 92, 92, 0.1);
+  --color-error-border: rgba(196, 92, 92, 0.3);
 
-  --color-warning: #f59e0b;
-  --color-warning-bg: rgba(245, 158, 11, 0.1);
-  --color-warning-border: rgba(245, 158, 11, 0.3);
+  --color-warning: #C4A35C;
+  --color-warning-bg: rgba(196, 163, 92, 0.1);
+  --color-warning-border: rgba(196, 163, 92, 0.3);
 
-  --color-info: #3b82f6;
-  --color-info-bg: rgba(59, 130, 246, 0.1);
-  --color-info-border: rgba(59, 130, 246, 0.3);
+  --color-info: #39BEAE;
+  --color-info-bg: rgba(57, 190, 174, 0.1);
+  --color-info-border: rgba(57, 190, 174, 0.3);
 
   /* Component specific */
-  --color-card-bg: #ffffff;
-  --color-card-border: #e5e7eb;
-  --color-input-bg: #ffffff;
-  --color-input-border: #d1d5db;
-  --color-sidebar-bg: #e2e2e2;
-  --color-header-bg: #ffffff;
+  --color-card-bg: #e6e6e6;
+  --color-card-border: #c3c3c3;
+  --color-input-bg: #FFFFFF;
+  --color-input-border: #D9D9D9;
+  --color-sidebar-bg: #39BEAE;
+  --color-header-bg: #FFFFFF;
 
   /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  --shadow-sm: 0 1px 2px 0 rgba(13, 29, 64, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(13, 29, 64, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(13, 29, 64, 0.1);
 }
 
 /* -------------------------------------------------------------------------
@@ -79,61 +85,62 @@
    ------------------------------------------------------------------------- */
 
 .dark {
-  /* Background colors */
-  --color-bg-primary: #111827;
-  --color-bg-secondary: #1f2937;
-  --color-bg-tertiary: #374151;
-  --color-bg-elevated: #1f2937;
-  --color-bg-hover: #374151;
-  --color-bg-active: #4b5563;
+  /* Background colors (black shades) */
+  --color-bg-primary: #000000;
+  --color-bg-secondary: #191919;
+  --color-bg-tertiary: #141414;
+  --color-bg-elevated: #141414;
+  --color-bg-hover: #1A1A1A;
+  --color-bg-active: #202020;
 
-  /* Text colors */
-  --color-text-primary: #ffffff;
-  --color-text-secondary: #e5e7eb;
-  --color-text-tertiary: #d1d5db;
-  --color-text-muted: #9ca3af;
-  --color-text-inverted: #111827;
+  /* Text colors (white shades) */
+  --color-text-primary: #FFFFFF;
+  --color-text-secondary: #F5F5F5;
+  --color-text-tertiary: #EBEBEB;
+  --color-text-muted: #A0A0A0;
+  --color-text-inverted: #0D1D40;
 
   /* Border colors */
-  --color-border-primary: #374151;
-  --color-border-secondary: #4b5563;
-  --color-border-focus: #a855f7;
+  --color-border-primary: #1A1A1A;
+  --color-border-secondary: #252525;
+  --color-border-focus: #39BEAE;
 
-  /* Brand colors - slightly brighter for dark mode */
-  --color-brand-primary: #a855f7;
-  --color-brand-secondary: #9333ea;
-  --color-brand-hover: #c084fc;
-  --color-brand-muted: rgba(168, 85, 247, 0.2);
+  /* Brand colors (teal - slightly brighter for dark mode) */
+  --color-brand-primary: #39BEAE;
+  --color-brand-secondary: #79CFC2;
+  --color-brand-hover: #4DD4C4;
+  --color-brand-muted: rgba(57, 190, 174, 0.2);
 
-  /* Accent color */
-  --color-accent: #39BEAE;
-  --color-accent-hover: #4dd4c4;
-  --color-accent-muted: rgba(57, 190, 174, 0.2);
+  /* Accent colors (navy - lighter for dark mode visibility) */
+  --color-accent: #79CFC2;
+  --color-accent-secondary: #39BEAE;
+  --color-accent-hover: #8EDBD0;
+  --color-accent-muted: rgba(121, 207, 194, 0.2);
 
-  /* Status colors - adjusted for dark mode */
-  --color-success: #4ade80;
-  --color-success-bg: rgba(74, 222, 128, 0.2);
-  --color-success-border: rgba(74, 222, 128, 0.3);
+  /* Status colors (adjusted for dark mode) */
+  --color-success: #79CFC2;
+  --color-success-bg: rgba(121, 207, 194, 0.2);
+  --color-success-border: rgba(121, 207, 194, 0.3);
 
-  --color-error: #f87171;
-  --color-error-bg: rgba(248, 113, 113, 0.2);
-  --color-error-border: rgba(248, 113, 113, 0.3);
+  --color-error: #E07070;
+  --color-error-bg: rgba(224, 112, 112, 0.2);
+  --color-error-border: rgba(224, 112, 112, 0.3);
 
-  --color-warning: #fbbf24;
-  --color-warning-bg: rgba(251, 191, 36, 0.2);
-  --color-warning-border: rgba(251, 191, 36, 0.3);
+  --color-warning: #E0C870;
+  --color-warning-bg: rgba(224, 200, 112, 0.2);
+  --color-warning-border: rgba(224, 200, 112, 0.3);
 
-  --color-info: #60a5fa;
-  --color-info-bg: rgba(96, 165, 250, 0.2);
-  --color-info-border: rgba(96, 165, 250, 0.3);
+  --color-info: #79CFC2;
+  --color-info-bg: rgba(121, 207, 194, 0.2);
+  --color-info-border: rgba(121, 207, 194, 0.3);
 
   /* Component specific */
-  --color-card-bg: #1f2937;
-  --color-card-border: #374151;
-  --color-input-bg: #374151;
-  --color-input-border: #4b5563;
-  --color-sidebar-bg: #1f2937;
-  --color-header-bg: #1f2937;
+  --color-card-bg: #0A0A0A;
+  --color-card-border: #1A1A1A;
+  --color-input-bg: #141414;
+  --color-input-border: #252525;
+  --color-sidebar-bg: #0A0A0A;
+  --color-header-bg: #0A0A0A;
 
   /* Shadows - more subtle in dark mode */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
@@ -171,17 +178,22 @@
 .theme-border-secondary { border-color: var(--color-border-secondary); }
 .theme-border-focus:focus { border-color: var(--color-border-focus); }
 
-/* Brand utilities */
+/* Brand utilities (teal) */
 .theme-bg-brand { background-color: var(--color-brand-primary); }
+.theme-bg-brand-secondary { background-color: var(--color-brand-secondary); }
 .theme-bg-brand-hover:hover { background-color: var(--color-brand-hover); }
 .theme-bg-brand-muted { background-color: var(--color-brand-muted); }
 .theme-text-brand { color: var(--color-brand-primary); }
+.theme-text-brand-secondary { color: var(--color-brand-secondary); }
+.theme-border-brand { border-color: var(--color-brand-primary); }
 
-/* Accent utilities */
+/* Accent utilities (navy) */
 .theme-bg-accent { background-color: var(--color-accent); }
+.theme-bg-accent-secondary { background-color: var(--color-accent-secondary); }
 .theme-bg-accent-hover:hover { background-color: var(--color-accent-hover); }
 .theme-bg-accent-muted { background-color: var(--color-accent-muted); }
 .theme-text-accent { color: var(--color-accent); }
+.theme-text-accent-secondary { color: var(--color-accent-secondary); }
 .theme-border-accent { border-color: var(--color-accent); }
 
 /* Status utilities */
@@ -234,7 +246,7 @@
 }
 
 .theme-card-hover:hover {
-  border-color: var(--color-accent);
+  border-color: var(--color-brand-primary);
 }
 
 /* Input component */
@@ -273,6 +285,15 @@
   background-color: var(--color-bg-hover);
 }
 
+.theme-btn-accent {
+  background-color: var(--color-accent);
+  color: white;
+}
+
+.theme-btn-accent:hover {
+  background-color: var(--color-accent-hover);
+}
+
 .theme-btn-ghost {
   background-color: transparent;
   color: var(--color-text-secondary);
@@ -292,6 +313,11 @@
 .theme-badge-brand {
   background-color: var(--color-brand-muted);
   color: var(--color-brand-primary);
+}
+
+.theme-badge-accent {
+  background-color: var(--color-accent-muted);
+  color: var(--color-accent);
 }
 
 .theme-badge-success {
