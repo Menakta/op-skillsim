@@ -60,6 +60,9 @@ function hasAdminAccess(role: string): boolean {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+  const token = request.cookies.get('session_token')?.value
+  // Log 1: Monitor what hits the middleware
+  console.log(`[Middleware] Request: ${request.method} ${pathname} | Token Present: ${!!token}`)
 
   // Allow public routes
   if (isPublicRoute(pathname)) {
@@ -67,11 +70,12 @@ export async function middleware(request: NextRequest) {
   }
 
   // Get session token from cookie
-  const token = request.cookies.get('session_token')?.value
+  
 
   // Check admin routes (pages)
   if (isAdminRoute(pathname)) {
     if (!token) {
+      console.log(`[Middleware] Admin Access Denied: No Token for ${pathname}`)
       // No token - redirect to login
       const loginUrl = new URL('/login', request.url)
       loginUrl.searchParams.set('redirect', pathname)
@@ -118,6 +122,7 @@ export async function middleware(request: NextRequest) {
       )
     }
 
+
     if (!hasAdminAccess(session.role)) {
       console.log(`[Middleware] API access denied: User ${session.userId} with role '${session.role}' tried to access ${pathname}`)
       return NextResponse.json(
@@ -136,11 +141,15 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Match admin pages
+    /*
+     * 1. Match your protected routes explicitly
+     */
     '/admin/:path*',
-    // Match admin API routes
     '/api/admin/:path*',
-    // Skip static files and images
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    /*
+     * 2. Use a negative lookahead to exclude LTI and static files
+     * This ensures /api/lti/launch is NEVER touched by this middleware
+     */
+    '/((?!api/lti|_next/static|_next/image|favicon.ico).*)',
   ],
 }
