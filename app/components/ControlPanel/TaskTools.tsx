@@ -3,17 +3,7 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import type { TrainingState } from '@/app/hooks/useTrainingMessagesComposite'
-import type { PipeType } from '@/app/lib/messageTypes'
-
-// =============================================================================
-// Constants
-// =============================================================================
-
-const PIPE_TYPES: { id: PipeType; label: string; icon: string }[] = [
-  { id: 'y-junction', label: 'Y-Junction', icon: '/icons/y-junction.png' },
-  { id: 'elbow', label: '90° Elbow', icon: '/icons/pipe-90-deg.png' },
-
-]
+import { useFittingOptions } from '@/app/features/training'
 
 // =============================================================================
 // Props Interface
@@ -21,7 +11,7 @@ const PIPE_TYPES: { id: PipeType; label: string; icon: string }[] = [
 
 interface TaskToolsProps {
   state: TrainingState
-  onSelectPipe: (pipe: PipeType) => void
+  onSelectPipe: (pipe: string) => void
   onSelectPressureTest: (testType: 'air-plug' | 'conduct-test') => void
 }
 
@@ -35,6 +25,7 @@ export function TaskTools({
   onSelectPressureTest
 }: TaskToolsProps) {
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
+  const { pipeTypes, loading: fittingsLoading } = useFittingOptions()
 
   // Only show when PipeConnection or PressureTester tool is selected
   const showPipeSelection = state.selectedTool === 'PipeConnection'
@@ -45,13 +36,25 @@ export function TaskTools({
     return null
   }
 
+  // Show loading state for pipe selection
+  if (showPipeSelection && fittingsLoading) {
+    return (
+      <div className="fixed left-5 top-1/2 -translate-y-1/2 flex flex-col gap-2" style={{ zIndex: 2147483647 }}>
+        <span className="text-white">Materials</span>
+        <div className="w-12 h-12 rounded-xl bg-gray-700/80 flex items-center justify-center">
+          <span className="text-white text-xs">...</span>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="fixed left-5 top-1/2 -translate-y-1/2 flex flex-col gap-2" style={{ zIndex: 2147483647 }}>
       <span className='text-white'>Materials</span>
       {/* Pipe Selection Icons - Only when PipeConnection tool is selected */}
       {showPipeSelection && (
         <>
-          {PIPE_TYPES.map((pipe) => {
+          {pipeTypes.map((pipe) => {
             const isSelected = state.selectedPipe === pipe.id
             return (
               <div key={pipe.id} className="relative">

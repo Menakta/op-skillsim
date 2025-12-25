@@ -32,3 +32,7 @@ export { quizService } from './quiz.service'
 
 // Training session service
 export { trainingSessionService } from './training-session.service'
+
+// Fitting service
+export { fittingService } from './fitting.service'
+export type { PipeTypeOption } from './fitting.service'

@@ -1,10 +1,12 @@
 /**
  * Task Configuration
  *
- * Centralized configuration for training tasks, tools, and pipes.
+ * Centralized configuration for training tasks and tools.
+ * Pipe/fitting options are now fetched dynamically from Supabase.
+ * Use useFittingOptions hook or fittingService for pipe types.
  */
 
-import type { ToolName, PipeType } from '@/app/lib/messageTypes'
+import type { ToolName } from '@/app/lib/messageTypes'
 
 // =============================================================================
 // Task Definitions
@@ -120,39 +122,6 @@ export const TOOL_INFO: Record<ToolName, ToolInfo> = {
 }
 
 // =============================================================================
-// Pipe Types
-// =============================================================================
-
-export interface PipeInfo {
-  name: string
-  displayName: string
-  description: string
-}
-
-export const PIPE_TYPES: Record<PipeType, PipeInfo> = {
-  'y-junction': {
-    name: 'y-junction',
-    displayName: 'Y-Junction',
-    description: 'Y-shaped junction for branching pipes'
-  },
-  'elbow': {
-    name: 'elbow',
-    displayName: 'Elbow',
-    description: '90-degree elbow connector'
-  },
-  '100mm': {
-    name: '100mm',
-    displayName: '100mm Pipe',
-    description: '100mm diameter straight pipe'
-  },
-  '150mm': {
-    name: '150mm',
-    displayName: '150mm Pipe',
-    description: '150mm diameter straight pipe'
-  }
-}
-
-// =============================================================================
 // Helper Functions
 // =============================================================================
 
@@ -178,8 +147,4 @@ export function isLastTask(currentIndex: number): boolean {
 
 export function getToolInfo(tool: ToolName): ToolInfo {
   return TOOL_INFO[tool]
-}
-
-export function getPipeInfo(pipe: PipeType): PipeInfo {
-  return PIPE_TYPES[pipe]
 }

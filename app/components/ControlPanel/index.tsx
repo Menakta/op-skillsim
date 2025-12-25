@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import type { ToolName, PipeType, CameraPerspective } from '@/app/lib/messageTypes'
+import type { ToolName, CameraPerspective } from '@/app/lib/messageTypes'
 import { TASK_SEQUENCE } from '@/app/config'
 import {
   GraduationCap,
@@ -43,7 +43,7 @@ interface ControlPanelProps {
 
   // Tool Selection Actions
   onSelectTool: (tool: ToolName) => void
-  onSelectPipe: (pipe: PipeType) => void
+  onSelectPipe: (pipe: string) => void
   onSelectPressureTest: (testType: 'air-plug' | 'conduct-test') => void
 
   // Camera Control Actions

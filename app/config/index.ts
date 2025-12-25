@@ -18,20 +18,19 @@ export {
 } from './app.config'
 
 // Task Configuration
+// Note: Pipe/fitting options are now fetched from Supabase via useFittingOptions hook
 export {
   TASK_SEQUENCE,
   TOOL_INFO,
-  PIPE_TYPES,
   getTaskByIndex,
   getTaskByTool,
   getTaskById,
   getNextTask,
   isLastTask,
   getToolInfo,
-  getPipeInfo,
 } from './tasks.config'
 
-export type { TaskDefinition, ToolInfo, PipeInfo } from './tasks.config'
+export type { TaskDefinition, ToolInfo } from './tasks.config'
 
 // Question Configuration
 export {

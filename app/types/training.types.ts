@@ -10,7 +10,8 @@
 
 export type ToolName = 'XRay' | 'Shovel' | 'Measuring' | 'PipeConnection' | 'Glue' | 'PressureTester' | 'None'
 
-export type PipeType = 'y-junction' | 'elbow' | '100mm' | '150mm'
+/** Dynamic pipe type - fitting_id from Supabase fitting_options table */
+export type PipeType = string
 
 export type PressureTestType = 'air-plug' | 'conduct-test'
 

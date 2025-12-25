@@ -10,10 +10,12 @@ export { CompletionPopup } from './components/CompletionPopup'
 // Hooks
 export { useTrainingState } from './hooks/useTrainingState'
 export { useToolSelection } from './hooks/useToolSelection'
+export { useFittingOptions } from './hooks/useFittingOptions'
 
 // Types
 export type { TrainingStateData, UseTrainingStateReturn, TrainingStateCallbacks } from './hooks/useTrainingState'
 export type { ToolStateData, UseToolSelectionReturn, ToolSelectionCallbacks } from './hooks/useToolSelection'
+export type { UseFittingOptionsReturn } from './hooks/useFittingOptions'
 
 // Re-export composite hook types from canonical location
 export type { TrainingMessageCallbacks, UseTrainingMessagesConfig, TrainingState } from '@/app/hooks/useTrainingMessagesComposite'

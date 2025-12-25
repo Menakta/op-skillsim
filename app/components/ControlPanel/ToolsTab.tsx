@@ -2,19 +2,13 @@
 
 import { useState } from 'react'
 import type { TrainingState } from '@/app/hooks/useTrainingMessagesComposite'
-import type { ToolName, PipeType } from '@/app/lib/messageTypes'
+import type { ToolName } from '@/app/lib/messageTypes'
 import { TASK_SEQUENCE, TOOL_INFO } from '@/app/config'
+import { useFittingOptions } from '@/app/features/training'
 
 // =============================================================================
 // Constants
 // =============================================================================
-
-const PIPE_TYPES: { id: PipeType; label: string }[] = [
-  { id: 'y-junction', label: 'Y-Junction' },
-  { id: 'elbow', label: '90° Elbow' },
-  { id: '100mm', label: '100mm Pipe' },
-  { id: '150mm', label: '150mm Pipe' }
-]
 
 const AVAILABLE_TOOLS: ToolName[] = ['XRay', 'Shovel', 'Measuring', 'PipeConnection', 'Glue', 'PressureTester']
 
@@ -25,7 +19,7 @@ const AVAILABLE_TOOLS: ToolName[] = ['XRay', 'Shovel', 'Measuring', 'PipeConnect
 interface ToolsTabProps {
   state: TrainingState
   onSelectTool: (tool: ToolName) => void
-  onSelectPipe: (pipe: PipeType) => void
+  onSelectPipe: (pipe: string) => void
   onSelectPressureTest: (testType: 'air-plug' | 'conduct-test') => void
 }
 
@@ -40,6 +34,7 @@ export function ToolsTab({
   onSelectPressureTest
 }: ToolsTabProps) {
   const [wrongToolClicked, setWrongToolClicked] = useState<ToolName | null>(null)
+  const { pipeTypes, loading: fittingsLoading } = useFittingOptions()
 
   const isTrainingMode = state.mode === 'training'
   const currentTaskDef = TASK_SEQUENCE[state.currentTaskIndex]
@@ -118,21 +113,25 @@ export function ToolsTab({
         <div className="bg-[#1e2a4a] rounded-lg p-4 border border-[#2c3e50] border-pink-500">
           <h3 className="text-pink-400 text-sm font-medium border-b border-[#2c3e50] pb-2 mb-3">🔧 Select Pipe Type</h3>
           <div className="text-xs text-gray-400 mb-3">Choose the correct pipe fitting to continue</div>
-          <div className="grid grid-cols-2 gap-2">
-            {PIPE_TYPES.map((pipe) => (
-              <button
-                key={pipe.id}
-                onClick={() => onSelectPipe(pipe.id)}
-                className={`p-3 rounded text-sm font-medium transition-all ${
-                  state.selectedPipe === pipe.id
-                    ? 'bg-pink-500 text-white border-2 border-pink-300'
-                    : 'bg-orange-500 text-white hover:bg-orange-400'
-                }`}
-              >
-                {pipe.label}
-              </button>
-            ))}
-          </div>
+          {fittingsLoading ? (
+            <div className="text-center text-gray-400 py-4">Loading fittings...</div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              {pipeTypes.map((pipe) => (
+                <button
+                  key={pipe.id}
+                  onClick={() => onSelectPipe(pipe.id)}
+                  className={`p-3 rounded text-sm font-medium transition-all ${
+                    state.selectedPipe === pipe.id
+                      ? 'bg-pink-500 text-white border-2 border-pink-300'
+                      : 'bg-orange-500 text-white hover:bg-orange-400'
+                  }`}
+                >
+                  {pipe.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
