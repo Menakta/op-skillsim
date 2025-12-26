@@ -18,6 +18,7 @@ interface SessionPayload {
   email: string
   role: 'student' | 'teacher' | 'admin'
   sessionType: 'lti' | 'teacher' | 'admin'
+  isLti?: boolean // true = LTI session (full access), false/undefined = demo session
 }
 
 export async function GET(request: NextRequest) {
@@ -46,6 +47,7 @@ export async function GET(request: NextRequest) {
         role: role,
         sessionType: session.sessionType,
         sessionId: session.sessionId,
+        isLti: session.isLti ?? true, // Default to true for backward compatibility
       }
     })
   } catch {

@@ -15,6 +15,8 @@ import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { SearchInput } from '../components/ui/SearchInput'
 import { EmptyState } from '../components/ui/EmptyState'
+import { LoadingState } from '../components/ui/LoadingState'
+import { useAdmin, DemoModeNotice } from '../context/AdminContext'
 
 // =============================================================================
 // Types
@@ -39,6 +41,7 @@ interface QuestionFromDB {
 // =============================================================================
 
 export default function QuestionnairesPage() {
+  const { isLti } = useAdmin()
   const [questions, setQuestions] = useState<QuestionFromDB[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -190,22 +193,23 @@ export default function QuestionnairesPage() {
         </div>
       )}
 
+      {/* Demo Mode Notice */}
+      <DemoModeNotice />
+
       {/* Info Notice */}
       <div className="mb-6 p-4 rounded-lg border theme-bg-info theme-border-info">
         <p className="text-sm theme-text-info">
-          <strong>Note:</strong> You can edit existing questions but cannot add new ones or delete existing ones.
-          Changes will be reflected immediately in the training simulation.
+          <strong>Note:</strong> {isLti
+            ? 'You can edit existing questions but cannot add new ones or delete existing ones. Changes will be reflected immediately in the training simulation.'
+            : 'You are viewing questions in read-only mode.'}
         </p>
       </div>
 
       {/* Loading State */}
       {loading && (
         <Card>
-          <CardContent className="py-12">
-            <div className="flex flex-col items-center justify-center">
-              <RefreshCw className="w-8 h-8 theme-text-brand animate-spin mb-4" />
-              <p className="theme-text-muted">Loading questions...</p>
-            </div>
+          <CardContent>
+            <LoadingState message="Loading questions..." />
           </CardContent>
         </Card>
       )}
@@ -262,6 +266,7 @@ export default function QuestionnairesPage() {
                     onCancel={() => setEditingId(null)}
                     onSave={handleSave}
                     saving={saving}
+                    canEdit={isLti}
                   />
                 ))}
               </CardContent>
@@ -284,6 +289,7 @@ interface QuestionCardProps {
   onCancel: () => void
   onSave: (question: QuestionFromDB) => void
   saving: boolean
+  canEdit: boolean
 }
 
 function QuestionCard({
@@ -292,7 +298,8 @@ function QuestionCard({
   onEdit,
   onCancel,
   onSave,
-  saving
+  saving,
+  canEdit
 }: QuestionCardProps) {
   const [editData, setEditData] = useState<QuestionFromDB>(question)
 
@@ -460,13 +467,15 @@ function QuestionCard({
           )}
         </div>
 
-        {/* Edit Button */}
-        <button
-          onClick={onEdit}
-          className="ml-4 p-2 rounded-lg transition-colors theme-btn-ghost"
-        >
-          <Edit className="w-4 h-4" />
-        </button>
+        {/* Edit Button - Only shown for LTI users */}
+        {canEdit && (
+          <button
+            onClick={onEdit}
+            className="ml-4 p-2 rounded-lg transition-colors theme-btn-ghost"
+          >
+            <Edit className="w-4 h-4" />
+          </button>
+        )}
       </div>
     </div>
   )

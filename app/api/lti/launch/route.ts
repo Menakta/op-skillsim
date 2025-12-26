@@ -3,17 +3,18 @@
  *
  * Authentication Flow:
  * - Students: LTI launch → SessionManager creates session → redirect to / (training)
- * - Teachers/Admins: LTI launch → set role cookie → redirect to /login (Supabase auth required)
+ * - Teachers/Admins: LTI launch → SessionManager creates session → redirect to /admin (direct access)
  *
  * Updated with Absolute HTTPS Redirects for Ngrok compatibility.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createHmac } from 'crypto'
+import { createHmac, randomUUID } from 'crypto'
 import { logger } from '@/app/lib/logger'
 import { sessionManager } from '@/app/lib/sessions'
 import { findOrCreateLtiUser, LtiPayload } from '@/app/lib/database'
-import type { UserRole } from '@/app/types'
+import { getSupabaseAdmin } from '@/app/lib/supabase/admin'
+import type { UserRole, AdminPermissions, TeacherPermissions } from '@/app/types'
 
 // =============================================================================
 // Types
@@ -137,9 +138,9 @@ function mapLtiRole(ltiRoles: string | undefined): UserRole {
 }
 
 function getRedirectPath(role: UserRole): string {
-  // Students: Go directly to training (auto-login via session)
-  // Teachers/Admins: Must authenticate via Supabase login page
-  return role === 'student' ? '/' : '/login'
+  // Students: Go directly to training
+  // Teachers/Admins: Go directly to admin dashboard (auto-login via LTI session)
+  return role === 'student' ? '/' : '/admin'
 }
 
 // =============================================================================
@@ -179,9 +180,33 @@ export async function POST(req: NextRequest) {
       resource_link_id: params.resource_link_id,
     }
 
+    // Log LTI user data for debugging
+    console.log('=== LTI Launch User Data ===')
+    console.log({
+      user_id: params.user_id,
+      roles: params.roles,
+      email: params.lis_person_contact_email_primary,
+      full_name: params.lis_person_name_full,
+      given_name: params.lis_person_name_given,
+      family_name: params.lis_person_name_family,
+      context_id: params.context_id,
+      context_title: params.context_title,
+      resource_link_id: params.resource_link_id,
+      institution: params.tool_consumer_instance_name,
+      return_url: params.launch_presentation_return_url,
+    })
+    console.log('============================')
+
     const user = await findOrCreateLtiUser(ltiPayload)
     const appRole = mapLtiRole(params.roles)
     const redirectPath = getRedirectPath(appRole)
+
+    // Debug: Log role mapping
+    console.log('=== LTI Role Mapping ===')
+    console.log('Raw LTI roles:', params.roles)
+    console.log('Mapped appRole:', appRole)
+    console.log('Redirect path:', redirectPath)
+    console.log('========================')
 
     // Build absolute redirect URL
     const host = req.headers.get('x-forwarded-host') || req.headers.get('host')
@@ -220,12 +245,18 @@ export async function POST(req: NextRequest) {
       // Create student session
       const { sessionId, token } = await sessionManager.createStudentSession(ltiData, requestInfo)
 
-      // Create training session
+      // Create training session with student details
       try {
         await sessionManager.createTrainingSession(
           sessionId,
           ltiData.courseId,
-          ltiData.courseName
+          ltiData.courseName,
+          {
+            userId: ltiData.userId,
+            email: ltiData.email,
+            fullName: ltiData.fullName,
+            institution: ltiData.institution,
+          }
         )
       } catch (error) {
         logger.warn({ error }, 'Failed to create training session - continuing without it')
@@ -242,18 +273,134 @@ export async function POST(req: NextRequest) {
       }, 'LTI Student Launch Success')
     }
     // ==========================================================================
-    // Teacher/Admin Flow: Set role cookie, redirect to login
+    // Teacher/Admin Flow: Create session directly, redirect to admin
     // ==========================================================================
     else {
-      // Set role cookie so login page knows they came from LTI
-      response.cookies.set('lti_role', appRole, { ...cookieOptions, httpOnly: false })
-      response.cookies.set('lti_user_id', user.id, cookieOptions)
+      const ltiData = {
+        userId: user.id,
+        email: params.lis_person_contact_email_primary || `${user.id}@lti.local`,
+        fullName: params.lis_person_name_full || 'Unknown User',
+        institution: params.tool_consumer_instance_name || 'Unknown Institution',
+      }
+
+      // Get request info for session tracking
+      const requestInfo = await sessionManager.getRequestInfo()
+
+      // Define permissions based on role
+      const adminPermissions: AdminPermissions = {
+        editQuestionnaires: true,
+        viewResults: true,
+        manageUsers: true,
+        viewAnalytics: true,
+      }
+
+      const teacherPermissions: TeacherPermissions = {
+        editQuestionnaires: true,
+        viewResults: true,
+      }
+
+      // Save or update teacher_profiles in Supabase
+      const supabase = getSupabaseAdmin()
+      const permissions = appRole === 'admin' ? adminPermissions : teacherPermissions
+
+      // Check if profile exists by email first (since id is UUID and LTI sends different format)
+      const { data: existingProfile } = await supabase
+        .from('teacher_profiles')
+        .select('id')
+        .eq('email', ltiData.email)
+        .single()
+
+      let profileId: string
+
+      if (existingProfile) {
+        // Use existing profile ID
+        profileId = existingProfile.id
+
+        // Update existing profile
+        const { error: updateError } = await supabase
+          .from('teacher_profiles')
+          .update({
+            full_name: ltiData.fullName,
+            institution: ltiData.institution,
+            role: appRole,
+            permissions: JSON.stringify(permissions),
+            last_login: new Date().toISOString(),
+          })
+          .eq('id', profileId)
+
+        if (updateError) {
+          console.error('=== Failed to update teacher_profile ===')
+          console.error(updateError)
+          logger.error({ error: updateError, email: ltiData.email }, 'Failed to update teacher_profile')
+        } else {
+          console.log('=== Teacher Profile Updated Successfully ===')
+          console.log({ profileId, email: ltiData.email, role: appRole })
+          logger.info({ profileId, email: ltiData.email, role: appRole }, 'Updated teacher_profile from LTI')
+        }
+      } else {
+        // Generate a proper UUID for new profile
+        profileId = randomUUID()
+
+        const profileData = {
+          id: profileId,
+          email: ltiData.email,
+          full_name: ltiData.fullName,
+          institution: ltiData.institution,
+          role: appRole,
+          permissions: JSON.stringify(permissions),
+          last_login: new Date().toISOString(),
+        }
+
+        console.log('=== Saving New Teacher Profile to Supabase ===')
+        console.log(profileData)
+
+        const { data: savedProfile, error: insertError } = await supabase
+          .from('teacher_profiles')
+          .insert(profileData)
+          .select()
+          .single()
+
+        if (insertError) {
+          console.error('=== Failed to save teacher_profile ===')
+          console.error(insertError)
+          logger.error({ error: insertError, email: ltiData.email }, 'Failed to save teacher_profile')
+        } else {
+          console.log('=== Teacher Profile Saved Successfully ===')
+          console.log(savedProfile)
+          logger.info({ profileId, email: ltiData.email, role: appRole }, 'Created teacher_profile from LTI')
+        }
+      }
+
+      // Create session based on role
+      let sessionResult: { sessionId: string; token: string }
+
+      if (appRole === 'admin') {
+        sessionResult = await sessionManager.createAdminSession(
+          ltiData.userId,
+          ltiData.email,
+          ltiData.fullName,
+          adminPermissions,
+          requestInfo
+        )
+      } else {
+        sessionResult = await sessionManager.createTeacherSession(
+          ltiData.userId,
+          ltiData.email,
+          ltiData.fullName,
+          teacherPermissions,
+          requestInfo
+        )
+      }
+
+      // Set session token cookie
+      response.cookies.set('session_token', sessionResult.token, cookieOptions)
 
       logger.info({
         userId: user.id,
+        sessionId: sessionResult.sessionId,
         role: appRole,
         redirect: absoluteRedirectUrl.toString(),
-      }, 'LTI Teacher/Admin Launch - Redirecting to login')
+      }, 'LTI Teacher/Admin Launch Success')
     }
 
     return response

@@ -26,7 +26,11 @@ export interface QuestionStateData {
 export interface QuestionFlowCallbacks {
   onQuestionRequest?: (questionId: string, question: QuestionData) => void
   onQuizComplete?: (answers: QuizAnswerState[], totalQuestions: number) => void
+  onAnswerSaved?: (answer: QuizAnswerState, success: boolean) => void
 }
+
+// Total questions in the quiz (used for incremental saves)
+const TOTAL_QUESTIONS = 6
 
 // =============================================================================
 // Initial State
@@ -170,6 +174,17 @@ export function useQuestionFlow(
 
       const answerMessage = `${question.id}:${state.questionTryCount}:true`
       messageBus.sendMessage(WEB_TO_UE_MESSAGES.QUESTION_ANSWER, answerMessage)
+
+      // Save answer to database immediately
+      console.log('📝 [useQuestionFlow] Saving correct answer to database...')
+      quizService.saveAnswer(answerState, TOTAL_QUESTIONS).then(result => {
+        if (result.success) {
+          console.log('✅ [useQuestionFlow] Answer saved to database:', question.id)
+        } else {
+          console.warn('⚠️ [useQuestionFlow] Failed to save answer:', result.error)
+        }
+        callbacksRef.current.onAnswerSaved?.(answerState, result.success)
+      })
 
       // Special handling for Q6 pressure testing
       if (question.id === 'Q6') {

@@ -3,79 +3,173 @@
 /**
  * Results Page
  *
- * Displays assessment results for all students with filtering and details.
+ * Displays quiz results from quiz_responses table.
+ * Primary data source is quiz_responses, with student info from training_sessions.
  */
 
-import { useState } from 'react'
-import { Award, CheckCircle, XCircle, Clock, TrendingUp, Download } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Award, CheckCircle, XCircle, Clock, TrendingUp, Download, Timer } from 'lucide-react'
 import { DashboardLayout } from '../components/layout'
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/ui/Table'
 import { Badge } from '../components/ui/Badge'
 import { SearchInput } from '../components/ui/SearchInput'
 import { EmptyState } from '../components/ui/EmptyState'
-import { mockResults, mockQuestionnaires } from '../data/mockData'
-import type { StudentResult } from '../types'
+import { LoadingState } from '../components/ui/LoadingState'
 import { StatCard } from '../components'
+
+// =============================================================================
+// Types
+// =============================================================================
+
+interface QuestionDetail {
+  questionId: string
+  answer: string
+  correct: boolean
+  attempts: number
+  time: number
+}
+
+interface QuizResult {
+  id: string
+  sessionId: string
+  studentName: string
+  studentEmail: string
+  courseName: string
+  courseId: string
+  totalQuestions: number
+  correctCount: number
+  scorePercentage: number
+  passed: boolean
+  status: string
+  currentPhase: string
+  timeSpent: number
+  answeredAt: string
+  startedAt: string
+  questions: QuestionDetail[]
+}
+
+interface Stats {
+  totalResults: number
+  passedCount: number
+  failedCount: number
+  avgScore: number
+  passRate: number
+}
+
+interface Course {
+  id: string
+  title: string
+}
 
 type ResultFilter = 'all' | 'passed' | 'failed'
 
+// =============================================================================
+// Main Component
+// =============================================================================
+
 export default function ResultsPage() {
+  const [results, setResults] = useState<QuizResult[]>([])
+  const [stats, setStats] = useState<Stats | null>(null)
+  const [courses, setCourses] = useState<Course[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
   const [searchQuery, setSearchQuery] = useState('')
   const [resultFilter, setResultFilter] = useState<ResultFilter>('all')
-  const [quizFilter, setQuizFilter] = useState<string>('all')
-  const [selectedResult, setSelectedResult] = useState<StudentResult | null>(null)
+  const [courseFilter, setCourseFilter] = useState<string>('all')
+  const [selectedResult, setSelectedResult] = useState<QuizResult | null>(null)
+
+  useEffect(() => {
+    fetchResults()
+  }, [])
+
+  const fetchResults = async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+
+      const response = await fetch('/api/admin/results')
+      const data = await response.json()
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to fetch results')
+      }
+
+      setResults(data.results || [])
+      setStats(data.stats)
+      setCourses(data.courses || [])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load results')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   // Filter results
-  const filteredResults = mockResults.filter(result => {
+  const filteredResults = results.filter(result => {
     const matchesSearch =
       result.studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      result.questionnaireTitle.toLowerCase().includes(searchQuery.toLowerCase())
+      result.studentEmail.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      result.courseName.toLowerCase().includes(searchQuery.toLowerCase())
 
     const matchesResult =
       resultFilter === 'all' ||
       (resultFilter === 'passed' && result.passed) ||
       (resultFilter === 'failed' && !result.passed)
 
-    const matchesQuiz = quizFilter === 'all' || result.questionnaireId === quizFilter
+    const matchesCourse = courseFilter === 'all' || result.courseName === courseFilter
 
-    return matchesSearch && matchesResult && matchesQuiz
+    return matchesSearch && matchesResult && matchesCourse
   })
 
-  // Calculate stats
-  const totalResults = mockResults.length
-  const passedCount = mockResults.filter(r => r.passed).length
-  const failedCount = mockResults.filter(r => !r.passed).length
-  const avgScore = Math.round(mockResults.reduce((acc, r) => acc + r.percentage, 0) / totalResults)
-  const passRate = Math.round((passedCount / totalResults) * 100)
+  if (isLoading) {
+    return (
+      <DashboardLayout title="Results" subtitle="View and analyze quiz results">
+        <LoadingState message="Loading results..." />
+      </DashboardLayout>
+    )
+  }
+
+  if (error) {
+    return (
+      <DashboardLayout title="Results" subtitle="Error loading data">
+        <div className="p-6 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400">
+          {error}
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  const avgScore = stats?.avgScore || 0
 
   return (
-    <DashboardLayout title="Results" subtitle="View and analyze assessment results">
+    <DashboardLayout title="Results" subtitle="View and analyze quiz results">
       {/* Stats Overview */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard
           label="Total Submissions"
-          value={totalResults}
-          icon={<Award className="w-5 h-5 text-purple-400" />}
+          value={stats?.totalResults || 0}
+          icon={<Award className="w-5 h-5" />}
           color="purple"
         />
         <StatCard
           label="Passed"
-          value={passedCount}
-          icon={<CheckCircle className="w-5 h-5 text-green-400" />}
+          value={stats?.passedCount || 0}
+          icon={<CheckCircle className="w-5 h-5" />}
           color="green"
         />
         <StatCard
-          label="Failed"
-          value={failedCount}
-          icon={<XCircle className="w-5 h-5 text-red-400" />}
+          label="Below Target"
+          value={stats?.failedCount || 0}
+          icon={<XCircle className="w-5 h-5" />}
           color="red"
         />
         <StatCard
           label="Pass Rate"
-          value={`${passRate}%`}
-          icon={<TrendingUp className="w-5 h-5 text-blue-400" />}
-          color="blue"
+          value={`${stats?.passRate || 0}%`}
+          icon={<TrendingUp className="w-5 h-5" />}
+          color="yellow"
         />
       </div>
 
@@ -84,7 +178,7 @@ export default function ResultsPage() {
         <CardContent className="py-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="theme-text-muted text-sm">Average Score Across All Assessments</p>
+              <p className="theme-text-muted text-sm">Average Quiz Score</p>
               <p className="text-4xl font-bold theme-text-primary mt-1">{avgScore}%</p>
             </div>
             <div className="w-32 h-32 relative">
@@ -93,7 +187,7 @@ export default function ResultsPage() {
                   cx="50"
                   cy="50"
                   r="40"
-                  stroke="#ffffffff"
+                  stroke="#374151"
                   strokeWidth="8"
                   fill="none"
                 />
@@ -123,7 +217,7 @@ export default function ResultsPage() {
             <SearchInput
               value={searchQuery}
               onChange={setSearchQuery}
-              placeholder="Search by student or quiz..."
+              placeholder="Search by student or course..."
               className="w-full lg:w-80"
             />
             <div className="flex flex-wrap gap-2">
@@ -140,22 +234,24 @@ export default function ResultsPage() {
                 </FilterButton>
               </div>
 
-              {/* Quiz Filter */}
-              <select
-                value={quizFilter}
-                onChange={(e) => setQuizFilter(e.target.value)}
-                className="px-4 py-2 bg-[#181818] border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
-                <option value="all">All Quizzes</option>
-                {mockQuestionnaires.map((quiz) => (
-                  <option key={quiz.id} value={quiz.id}>
-                    {quiz.title}
-                  </option>
-                ))}
-              </select>
+              {/* Course Filter */}
+              {courses.length > 1 && (
+                <select
+                  value={courseFilter}
+                  onChange={(e) => setCourseFilter(e.target.value)}
+                  className="px-4 py-2 bg-[#181818] border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#39BEAE]"
+                >
+                  <option value="all">All Courses</option>
+                  {courses.map((course) => (
+                    <option key={course.id} value={course.title}>
+                      {course.title}
+                    </option>
+                  ))}
+                </select>
+              )}
 
               {/* Export Button */}
-              <button className="flex items-center gap-2 px-4 py-2 bg-[#39BEAE] text-white rounded-lg transition-colors">
+              <button className="flex items-center gap-2 px-4 py-2 bg-[#39BEAE] hover:bg-[#2ea89a] text-white rounded-lg transition-colors">
                 <Download className="w-4 h-4" />
                 Export
               </button>
@@ -168,7 +264,7 @@ export default function ResultsPage() {
       <Card className="hidden md:block">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Assessment Results</CardTitle>
+            <CardTitle>Quiz Results</CardTitle>
             <span className="text-gray-400 text-sm">{filteredResults.length} results</span>
           </div>
         </CardHeader>
@@ -177,7 +273,7 @@ export default function ResultsPage() {
             <EmptyState
               icon={<Award className="w-8 h-8 text-gray-400" />}
               title="No results found"
-              description="Try adjusting your search or filter criteria"
+              description={results.length === 0 ? "No quiz submissions yet" : "Try adjusting your search or filter criteria"}
               className="py-12"
             />
           ) : (
@@ -185,11 +281,11 @@ export default function ResultsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Student</TableHead>
-                  <TableHead className="hidden lg:table-cell">Assessment</TableHead>
+                  <TableHead className="hidden lg:table-cell">Course</TableHead>
                   <TableHead>Score</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="hidden xl:table-cell">Time Spent</TableHead>
-                  <TableHead className="hidden lg:table-cell">Completed</TableHead>
+                  <TableHead>Questions</TableHead>
+                  <TableHead>Result</TableHead>
+                  <TableHead className="hidden lg:table-cell">Submitted</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -203,7 +299,7 @@ export default function ResultsPage() {
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center flex-shrink-0">
                           <span className="text-white text-xs font-medium">
-                            {result.studentName.split(' ').map(n => n[0]).join('')}
+                            {result.studentName.split(' ').map(n => n[0]).join('').substring(0, 2)}
                           </span>
                         </div>
                         <div className="min-w-0">
@@ -213,34 +309,27 @@ export default function ResultsPage() {
                       </div>
                     </TableCell>
                     <TableCell className="hidden lg:table-cell">
-                      <p className="theme-text-primary">{result.questionnaireTitle}</p>
+                      <p className="theme-text-primary">{result.courseName}</p>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-lg font-bold ${
-                          result.percentage >= 80 ? 'text-green-400' :
-                          result.percentage >= 60 ? 'text-yellow-400' : 'text-red-400'
-                        }`}>
-                          {result.percentage}%
-                        </span>
-                        <span className="theme-text-muted text-sm hidden sm:inline">
-                          ({result.score}/{result.totalPoints})
-                        </span>
-                      </div>
+                      <span className={`text-lg font-bold ${
+                        result.scorePercentage >= 75 ? 'text-green-400' :
+                        result.scorePercentage >= 50 ? 'text-yellow-400' : 'text-red-400'
+                      }`}>
+                        {result.scorePercentage}%
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="theme-text-primary">{result.correctCount}</span>
+                      <span className="theme-text-muted">/{result.totalQuestions}</span>
                     </TableCell>
                     <TableCell>
                       <Badge variant={result.passed ? 'success' : 'danger'}>
                         {result.passed ? 'Passed' : 'Failed'}
                       </Badge>
                     </TableCell>
-                    <TableCell className="hidden xl:table-cell">
-                      <div className="flex items-center gap-2 theme-text-secondary">
-                        <Clock className="w-4 h-4" />
-                        {formatTime(result.timeSpent)}
-                      </div>
-                    </TableCell>
                     <TableCell className="hidden lg:table-cell">
-                      <span className="theme-text-secondary">{formatDate(result.completedAt)}</span>
+                      <span className="theme-text-secondary">{formatDate(result.answeredAt)}</span>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -253,7 +342,7 @@ export default function ResultsPage() {
       {/* Results Cards - Mobile */}
       <div className="md:hidden space-y-3">
         <div className="flex items-center justify-between px-1">
-          <span className="text-sm font-medium theme-text-primary">Assessment Results</span>
+          <span className="text-sm font-medium theme-text-primary">Quiz Results</span>
           <span className="text-gray-400 text-sm">{filteredResults.length} results</span>
         </div>
         {filteredResults.length === 0 ? (
@@ -261,7 +350,7 @@ export default function ResultsPage() {
             <EmptyState
               icon={<Award className="w-8 h-8 text-gray-400" />}
               title="No results found"
-              description="Try adjusting your search or filter criteria"
+              description={results.length === 0 ? "No quiz submissions yet" : "Try adjusting your search or filter criteria"}
               className="py-12"
             />
           </Card>
@@ -276,34 +365,31 @@ export default function ResultsPage() {
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <div className="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center flex-shrink-0">
                     <span className="text-white font-medium text-sm">
-                      {result.studentName.split(' ').map(n => n[0]).join('')}
+                      {result.studentName.split(' ').map(n => n[0]).join('').substring(0, 2)}
                     </span>
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="theme-text-primary font-medium truncate">{result.studentName}</p>
-                    <p className="theme-text-muted text-xs truncate">{result.questionnaireTitle}</p>
+                    <p className="theme-text-muted text-xs truncate">{result.courseName}</p>
                   </div>
                 </div>
                 <div className="text-right flex-shrink-0">
                   <span className={`text-xl font-bold ${
-                    result.percentage >= 80 ? 'text-green-400' :
-                    result.percentage >= 60 ? 'text-yellow-400' : 'text-red-400'
+                    result.scorePercentage >= 75 ? 'text-green-400' :
+                    result.scorePercentage >= 50 ? 'text-yellow-400' : 'text-red-400'
                   }`}>
-                    {result.percentage}%
+                    {result.scorePercentage}%
                   </span>
+                  <p className="text-xs theme-text-muted">
+                    {result.correctCount}/{result.totalQuestions}
+                  </p>
                 </div>
               </div>
               <div className="mt-3 flex items-center justify-between">
                 <Badge variant={result.passed ? 'success' : 'danger'}>
                   {result.passed ? 'Passed' : 'Failed'}
                 </Badge>
-                <div className="flex items-center gap-3 text-xs theme-text-muted">
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    {formatTime(result.timeSpent)}
-                  </span>
-                  <span>{formatDate(result.completedAt)}</span>
-                </div>
+                <span className="text-xs theme-text-muted">{formatDate(result.answeredAt)}</span>
               </div>
             </Card>
           ))
@@ -325,13 +411,6 @@ export default function ResultsPage() {
 // Sub-components
 // =============================================================================
 
-interface StatCardProps {
-  label: string
-  value: string | number
-  icon: React.ReactNode
-  color: 'purple' | 'green' | 'red' | 'blue'
-}
-
 interface FilterButtonProps {
   children: React.ReactNode
   active: boolean
@@ -343,8 +422,8 @@ function FilterButton({ children, active, onClick }: FilterButtonProps) {
     <button
       onClick={onClick}
       className={`
-        px-3 py-1.5 rounded-md text-sm font-medium transition-colors
-        ${active ? 'bg-[#39BEAE] text-white' : 'theme-bg-tertiary theme-text-primary hover:theme-text-primary hover:theme-bg-hover'}
+        px-3 py-1.5 rounded-md text-sm font-medium transition-colors cursor-pointer
+        ${active ? 'bg-[#39BEAE] text-white' : 'theme-bg-tertiary theme-text-primary hover:theme-bg-hover'}
       `}
     >
       {children}
@@ -353,30 +432,33 @@ function FilterButton({ children, active, onClick }: FilterButtonProps) {
 }
 
 interface ResultDetailModalProps {
-  result: StudentResult
+  result: QuizResult
   onClose: () => void
 }
 
 function ResultDetailModal({ result, onClose }: ResultDetailModalProps) {
+  // Calculate total time from all questions
+  const totalQuizTime = result.questions.reduce((acc, q) => acc + (q.time || 0), 0)
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30 backdrop-blur-sm sm:p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm sm:p-4"
       onClick={onClose}
     >
       <div
-        className="theme-bg-secondary rounded-t-xl sm:rounded-xl w-full sm:max-w-lg max-h-[90vh] overflow-hidden"
+        className="theme-bg-secondary rounded-t-xl sm:rounded-xl w-full sm:max-w-2xl max-h-[90vh] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="p-4 sm:p-6 border-b border-gray-700">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <h2 className="text-lg sm:text-xl font-semibold theme-text-primary">Result Details</h2>
-              <p className="theme-text-muted text-sm mt-1 truncate">{result.questionnaireTitle}</p>
+              <h2 className="text-lg sm:text-xl font-semibold theme-text-primary">Quiz Results</h2>
+              <p className="theme-text-muted text-sm mt-1 truncate">{result.courseName}</p>
             </div>
             <button
               onClick={onClose}
-              className="p-2 theme-text-primary hover:text-white hover:theme-bg-hover cursor-pointer rounded-lg transition-colors text-2xl leading-none flex-shrink-0"
+              className="p-2 theme-text-muted hover:theme-text-primary hover:theme-bg-hover cursor-pointer rounded-lg transition-colors text-2xl leading-none flex-shrink-0"
             >
               ×
             </button>
@@ -384,12 +466,12 @@ function ResultDetailModal({ result, onClose }: ResultDetailModalProps) {
         </div>
 
         {/* Content */}
-        <div className="p-4 sm:p-6 overflow-y-auto max-h-[60vh]">
+        <div className="p-4 sm:p-6 overflow-y-auto max-h-[65vh]">
           {/* Student Info */}
           <div className="flex items-center gap-3 sm:gap-4 mb-6 p-3 sm:p-4 theme-bg-tertiary rounded-lg">
             <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-[#39BEAE] flex items-center justify-center flex-shrink-0">
-              <span className="theme-text-primary font-bold text-sm sm:text-base">
-                {result.studentName.split(' ').map(n => n[0]).join('')}
+              <span className="text-white font-bold text-sm sm:text-base">
+                {result.studentName.split(' ').map(n => n[0]).join('').substring(0, 2)}
               </span>
             </div>
             <div className="min-w-0">
@@ -401,31 +483,111 @@ function ResultDetailModal({ result, onClose }: ResultDetailModalProps) {
           {/* Score Display */}
           <div className="text-center mb-6">
             <div className={`text-5xl sm:text-6xl font-bold ${result.passed ? 'text-green-400' : 'text-red-400'}`}>
-              {result.percentage}%
+              {result.scorePercentage}%
             </div>
             <p className="theme-text-secondary mt-2">
-              {result.score} / {result.totalPoints} points
+              {result.correctCount} of {result.totalQuestions} questions correct
             </p>
-            <Badge variant={result.passed ? 'success' : 'danger'} className="mt-3">
-              {result.passed ? 'PASSED' : 'FAILED'}
-            </Badge>
+            <div className="flex justify-center gap-2 mt-3">
+              <Badge variant={result.passed ? 'success' : 'danger'} className="text-sm px-3 py-1">
+                {result.passed ? 'PASSED' : 'FAILED'}
+              </Badge>
+            </div>
           </div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+          {/* Quiz Stats Summary */}
+          <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6">
+            <div className="p-3 sm:p-4 theme-bg-tertiary rounded-lg text-center">
+              <p className="text-2xl font-bold theme-text-primary">{result.totalQuestions}</p>
+              <p className="text-xs theme-text-muted">Questions</p>
+            </div>
+            <div className="p-3 sm:p-4 theme-bg-tertiary rounded-lg text-center">
+              <p className="text-2xl font-bold text-green-400">{result.correctCount}</p>
+              <p className="text-xs theme-text-muted">Correct</p>
+            </div>
+            <div className="p-3 sm:p-4 theme-bg-tertiary rounded-lg text-center">
+              <p className="text-2xl font-bold text-red-400">{result.totalQuestions - result.correctCount}</p>
+              <p className="text-xs theme-text-muted">Incorrect</p>
+            </div>
+          </div>
+
+          {/* Individual Question Results */}
+          {result.questions.length > 0 && (
+            <div className="mb-6">
+              <h3 className="theme-text-primary font-medium mb-3 flex items-center gap-2">
+                <Award className="w-4 h-4" />
+                Question Details
+              </h3>
+              <div className="space-y-2">
+                {result.questions
+                  .sort((a, b) => a.questionId.localeCompare(b.questionId))
+                  .map((question) => (
+                  <div
+                    key={question.questionId}
+                    className={`p-3 rounded-lg border ${
+                      question.correct
+                        ? 'bg-green-500/10 border-green-500/30'
+                        : 'bg-red-500/10 border-red-500/30'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                          question.correct ? 'bg-green-500' : 'bg-red-500'
+                        }`}>
+                          {question.correct ? (
+                            <CheckCircle className="w-4 h-4 text-white" />
+                          ) : (
+                            <XCircle className="w-4 h-4 text-white" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-medium theme-text-primary">
+                            {question.questionId.toUpperCase().replace('_', ' ')}
+                          </p>
+                          <p className="text-xs theme-text-muted">
+                            Answer: {question.answer} • Attempts: {question.attempts}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 text-xs theme-text-muted">
+                        <Timer className="w-3 h-3" />
+                        {formatTimeMs(question.time)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Time Info */}
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6">
             <div className="p-3 sm:p-4 theme-bg-tertiary rounded-lg">
-              <div className="flex items-center gap-2 theme-text-primary mb-1">
+              <div className="flex items-center gap-2 theme-text-muted mb-1">
+                <Timer className="w-4 h-4 flex-shrink-0" />
+                <span className="text-xs sm:text-sm">Total Quiz Time</span>
+              </div>
+              <p className="theme-text-primary font-medium text-sm sm:text-base">{formatTimeMs(totalQuizTime)}</p>
+            </div>
+            <div className="p-3 sm:p-4 theme-bg-tertiary rounded-lg">
+              <div className="flex items-center gap-2 theme-text-muted mb-1">
                 <Clock className="w-4 h-4 flex-shrink-0" />
-                <span className="text-xs sm:text-sm">Time Spent</span>
+                <span className="text-xs sm:text-sm">Session Time</span>
               </div>
               <p className="theme-text-primary font-medium text-sm sm:text-base">{formatTime(result.timeSpent)}</p>
             </div>
+          </div>
+
+          {/* Timeline */}
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
             <div className="p-3 sm:p-4 theme-bg-tertiary rounded-lg">
-              <div className="flex items-center gap-2 theme-text-primary mb-1">
-                <Award className="w-4 h-4 flex-shrink-0" />
-                <span className="text-xs sm:text-sm">Completed</span>
-              </div>
-              <p className="theme-text-primary font-medium text-sm sm:text-base">{formatDate(result.completedAt)}</p>
+              <p className="text-xs theme-text-muted mb-1">Started</p>
+              <p className="theme-text-primary font-medium text-sm">{formatDate(result.startedAt)}</p>
+            </div>
+            <div className="p-3 sm:p-4 theme-bg-tertiary rounded-lg">
+              <p className="text-xs theme-text-muted mb-1">Submitted</p>
+              <p className="theme-text-primary font-medium text-sm">{formatDate(result.answeredAt)}</p>
             </div>
           </div>
         </div>
@@ -434,7 +596,7 @@ function ResultDetailModal({ result, onClose }: ResultDetailModalProps) {
         <div className="p-4 sm:p-6 border-t border-gray-700">
           <button
             onClick={onClose}
-            className="w-full py-2.5 bg-[#39BEAE] cursor-pointer text-white rounded-lg transition-colors"
+            className="w-full py-2.5 bg-[#39BEAE] hover:bg-[#2ea89a] cursor-pointer text-white rounded-lg transition-colors"
           >
             Close
           </button>
@@ -446,15 +608,32 @@ function ResultDetailModal({ result, onClose }: ResultDetailModalProps) {
 
 // Helper functions
 function formatDate(dateString: string): string {
+  if (!dateString) return 'N/A'
   const date = new Date(dateString)
   return date.toLocaleDateString('en-NZ', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   })
 }
 
 function formatTime(seconds: number): string {
+  if (!seconds || seconds === 0) return '0s'
+  if (seconds < 60) return `${seconds}s`
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  if (mins < 60) return `${mins}m ${secs}s`
+  const hours = Math.floor(mins / 60)
+  const remainingMins = mins % 60
+  return `${hours}h ${remainingMins}m`
+}
+
+function formatTimeMs(ms: number): string {
+  if (!ms || ms === 0) return '0s'
+  const seconds = Math.round(ms / 1000)
+  if (seconds < 60) return `${seconds}s`
   const mins = Math.floor(seconds / 60)
   const secs = seconds % 60
   return `${mins}m ${secs}s`

@@ -21,6 +21,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { SearchInput } from '../components/ui/SearchInput'
 import { EmptyState } from '../components/ui/EmptyState'
+import { LoadingState } from '../components/ui/LoadingState'
 import type { FittingOption } from '@/app/types'
 
 // =============================================================================
@@ -144,11 +145,8 @@ export default function FittingsPage() {
       {/* Loading State */}
       {loading && (
         <Card>
-          <CardContent className="py-12">
-            <div className="flex flex-col items-center justify-center">
-              <RefreshCw className="w-8 h-8 theme-text-brand animate-spin mb-4" />
-              <p className="theme-text-muted">Loading fitting options...</p>
-            </div>
+          <CardContent>
+            <LoadingState message="Loading fitting options..." />
           </CardContent>
         </Card>
       )}

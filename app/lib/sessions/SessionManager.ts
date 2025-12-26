@@ -118,13 +118,14 @@ export class SessionManager {
       console.warn('Database operation failed:', dbError)
     }
 
-    // Generate JWT token
+    // Generate JWT token with isLti=true
     const token = await this.generateToken({
       sessionId,
       userId: ltiData.userId,
       email: ltiData.email,
       role: 'student',
       sessionType: 'lti',
+      isLti: true, // LTI session - full access, data is saved
     })
 
     return { sessionId, token }
@@ -199,6 +200,7 @@ export class SessionManager {
     }
 
     // Generate JWT token (permissions stored in JWT, not in DB)
+    // Note: Teacher sessions created via LTI will have isLti=true set by the LTI route
     const token = await this.generateToken({
       sessionId,
       userId,
@@ -206,6 +208,7 @@ export class SessionManager {
       role: 'teacher',
       sessionType: 'teacher',
       permissions: effectivePermissions,
+      isLti: true, // Default to true for LTI-created sessions
     })
 
     return { sessionId, token }
@@ -282,6 +285,7 @@ export class SessionManager {
     }
 
     // Generate JWT token (permissions stored in JWT, not in DB)
+    // Note: Admin sessions created via LTI will have isLti=true set by the LTI route
     const token = await this.generateToken({
       sessionId,
       userId,
@@ -289,6 +293,7 @@ export class SessionManager {
       role: 'admin',
       sessionType: 'admin',
       permissions: effectivePermissions,
+      isLti: true, // Default to true for LTI-created sessions
     })
 
     return { sessionId, token }
@@ -396,17 +401,39 @@ export class SessionManager {
   async createTrainingSession(
     userSessionId: string,
     courseId: string,
-    courseName: string
+    courseName: string,
+    studentDetails?: {
+      userId: string
+      email: string
+      fullName?: string
+      institution?: string
+    }
   ): Promise<string> {
+    // Build student JSONB data
+    const student = studentDetails ? {
+      user_id: studentDetails.userId,
+      email: studentDetails.email,
+      full_name: studentDetails.fullName || 'Unknown Student',
+      institution: studentDetails.institution || 'Unknown Institution',
+      enrolled_at: new Date().toISOString(),
+    } : {
+      user_id: 'unknown',
+      email: 'unknown@unknown.local',
+      full_name: 'Unknown Student',
+      institution: 'Unknown Institution',
+      enrolled_at: new Date().toISOString(),
+    }
+
     const { data, error } = await supabaseAdmin
       .from('training_sessions')
       .insert({
         session_id: userSessionId,
         course_id: courseId,
         course_name: courseName,
-        training_phase: 'Phase A',
+        current_training_phase: 'Phase A',
         overall_progress: 0,
         status: 'active',
+        student: student,
       })
       .select('id')
       .single()
@@ -434,7 +461,7 @@ export class SessionManager {
       updated_at: new Date().toISOString(),
     }
 
-    if (data.phase) updateData.training_phase = data.phase
+    if (data.phase) updateData.current_training_phase = data.phase
     if (data.progress !== undefined) updateData.overall_progress = data.progress
     if (data.score !== undefined) updateData.total_score = data.score
     if (data.timeSpent !== undefined) updateData.total_time_spent = data.timeSpent
@@ -457,7 +484,7 @@ export class SessionManager {
       .update({
         status: 'completed',
         end_time: new Date().toISOString(),
-        completion_percentage: 100,
+        overall_progress: 100,
         final_results: finalResults,
       })
       .eq('id', trainingSessionId)
@@ -570,6 +597,7 @@ export class SessionManager {
       sessionId: dbSession.session_id as string,
       userId: dbSession.user_id as string,
       email: dbSession.email as string,
+      isLti: jwtPayload.isLti ?? true, // Default to true for existing LTI sessions
       createdAt: new Date(dbSession.created_at as string),
       expiresAt: new Date(dbSession.expires_at as string),
     }
@@ -624,6 +652,7 @@ export class SessionManager {
       sessionId: jwtPayload.sessionId,
       userId: jwtPayload.userId,
       email: jwtPayload.email,
+      isLti: jwtPayload.isLti ?? true, // Default to true for existing LTI sessions
       createdAt: now,
       expiresAt,
     }

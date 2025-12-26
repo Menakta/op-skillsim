@@ -37,6 +37,7 @@ export interface BaseSession {
   email: string
   role: UserRole
   sessionType: SessionType
+  isLti: boolean // true = LTI session (full access), false = demo session (read-only for non-students)
   createdAt: Date
   expiresAt: Date
 }
@@ -110,6 +111,7 @@ export interface SessionJwtPayload {
   role: UserRole
   sessionType: SessionType
   permissions?: TeacherPermissions | AdminPermissions
+  isLti?: boolean // true = LTI session (full access), false/undefined = demo session (read-only for non-students)
   iat?: number
   exp?: number
 }

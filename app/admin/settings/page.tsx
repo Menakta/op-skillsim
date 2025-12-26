@@ -11,13 +11,18 @@ import { Save, User, Bell, Shield, Palette } from 'lucide-react'
 import { DashboardLayout } from '../components/layout'
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card'
 import { useTheme } from '@/app/context/ThemeContext'
+import { useAdmin, DemoModeNotice } from '../context/AdminContext'
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme()
+  const { isLti } = useAdmin()
 
   return (
     <DashboardLayout title="Settings" subtitle="Manage your account and preferences">
       <div className="max-w-3xl space-y-6">
+        {/* Demo Mode Notice */}
+        <DemoModeNotice />
+
         {/* Profile Settings */}
         <Card>
           <CardHeader>
@@ -115,12 +120,14 @@ export default function SettingsPage() {
         </Card>
 
         {/* Save Button */}
-        <div className="flex justify-end">
-          <button className="flex items-center gap-2 px-6 py-2 rounded-lg transition-colors theme-btn-primary">
-            <Save className="w-4 h-4" />
-            Save Changes
-          </button>
-        </div>
+        {isLti && (
+          <div className="flex justify-end">
+            <button className="flex items-center gap-2 px-6 py-2 rounded-lg transition-colors theme-btn-primary">
+              <Save className="w-4 h-4" />
+              Save Changes
+            </button>
+          </div>
+        )}
       </div>
     </DashboardLayout>
   )

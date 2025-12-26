@@ -23,7 +23,9 @@ const JWT_SECRET = new TextEncoder().encode(
 interface SessionPayload {
   sessionId: string
   userId: string
+  email: string
   role: string
+  isLti: boolean // true = LTI session (data saved), false = demo (no save)
 }
 
 async function getSessionFromRequest(request: NextRequest): Promise<SessionPayload | null> {
@@ -38,7 +40,9 @@ async function getSessionFromRequest(request: NextRequest): Promise<SessionPaylo
     return {
       sessionId: payload.sessionId as string,
       userId: payload.userId as string,
+      email: payload.email as string || 'unknown@unknown.local',
       role: payload.role as string,
+      isLti: (payload.isLti as boolean) ?? true, // Default to true for backward compatibility
     }
   } catch {
     return null
@@ -58,6 +62,27 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'Authentication required' },
         { status: 401 }
       )
+    }
+
+    // Skip save for non-LTI sessions (demo mode)
+    if (!session.isLti) {
+      logger.info({ sessionId: session.sessionId }, 'Demo mode: Returning mock training session')
+      return NextResponse.json({
+        success: true,
+        session: {
+          id: `demo_${session.sessionId}`,
+          session_id: session.sessionId,
+          course_id: 'demo',
+          course_name: 'Demo Training',
+          current_training_phase: 'Phase A',
+          overall_progress: 0,
+          status: 'active',
+          phases_completed: 0,
+          total_score: 0,
+        },
+        isNew: true,
+        demo: true,
+      })
     }
 
     const body = await request.json().catch(() => ({}))
@@ -84,6 +109,15 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    // Build student details for JSONB column
+    const student = {
+      user_id: session.userId,
+      email: session.email,
+      full_name: 'Unknown Student',
+      institution: 'Unknown Institution',
+      enrolled_at: new Date().toISOString(),
+    }
+
     // Create new training session
     const { data: newSession, error: createError } = await supabase
       .from('training_sessions')
@@ -91,13 +125,12 @@ export async function POST(request: NextRequest) {
         session_id: session.sessionId,
         course_id: courseId || 'default',
         course_name: courseName || 'VR Pipe Training',
-        training_phase: 'Phase A',
+        current_training_phase: 'Phase A',
         overall_progress: 0,
         status: 'active',
         phases_completed: 0,
         total_score: 0,
-        quiz_attempts: {},
-        completion_percentage: 0,
+        student: student,
       })
       .select()
       .single()
@@ -140,6 +173,15 @@ export async function GET(request: NextRequest) {
         { success: false, error: 'Authentication required' },
         { status: 401 }
       )
+    }
+
+    // Return null for non-LTI sessions (demo mode - no stored data)
+    if (!session.isLti) {
+      return NextResponse.json({
+        success: true,
+        session: null,
+        demo: true,
+      })
     }
 
     const supabase = getSupabaseAdmin()
@@ -188,6 +230,17 @@ export async function PATCH(request: NextRequest) {
         { success: false, error: 'Authentication required' },
         { status: 401 }
       )
+    }
+
+    // Skip update for non-LTI sessions (demo mode)
+    if (!session.isLti) {
+      const body = await request.json()
+      logger.info({ sessionId: session.sessionId, status: body.status }, 'Demo mode: Skipping session status update')
+      return NextResponse.json({
+        success: true,
+        status: body.status || 'active',
+        demo: true,
+      })
     }
 
     const body = await request.json()

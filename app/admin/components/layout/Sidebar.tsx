@@ -20,6 +20,7 @@ import {
   LogOut,
   X,
   Wrench,
+  UserCog,
 } from 'lucide-react'
 
 interface NavItem {
@@ -34,6 +35,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Questionnaires', href: '/admin/questionnaires', icon: ClipboardList },
   { label: 'Fittings', href: '/admin/fittings', icon: Wrench },
   { label: 'Results', href: '/admin/results', icon: BarChart3 },
+  { label: 'Users', href: '/admin/users', icon: UserCog },
 ]
 
 const SECONDARY_ITEMS: NavItem[] = [

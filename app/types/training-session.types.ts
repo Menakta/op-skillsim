@@ -12,6 +12,18 @@
 export type TrainingSessionStatus = 'active' | 'paused' | 'completed' | 'abandoned'
 
 // =============================================================================
+// Student Details (JSONB)
+// =============================================================================
+
+export interface StudentDetails {
+  user_id: string
+  email: string
+  full_name: string
+  institution: string
+  enrolled_at: string
+}
+
+// =============================================================================
 // Training Session - Database Schema
 // =============================================================================
 
@@ -19,10 +31,13 @@ export interface TrainingSession {
   id: string
   session_id: string
 
+  // Student info (JSONB)
+  student: StudentDetails
+
   // Training context
   course_id: string | null
   course_name: string | null
-  training_phase: string
+  current_training_phase: string
   overall_progress: number
 
   // Training state
@@ -33,11 +48,9 @@ export interface TrainingSession {
   // Performance data
   phases_completed: number
   total_score: number
-  quiz_attempts: Record<string, number>
 
   // Completion status
   status: TrainingSessionStatus
-  completion_percentage: number
 
   // Results data
   final_results: TrainingFinalResults | null
@@ -81,7 +94,7 @@ export interface TrainingSessionInsert {
   session_id: string
   course_id?: string
   course_name?: string
-  training_phase?: string
+  current_training_phase?: string
   overall_progress?: number
   status?: TrainingSessionStatus
 }
@@ -91,15 +104,13 @@ export interface TrainingSessionInsert {
 // =============================================================================
 
 export interface TrainingSessionUpdate {
-  training_phase?: string
+  current_training_phase?: string
   overall_progress?: number
   end_time?: string
   total_time_spent?: number
   phases_completed?: number
   total_score?: number
-  quiz_attempts?: Record<string, number>
   status?: TrainingSessionStatus
-  completion_percentage?: number
   final_results?: TrainingFinalResults
 }
 

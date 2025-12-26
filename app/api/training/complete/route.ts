@@ -100,7 +100,6 @@ export async function POST(request: NextRequest) {
       averageTimeMs: 0,
     }
     let totalScore = 0
-    let quizAttempts: Record<string, { attempts: number; correct: boolean }> = {}
 
     if (quizData && Object.keys(quizData).length > 0) {
       const entries = Object.entries(quizData)
@@ -118,14 +117,6 @@ export async function POST(request: NextRequest) {
         }
         return sum
       }, 0)
-
-      // Build quiz attempts object
-      for (const [key, value] of entries) {
-        quizAttempts[key] = {
-          attempts: value.attempts,
-          correct: value.correct
-        }
-      }
     }
 
     // Calculate total time spent in seconds
@@ -145,13 +136,11 @@ export async function POST(request: NextRequest) {
       .from('training_sessions')
       .update({
         status: 'completed',
-        completion_percentage: 100,
         overall_progress: 100,
         end_time: new Date().toISOString(),
         total_time_spent: totalTimeSpent,
         phases_completed: phasesCompleted || 6,
         total_score: totalScore,
-        quiz_attempts: quizAttempts,
         final_results: results,
         updated_at: new Date().toISOString(),
       })
@@ -172,7 +161,7 @@ export async function POST(request: NextRequest) {
       totalScore,
       phasesCompleted: phasesCompleted || 6,
       totalTimeSpent,
-      quizQuestionsAnswered: Object.keys(quizAttempts).length,
+      quizQuestionsAnswered: quizData ? Object.keys(quizData).length : 0,
     }, 'Training session completed')
 
     return NextResponse.json({

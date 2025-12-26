@@ -21,6 +21,7 @@ interface SessionPayload {
   sessionId: string
   userId: string
   role: string
+  isLti: boolean // true = LTI session (data saved), false = demo (no save)
 }
 
 async function getSessionFromRequest(request: NextRequest): Promise<SessionPayload | null> {
@@ -36,6 +37,7 @@ async function getSessionFromRequest(request: NextRequest): Promise<SessionPaylo
       sessionId: payload.sessionId as string,
       userId: payload.userId as string,
       role: payload.role as string,
+      isLti: (payload.isLti as boolean) ?? true, // Default to true for backward compatibility
     }
   } catch {
     return null
@@ -65,6 +67,25 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'Phase is required' },
         { status: 400 }
       )
+    }
+
+    // Skip save for non-LTI sessions (demo mode)
+    if (!session.isLti) {
+      const phaseOrder = ['Phase A', 'Phase B', 'Phase C', 'Phase D']
+      const currentPhaseIndex = phaseOrder.indexOf(phase)
+      const nextPhase = currentPhaseIndex < phaseOrder.length - 1
+        ? phaseOrder[currentPhaseIndex + 1]
+        : phase
+
+      logger.info({ sessionId: session.sessionId, phase }, 'Demo mode: Skipping phase completion save')
+      return NextResponse.json({
+        success: true,
+        phasesCompleted: currentPhaseIndex + 1,
+        totalScore: score || 0,
+        nextPhase,
+        overallProgress: Math.min(((currentPhaseIndex + 1) / phaseOrder.length) * 100, 100),
+        demo: true,
+      })
     }
 
     const supabase = getSupabaseAdmin()
@@ -98,8 +119,8 @@ export async function POST(request: NextRequest) {
       ? phaseOrder[currentPhaseIndex + 1]
       : phase
 
-    // Calculate completion percentage based on phases
-    const completionPercentage = Math.min((newPhasesCompleted / phaseOrder.length) * 100, 100)
+    // Calculate overall progress based on phases completed
+    const overallProgress = Math.min((newPhasesCompleted / phaseOrder.length) * 100, 100)
 
     const { error: updateError } = await supabase
       .from('training_sessions')
@@ -107,8 +128,8 @@ export async function POST(request: NextRequest) {
         phases_completed: newPhasesCompleted,
         total_score: newTotalScore,
         total_time_spent: newTimeSpent,
-        training_phase: nextPhase,
-        completion_percentage: completionPercentage,
+        current_training_phase: nextPhase,
+        overall_progress: overallProgress,
         updated_at: new Date().toISOString(),
       })
       .eq('id', currentSession.id)
@@ -134,7 +155,7 @@ export async function POST(request: NextRequest) {
       phasesCompleted: newPhasesCompleted,
       totalScore: newTotalScore,
       nextPhase,
-      completionPercentage,
+      overallProgress,
     })
 
   } catch (error) {

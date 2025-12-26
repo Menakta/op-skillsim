@@ -3,19 +3,32 @@
 /**
  * Login Page
  *
- * Simple login page - redirects to dashboard on success.
+ * Simple email/password login for users coming from outside LTI.
+ * - Students: Can do training but data won't be saved
+ * - Teachers/Admins: Can view admin panel in read-only mode
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { useTheme } from '../context/ThemeContext'
 
 export default function LoginPage() {
   const { theme, toggleTheme } = useTheme()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [redirectPath, setRedirectPath] = useState<string | null>(null)
+
+  // Get redirect path from URL params
+  useEffect(() => {
+    const redirect = searchParams.get('redirect')
+    if (redirect) {
+      setRedirectPath(redirect)
+    }
+  }, [searchParams])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -23,7 +36,8 @@ export default function LoginPage() {
     setError(null)
 
     try {
-      const response = await fetch('/api/auth/login', {
+      // Use simple-login API for non-LTI authentication
+      const response = await fetch('/api/auth/simple-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -31,25 +45,38 @@ export default function LoginPage() {
 
       const data = await response.json()
 
-      if (!response.ok) {
+      if (!response.ok || !data.success) {
         setError(data.error || 'Login failed')
         setLoading(false)
         return
       }
 
-      // Save user info to localStorage
+      // Save user info to localStorage (including isLti flag)
       if (data.user) {
         localStorage.setItem('user', JSON.stringify({
           id: data.user.id,
           email: data.user.email,
           name: data.user.name,
           role: data.user.role,
+          isLti: false, // Mark as non-LTI user
         }))
         localStorage.setItem('userRole', data.user.role)
+        localStorage.setItem('isLti', 'false')
       }
 
-      // Redirect to dashboard
-      window.location.href = '/admin'
+      // Redirect based on role or to the requested path
+      if (redirectPath) {
+        // If there's a redirect path, go there (unless it's /admin for students)
+        if (data.user.role === 'student' && redirectPath.startsWith('/admin')) {
+          window.location.href = '/'
+        } else {
+          window.location.href = redirectPath
+        }
+      } else if (data.user.role === 'student') {
+        window.location.href = '/'
+      } else {
+        window.location.href = '/admin'
+      }
     } catch (err) {
       setError('Network error. Please try again.')
       setLoading(false)
@@ -81,7 +108,24 @@ export default function LoginPage() {
         {/* Login Form */}
         <div className="rounded-xl grid md:grid-cols-12 w-[947px] max-w-[947px] min-h-[611px]">
           <div className={`md:col-span-7 col-span-12 px-6 py-10 md:px-20 md:py-20 md:rounded-l-xl rounded-t-xl rounded-b-xl md:rounded-br-none md:rounded-t-none ${isDark ? 'bg-gray-800' : 'bg-[#D9D9D9]'}`}>
-             <h2 className={`text-xl font-semibold mb-6 ${isDark ? 'text-white' : 'text-black'}`}>Sign In</h2>
+             <h2 className={`text-xl font-semibold mb-2 ${isDark ? 'text-white' : 'text-black'}`}>Sign In</h2>
+
+             {/* Demo Mode Notice */}
+             <div className={`mb-4 p-3 rounded-lg ${isDark ? 'bg-yellow-900/30 border border-yellow-700/50' : 'bg-yellow-100 border border-yellow-300'}`}>
+               <p className={`text-xs ${isDark ? 'text-yellow-300' : 'text-yellow-800'}`}>
+                 <strong>Demo Mode:</strong> Data will not be saved. For full access, use your LMS.
+               </p>
+             </div>
+
+             {/* Demo Credentials */}
+             <div className={`mb-6 p-3 rounded-lg ${isDark ? 'bg-gray-700/50 border border-gray-600' : 'bg-gray-200 border border-gray-300'}`}>
+               <p className={`text-xs font-semibold mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Demo Credentials:</p>
+               <div className={`text-xs space-y-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                 <p><span className="font-medium">Student:</span> student@demo.com / student123</p>
+                 <p><span className="font-medium">Teacher:</span> teacher@demo.com / teacher123</p>
+                 <p><span className="font-medium">Admin:</span> admin@demo.com / admin123</p>
+               </div>
+             </div>
 
           {error && (
             <div className="mb-4 p-3 bg-red-900/50 border border-red-700 rounded-lg text-red-300 text-sm">
@@ -119,17 +163,10 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="mr-4 py-2 px-10 bg-[#39BEAE] rounded-[20px] hover:bg-gray-100 hover:text-black disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-small transition-colors"
+                className="mr-4 py-2 px-10 bg-[#39BEAE] rounded-[20px] hover:bg-green-600 hover:text-black disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-small transition-colors"
               >
-                {loading ? 'Signing in...' : 'Sign In'}
+                {loading ? 'Signing in' : 'Sign In'}
               </button>
-              <button
-                type="button"
-                className={`py-1 px-10 border border-[#39BEAE] rounded-[20px] hover:bg-gray-100 hover:text-black disabled:bg-blue-800 disabled:cursor-not-allowed font-small transition-colors ${isDark ? 'text-white' : 'text-black'}`}
-              >
-                Sign Up
-              </button>
-
             </div>
           </form>
 

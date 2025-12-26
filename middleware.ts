@@ -135,6 +135,31 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
+  // Training page (/) - requires authentication
+  if (pathname === '/') {
+    if (!token) {
+      console.log(`[Middleware] Training Access: No Token - redirecting to login`)
+      const loginUrl = new URL('/login', request.url)
+      loginUrl.searchParams.set('redirect', '/')
+      return NextResponse.redirect(loginUrl)
+    }
+
+    const session = await getSessionFromToken(token)
+
+    if (!session) {
+      console.log(`[Middleware] Training Access: Invalid Token - redirecting to login`)
+      const loginUrl = new URL('/login', request.url)
+      loginUrl.searchParams.set('redirect', '/')
+      const response = NextResponse.redirect(loginUrl)
+      response.cookies.delete('session_token')
+      return response
+    }
+
+    // Valid session - allow access
+    console.log(`[Middleware] Training Access: Allowed for ${session.email} (${session.role})`)
+    return NextResponse.next()
+  }
+
   // All other routes - pass through
   return NextResponse.next()
 }

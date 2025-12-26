@@ -1,17 +1,18 @@
 /**
  * Quiz Response API Route
  *
- * POST /api/quiz/response - Submit all quiz results at once
+ * POST /api/quiz/response - Save quiz response (upsert - creates or updates)
  * GET /api/quiz/response - Get quiz results for current session
  *
- * New schema: All question data stored in JSONB column
+ * Saves incrementally after each question answer.
+ * Uses upsert to update existing record or create new one.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { jwtVerify } from 'jose'
 import { getSupabaseAdmin } from '@/app/lib/supabase/admin'
 import { logger } from '@/app/lib/logger'
-import type { QuizResponseInsert, SubmitQuizResultsRequest, QuestionDataMap } from '@/app/types'
+import type { QuestionDataMap } from '@/app/types'
 
 const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'your-super-secret-jwt-key-min-32-chars'
@@ -25,6 +26,7 @@ interface SessionPayload {
   sessionId: string
   userId: string
   role: string
+  isLti: boolean // true = LTI session (data saved), false = demo (no save)
 }
 
 async function getSessionFromRequest(request: NextRequest): Promise<SessionPayload | null> {
@@ -40,6 +42,7 @@ async function getSessionFromRequest(request: NextRequest): Promise<SessionPaylo
       sessionId: payload.sessionId as string,
       userId: payload.userId as string,
       role: payload.role as string,
+      isLti: (payload.isLti as boolean) ?? true, // Default to true for backward compatibility
     }
   } catch {
     return null
@@ -93,7 +96,7 @@ function isValidQuestionDataMap(data: unknown): data is QuestionDataMap {
 }
 
 // =============================================================================
-// POST - Submit all quiz results
+// POST - Save quiz response (upsert - incremental save after each question)
 // =============================================================================
 
 export async function POST(request: NextRequest) {
@@ -108,14 +111,25 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 2. Parse request body
-    const body: SubmitQuizResultsRequest = await request.json()
+    // 2. Skip save for non-LTI sessions (demo mode)
+    if (!session.isLti) {
+      logger.info({ sessionId: session.sessionId }, 'Demo mode: Skipping quiz response save')
+      return NextResponse.json({
+        success: true,
+        response: null,
+        demo: true,
+        message: 'Demo mode: Quiz response not saved',
+      })
+    }
+
+    // 3. Parse request body
+    const body = await request.json()
     const { questionData, totalQuestions, finalScorePercentage } = body
 
-    // 3. Validate required fields
-    if (!questionData || totalQuestions === undefined || finalScorePercentage === undefined) {
+    // 4. Validate required fields
+    if (!questionData || totalQuestions === undefined) {
       return NextResponse.json(
-        { success: false, error: 'Missing required fields: questionData, totalQuestions, finalScorePercentage' },
+        { success: false, error: 'Missing required fields: questionData, totalQuestions' },
         { status: 400 }
       )
     }
@@ -141,7 +155,7 @@ export async function POST(request: NextRequest) {
           session_id: session.sessionId,
           course_id: 'default',
           course_name: 'Training Session',
-          training_phase: 'Phase A',
+          current_training_phase: 'Phase A',
           overall_progress: 0,
           status: 'active',
         })
@@ -159,40 +173,94 @@ export async function POST(request: NextRequest) {
       trainingSessionId = newSession.id
     }
 
-    // 5. Calculate correct count from question data
+    // 5. Calculate correct count and score from question data
     const correctCount = Object.values(questionData).filter(q => q.correct).length
+    const answeredCount = Object.keys(questionData).length
+    const scorePercentage = finalScorePercentage ??
+      (totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0)
 
-    // 6. Insert quiz response with all question data
-    const responseData: QuizResponseInsert = {
-      session_id: trainingSessionId!,
-      question_data: questionData,
-      total_questions: totalQuestions,
-      correct_count: correctCount,
-      score_percentage: finalScorePercentage,
-    }
-
-    logger.info({ responseData }, 'Inserting quiz response')
-
-    const { data: quizResponse, error: insertError } = await supabase
+    // 6. Check if a quiz response already exists for this session
+    const { data: existingResponse, error: fetchError } = await supabase
       .from('quiz_responses')
-      .insert(responseData)
-      .select()
+      .select('id, question_data')
+      .eq('session_id', trainingSessionId)
+      .order('answered_at', { ascending: false })
+      .limit(1)
       .single()
 
+    let quizResponse
+    let insertError
+
+    if (existingResponse && !fetchError) {
+      // Update existing response - merge question data
+      const existingQuestionData = existingResponse.question_data || {}
+      const mergedQuestionData = { ...existingQuestionData, ...questionData }
+
+      const mergedCorrectCount = Object.values(mergedQuestionData as Record<string, { correct: boolean }>).filter((q) => q.correct).length
+      const mergedScorePercentage = totalQuestions > 0
+        ? Math.round((mergedCorrectCount / totalQuestions) * 100)
+        : 0
+
+      logger.info({
+        existingId: existingResponse.id,
+        existingQuestions: Object.keys(existingQuestionData).length,
+        newQuestions: Object.keys(questionData).length,
+        mergedQuestions: Object.keys(mergedQuestionData).length
+      }, 'Updating existing quiz response')
+
+      const { data, error } = await supabase
+        .from('quiz_responses')
+        .update({
+          question_data: mergedQuestionData,
+          total_questions: totalQuestions,
+          correct_count: mergedCorrectCount,
+          score_percentage: mergedScorePercentage,
+          answered_at: new Date().toISOString(),
+        })
+        .eq('id', existingResponse.id)
+        .select()
+        .single()
+
+      quizResponse = data
+      insertError = error
+    } else {
+      // Insert new response
+      logger.info({
+        trainingSessionId,
+        answeredCount,
+        totalQuestions
+      }, 'Creating new quiz response')
+
+      const { data, error } = await supabase
+        .from('quiz_responses')
+        .insert({
+          session_id: trainingSessionId,
+          question_data: questionData,
+          total_questions: totalQuestions,
+          correct_count: correctCount,
+          score_percentage: scorePercentage,
+        })
+        .select()
+        .single()
+
+      quizResponse = data
+      insertError = error
+    }
+
     if (insertError) {
-      logger.error({ error: insertError.message, code: insertError.code, details: insertError.details }, 'Failed to save quiz results')
+      logger.error({ error: insertError.message, code: insertError.code }, 'Failed to save quiz results')
       return NextResponse.json(
-        { success: false, error: `Failed to save quiz results: ${insertError.message}`, code: insertError.code },
+        { success: false, error: `Failed to save quiz results: ${insertError.message}` },
         { status: 500 }
       )
     }
 
     logger.info({
       totalQuestions,
-      finalScorePercentage,
+      scorePercentage,
       sessionId: trainingSessionId,
-      questionsAnswered: Object.keys(questionData).length
-    }, 'Quiz results saved')
+      questionsAnswered: answeredCount
+    }, 'Quiz response saved')
 
     return NextResponse.json({
       success: true,

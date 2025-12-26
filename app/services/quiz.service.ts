@@ -2,7 +2,7 @@
  * Quiz Service
  *
  * Handles quiz response submission and retrieval.
- * New approach: Accumulate answers in memory, submit all at once at the end.
+ * Saves incrementally after each question is answered.
  */
 
 import type {
@@ -12,6 +12,7 @@ import type {
   QuizStatistics,
   QuizAnswerState,
   QuestionDataMap,
+  QuestionDataEntry,
 } from '@/app/types'
 import { buildQuestionDataMap, calculateScorePercentage } from '@/app/types'
 
@@ -29,8 +30,69 @@ export type ServiceResult<T> =
 
 export const quizService = {
   /**
+   * Save a single answer immediately after it's submitted
+   * This is called after each question is answered correctly
+   */
+  async saveAnswer(
+    answer: QuizAnswerState,
+    totalQuestions: number
+  ): Promise<ServiceResult<QuizResponse>> {
+    try {
+      console.log('📝 [quizService] saveAnswer called:', { answer, totalQuestions })
+
+      // Convert single answer to question data format
+      const answerLetters = ['A', 'B', 'C', 'D'] as const
+      const answerLetter = answerLetters[answer.selectedAnswer] || 'A'
+      const questionData: QuestionDataMap = {
+        [answer.questionId]: {
+          answer: answerLetter,
+          correct: answer.isCorrect,
+          attempts: answer.attemptCount,
+          time: answer.timeToAnswer,
+        }
+      }
+
+      const request = {
+        questionData,
+        totalQuestions,
+        // finalScorePercentage will be calculated on server
+      }
+
+      console.log('📝 [quizService] Saving answer to /api/quiz/response:', request)
+
+      const response = await fetch('/api/quiz/response', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(request),
+      })
+
+      const data: SubmitQuizResultsResponse = await response.json()
+      console.log('📝 [quizService] Response:', { status: response.status, data })
+
+      if (!response.ok || !data.success) {
+        return {
+          success: false,
+          error: data.error || 'Failed to save answer',
+        }
+      }
+
+      return {
+        success: true,
+        data: data.response!,
+      }
+    } catch (error) {
+      console.error('📝 [quizService] Error saving answer:', error)
+      return {
+        success: false,
+        error: 'Network error: Failed to save answer',
+      }
+    }
+  },
+
+  /**
    * Submit all quiz results at once
-   * Call this when the quiz is complete
+   * Call this when the quiz is complete (optional - for final submission)
    */
   async submitResults(
     answers: QuizAnswerState[],

@@ -8,7 +8,17 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { jwtVerify } from 'jose'
 import { createServerSupabaseClient } from '@/app/lib/supabase/server'
+
+const JWT_SECRET = new TextEncoder().encode(
+  process.env.JWT_SECRET || 'your-super-secret-jwt-key-min-32-chars'
+)
+
+interface SessionPayload {
+  role: string
+  isLti?: boolean
+}
 
 export interface SupabaseQuestion {
   id: number
@@ -143,9 +153,45 @@ export async function GET(request: NextRequest) {
 /**
  * PUT - Update an existing question
  * Only updates allowed, no create or delete
+ * Requires LTI session (demo sessions are read-only)
  */
 export async function PUT(request: NextRequest) {
   try {
+    // Check session for LTI access
+    const token = request.cookies.get('session_token')?.value
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
+
+    try {
+      const { payload } = await jwtVerify(token, JWT_SECRET)
+      const session = payload as unknown as SessionPayload
+
+      // Check if user is staff (teacher/admin)
+      if (session.role !== 'teacher' && session.role !== 'admin') {
+        return NextResponse.json(
+          { error: 'Access denied' },
+          { status: 403 }
+        )
+      }
+
+      // Check if LTI session (demo sessions cannot edit)
+      if (session.isLti === false) {
+        return NextResponse.json(
+          { error: 'Read-only mode: Changes not allowed in demo session' },
+          { status: 403 }
+        )
+      }
+    } catch {
+      return NextResponse.json(
+        { error: 'Invalid session' },
+        { status: 401 }
+      )
+    }
+
     const supabase = await createServerSupabaseClient()
     const body = await request.json()
 

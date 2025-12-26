@@ -21,6 +21,7 @@ interface SessionPayload {
   sessionId: string
   userId: string
   role: string
+  isLti: boolean // true = LTI session (data saved), false = demo (no save)
 }
 
 async function getSessionFromRequest(request: NextRequest): Promise<SessionPayload | null> {
@@ -36,6 +37,7 @@ async function getSessionFromRequest(request: NextRequest): Promise<SessionPaylo
       sessionId: payload.sessionId as string,
       userId: payload.userId as string,
       role: payload.role as string,
+      isLti: (payload.isLti as boolean) ?? true, // Default to true for backward compatibility
     }
   } catch {
     return null
@@ -59,6 +61,17 @@ export async function PATCH(request: NextRequest) {
 
     const body = await request.json()
     const { phase, progress, taskCompleted, timeSpentMs } = body
+
+    // Skip save for non-LTI sessions (demo mode)
+    if (!session.isLti) {
+      logger.info({ sessionId: session.sessionId, phase, progress }, 'Demo mode: Skipping progress update')
+      return NextResponse.json({
+        success: true,
+        phase: phase || 'Phase A',
+        progress: progress || 0,
+        demo: true,
+      })
+    }
 
     const supabase = getSupabaseAdmin()
 
@@ -85,13 +98,11 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (phase !== undefined) {
-      updateData.training_phase = phase
+      updateData.current_training_phase = phase
     }
 
     if (progress !== undefined) {
-      updateData.overall_progress = progress
-      // Calculate completion percentage (assuming 100 is max progress)
-      updateData.completion_percentage = Math.min(progress, 100)
+      updateData.overall_progress = Math.min(progress, 100)
     }
 
     if (timeSpentMs !== undefined) {
@@ -114,13 +125,13 @@ export async function PATCH(request: NextRequest) {
 
     logger.info({
       sessionId: currentSession.id,
-      phase: phase || currentSession.training_phase,
+      phase: phase || currentSession.current_training_phase,
       progress: progress || currentSession.overall_progress,
     }, 'Training progress updated')
 
     return NextResponse.json({
       success: true,
-      phase: phase || currentSession.training_phase,
+      phase: phase || currentSession.current_training_phase,
       progress: progress || currentSession.overall_progress,
     })
 

@@ -108,10 +108,10 @@ export function useTrainingState(
           ...prev,
           dbSessionId: result.data!.id,
           progress: result.data!.overall_progress,
-          phase: result.data!.training_phase,
+          phase: result.data!.current_training_phase,
         }))
         lastProgressRef.current = result.data.overall_progress
-        lastPhaseRef.current = result.data.training_phase
+        lastPhaseRef.current = result.data.current_training_phase
       }
     }
     initSession()

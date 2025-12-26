@@ -1,0 +1,36 @@
+{
+  "users": [
+    {
+      "id": "demo_student_001",
+      "email": "student@demo.com",
+      "password": "student123",
+      "role": "student",
+      "full_name": "Demo Student",
+      "institution": "Demo Institution"
+    },
+    {
+      "id": "demo_student_002",
+      "email": "jane.doe@demo.com",
+      "password": "jane123",
+      "role": "student",
+      "full_name": "Jane Doe",
+      "institution": "Demo Institution"
+    },
+    {
+      "id": "demo_teacher_001",
+      "email": "teacher@demo.com",
+      "password": "teacher123",
+      "role": "teacher",
+      "full_name": "Demo Teacher",
+      "institution": "Demo Institution"
+    },
+    {
+      "id": "demo_admin_001",
+      "email": "admin@demo.com",
+      "password": "admin123",
+      "role": "admin",
+      "full_name": "Demo Admin",
+      "institution": "Demo Institution"
+    }
+  ]
+}
