@@ -143,7 +143,7 @@ export default function LoginPage() {
                 id="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className={`w-full px-8 py-2 border-2 rounded-md focus:outline-none focus:ring-1 bg-[#FFFFFF] ${isDark ? ' text-white placeholder-gray-800 focus:ring-gray-500' : 'bg-[#D9D9D9] border-[#848484] text-black placeholder-gray-900 focus:ring-gray-800'}`}
+                className={`w-full px-8 py-2 border-2 rounded-md focus:outline-none focus:ring-1 bg-[#FFFFFF] border-[#848484] text-black placeholder-gray-900 focus:ring-gray-800`}
                 placeholder="Email"
                 required
               />

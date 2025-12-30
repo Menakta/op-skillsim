@@ -10,9 +10,15 @@ import { useQuestions } from '../features/questions'
 import { LoadingScreen, StarterScreen, type LoadingStep } from '../features'
 import type { QuestionData } from '../lib/messageTypes'
 import { TASK_SEQUENCE } from '../config'
+import { useTheme } from '../context/ThemeContext'
 
 // Lazy load heavy components - only loaded when stream connects
 const ControlPanel = dynamic(() => import('../components/ControlPanel'), {
+  ssr: false,
+  loading: () => null,
+})
+
+const Sidebar = dynamic(() => import('../components/Sidebar'), {
   ssr: false,
   loading: () => null,
 })
@@ -57,8 +63,8 @@ import { useReduxSync } from '../store/useReduxSync'
 // Configuration
 // =============================================================================
 
-const projectId = '94adc3ba-7020-49f0-9a7c-bb8f1531536a'
-const modelId = '26c1dfea-9845-46bb-861d-fb90a22b28df'
+const projectId =process.env.NEXT_PUBLIC_PUREWEB_PROJECT_ID
+const modelId = process.env.NEXT_PUBLIC_PUREWEB_MODEL_ID
 
 // Retry configuration
 const MAX_RETRIES = 3
@@ -73,7 +79,10 @@ const streamerOptions = DefaultStreamerOptions
 
 export default function StreamingApp() {
   const videoRef = useRef<HTMLVideoElement>(null)
-  const isDark = true // Default to dark theme
+
+  // Theme context
+  const { theme } = useTheme()
+  const isDark = theme === 'dark'
 
   // Questions context - for getting total question count
   const { questionCount } = useQuestions()
@@ -260,6 +269,7 @@ export default function StreamingApp() {
 
     // Prefetch dynamic imports
     import('../components/ControlPanel')
+    import('../components/Sidebar')
     import('../components/MessageLog')
     import('../features/questions')
     import('../features/training')
@@ -636,17 +646,12 @@ export default function StreamingApp() {
 
   return (
     <div className={`h-screen w-screen relative overflow-hidden ${isDark ? 'bg-[#1E1E1E]' : 'bg-gray-100'}`}>
-      {/* Control Panel - Only show when stream is connected */}
-      {/* State is now read from Redux via useReduxSync above */}
+      {/* Sidebar - Only show when stream is connected */}
       {isConnected && (
-        <ControlPanel
-          isDark={isDark}
+        <Sidebar
           onStartTraining={training.startTraining}
           onPauseTraining={training.pauseTraining}
           onResetTraining={training.resetTraining}
-          onSelectTool={training.selectTool}
-          onSelectPipe={training.selectPipe}
-          onSelectPressureTest={training.selectPressureTest}
           onSetCameraPerspective={training.setCameraPerspective}
           onToggleAutoOrbit={training.toggleAutoOrbit}
           onResetCamera={training.resetCamera}
@@ -664,6 +669,16 @@ export default function StreamingApp() {
           onToggleMainGroup={training.toggleMainGroup}
           onToggleChildGroup={training.toggleChildGroup}
           onQuitApplication={training.quitApplication}
+        />
+      )}
+
+      {/* Control Panel (ToolBar) - Only show when stream is connected */}
+      {isConnected && (
+        <ControlPanel
+          isDark={isDark}
+          onSelectTool={training.selectTool}
+          onSelectPipe={training.selectPipe}
+          onSelectPressureTest={training.selectPressureTest}
         />
       )}
 
