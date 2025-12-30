@@ -422,13 +422,16 @@ export default function UsersPage() {
       {/* Header Actions */}
       <Card className="mb-6 w-full lg:w-[49%]">
         <CardContent>
-          <div className="flex flex-col sm:flex-row">
+          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+        <div className="flex-1">
           <SearchInput
             value={searchQuery}
             onChange={setSearchQuery}
             placeholder="Search users by name, email, institution..."
-            className='w-full lg:w-1/2'
+            className="w-full lg:w-1/2"
+            
           />
+        </div>
         {canEdit && (
           <button
             onClick={handleAddUser}

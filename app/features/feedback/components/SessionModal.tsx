@@ -7,9 +7,21 @@
  * Built on BaseModal for consistent styling.
  */
 
+import Image from 'next/image'
 import { LogOut, Clock } from "lucide-react"
 import { BaseModal, ModalMessage, ModalFooter } from '@/app/components/shared'
 import { Button } from '@/app/components/shared'
+
+// Off-button icon component
+const OffButtonIcon = ({ size = 30 }: { size?: number }) => (
+  <Image
+    src="/icons/off-button 1.png"
+    alt="Session ended"
+    width={size}
+    height={size}
+    className="object-contain"
+  />
+)
 
 // =============================================================================
 // Props Interface
@@ -35,6 +47,7 @@ const REASON_CONFIG = {
   expired: {
     icon: Clock,
     iconColor: '#FFA500',
+    useOffButton: false,
     defaultTitle: 'Session Expired',
     defaultMessage: 'Expired',
     defaultText: 'Your session has expired. Please log in again to continue.'
@@ -42,13 +55,15 @@ const REASON_CONFIG = {
   logged_out: {
     icon: LogOut,
     iconColor: '#39BEAE',
-    defaultTitle: 'Logged Out',
-    defaultMessage: 'Goodbye!',
-    defaultText: 'You have been successfully logged out.'
+    useOffButton: true,
+    defaultTitle: 'Session Ended',
+    defaultMessage: 'Disconnected',
+    defaultText: 'Your session has ended. Please log in again to continue.'
   },
   inactive: {
     icon: Clock,
     iconColor: '#FFA500',
+    useOffButton: false,
     defaultTitle: 'Session Timeout',
     defaultMessage: 'Timeout',
     defaultText: 'Your session has timed out due to inactivity. Please log in again.'
@@ -56,6 +71,7 @@ const REASON_CONFIG = {
   kicked: {
     icon: LogOut,
     iconColor: '#FF6B6B',
+    useOffButton: true,
     defaultTitle: 'Session Ended',
     defaultMessage: 'Disconnected',
     defaultText: 'Your session was ended by an administrator. Please contact support if you need assistance.'
@@ -63,6 +79,7 @@ const REASON_CONFIG = {
   other: {
     icon: LogOut,
     iconColor: '#9CA3AF',
+    useOffButton: true,
     defaultTitle: 'Session Closed',
     defaultMessage: 'Closed',
     defaultText: 'Your session has been closed. Please log in again to continue.'
@@ -90,6 +107,14 @@ export function SessionModal({
   const displayMessage = message || config.defaultMessage
   const displayText = config.defaultText
 
+  // Use off-button icon for session end states, otherwise use lucide icon
+  const renderIcon = () => {
+    if (config.useOffButton) {
+      return <OffButtonIcon size={30} />
+    }
+    return <Icon size={30} color={config.iconColor} />
+  }
+
   const handleClose = () => {
     if (onClose) {
       onClose()
@@ -108,7 +133,7 @@ export function SessionModal({
     >
       {/* Content */}
       <ModalMessage
-        icon={<Icon size={30} color={config.iconColor} />}
+        icon={renderIcon()}
         message={displayMessage}
         subText={displayText}
       />

@@ -53,6 +53,11 @@ const ErrorModal = dynamic(
   { ssr: false, loading: () => null }
 )
 
+const SessionModal = dynamic(
+  () => import('../features').then(mod => ({ default: mod.SessionModal })),
+  { ssr: false, loading: () => null }
+)
+
 // Lazy load hooks - deferred until needed
 import { useTrainingMessagesComposite } from '../hooks/useTrainingMessagesComposite'
 
@@ -168,6 +173,34 @@ export default function StreamingApp() {
   const [showStarterScreen, setShowStarterScreen] = useState(true)
   const [showNavigationWalkthrough, setShowNavigationWalkthrough] = useState(false)
   const [streamStarted, setStreamStarted] = useState(false)
+
+  // Session end state
+  const [showSessionEndModal, setShowSessionEndModal] = useState(false)
+  const [sessionEndReason, setSessionEndReason] = useState<'expired' | 'logged_out' | 'inactive' | 'kicked' | 'other'>('other')
+  const wasConnectedRef = useRef(false) // Track if we were ever connected
+  const [isTestUser, setIsTestUser] = useState(false) // Track if user is a test user (non-LTI)
+
+  // ==========================================================================
+  // Check if user is a test user (non-LTI) on mount
+  // ==========================================================================
+
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const response = await fetch('/api/auth/session')
+        if (response.ok) {
+          const data = await response.json()
+          // Test user = isLti is false (coming from direct login, not LTI)
+          if (data.session && data.session.isLti === false) {
+            setIsTestUser(true)
+          }
+        }
+      } catch (err) {
+        console.log('Failed to check session:', err)
+      }
+    }
+    checkSession()
+  }, [])
 
   // ==========================================================================
   // Platform Initialization with Retry Logic
@@ -402,6 +435,7 @@ export default function StreamingApp() {
     if (streamerStatus === StreamerStatus.Connected) {
       setConnectionStatus('connected')
       setRetryCount(0)
+      wasConnectedRef.current = true // Mark that we were connected
       // Show navigation walkthrough when stream is connected
       setShowNavigationWalkthrough(true)
     } else if (streamerStatus === StreamerStatus.Failed) {
@@ -426,6 +460,28 @@ export default function StreamingApp() {
           initializePlatform(retryCount + 1)
         }, RETRY_DELAY)
       }
+    } else if (
+      // Session ended - show modal only if we were previously connected
+      wasConnectedRef.current &&
+      (streamerStatus === StreamerStatus.Disconnected ||
+       streamerStatus === StreamerStatus.Closed ||
+       streamerStatus === StreamerStatus.Completed ||
+       streamerStatus === StreamerStatus.Withdrawn)
+    ) {
+      console.log('🔌 Session ended with status:', streamerStatus)
+
+      // Determine the reason based on status
+      let reason: 'expired' | 'logged_out' | 'inactive' | 'kicked' | 'other' = 'other'
+      if (streamerStatus === StreamerStatus.Closed) {
+        reason = 'logged_out'
+      } else if (streamerStatus === StreamerStatus.Withdrawn) {
+        reason = 'kicked'
+      } else if (streamerStatus === StreamerStatus.Completed) {
+        reason = 'logged_out'
+      }
+
+      setSessionEndReason(reason)
+      setShowSessionEndModal(true)
     }
   }, [streamerStatus, retryCount, initializePlatform])
 
@@ -604,6 +660,21 @@ export default function StreamingApp() {
   }, [])
 
   // ==========================================================================
+  // Session End Handler - Redirect to Login (only for test users)
+  // ==========================================================================
+
+  const handleSessionEndLogin = useCallback(() => {
+    if (isTestUser) {
+      // Test users (non-LTI) get redirected to login
+      setShowSessionEndModal(false)
+      window.location.href = '/login'
+    } else {
+      // LTI users just close the modal (they came from external LMS)
+      setShowSessionEndModal(false)
+    }
+  }, [isTestUser])
+
+  // ==========================================================================
   // Loading Status Message & Step
   // ==========================================================================
 
@@ -777,6 +848,14 @@ export default function StreamingApp() {
         retryCount={retryCount}
         maxRetries={MAX_RETRIES}
         showRetryInfo={retryCount > 0}
+      />
+
+      {/* Session End Modal - Show when session is disconnected/closed */}
+      <SessionModal
+        isOpen={showSessionEndModal}
+        reason={sessionEndReason}
+        onLogin={handleSessionEndLogin}
+        loginButtonText={isTestUser ? "Back to Login" : "Close"}
       />
 
       {/* Video Styles */}
