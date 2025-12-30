@@ -7,7 +7,7 @@
  * Primary data source is quiz_responses, with student info from training_sessions.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Award, CheckCircle, XCircle, Clock, TrendingUp, Download, Timer } from 'lucide-react'
 import { DashboardLayout } from '../components/layout'
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card'
@@ -16,7 +16,14 @@ import { Badge } from '../components/ui/Badge'
 import { SearchInput } from '../components/ui/SearchInput'
 import { EmptyState } from '../components/ui/EmptyState'
 import { LoadingState } from '../components/ui/LoadingState'
+import { Pagination } from '../components/ui/Pagination'
 import { StatCard } from '../components'
+
+// =============================================================================
+// Constants
+// =============================================================================
+
+const ITEMS_PER_PAGE = 10
 
 // =============================================================================
 // Types
@@ -79,6 +86,7 @@ export default function ResultsPage() {
   const [resultFilter, setResultFilter] = useState<ResultFilter>('all')
   const [courseFilter, setCourseFilter] = useState<string>('all')
   const [selectedResult, setSelectedResult] = useState<QuizResult | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
 
   useEffect(() => {
     fetchResults()
@@ -107,21 +115,36 @@ export default function ResultsPage() {
   }
 
   // Filter results
-  const filteredResults = results.filter(result => {
-    const matchesSearch =
-      result.studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      result.studentEmail.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      result.courseName.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredResults = useMemo(() => {
+    return results.filter(result => {
+      const matchesSearch =
+        result.studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        result.studentEmail.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        result.courseName.toLowerCase().includes(searchQuery.toLowerCase())
 
-    const matchesResult =
-      resultFilter === 'all' ||
-      (resultFilter === 'passed' && result.passed) ||
-      (resultFilter === 'failed' && !result.passed)
+      const matchesResult =
+        resultFilter === 'all' ||
+        (resultFilter === 'passed' && result.passed) ||
+        (resultFilter === 'failed' && !result.passed)
 
-    const matchesCourse = courseFilter === 'all' || result.courseName === courseFilter
+      const matchesCourse = courseFilter === 'all' || result.courseName === courseFilter
 
-    return matchesSearch && matchesResult && matchesCourse
-  })
+      return matchesSearch && matchesResult && matchesCourse
+    })
+  }, [results, searchQuery, resultFilter, courseFilter])
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery, resultFilter, courseFilter])
+
+  // Paginated results
+  const paginatedResults = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE
+    return filteredResults.slice(start, start + ITEMS_PER_PAGE)
+  }, [filteredResults, currentPage])
+
+  const totalPages = Math.ceil(filteredResults.length / ITEMS_PER_PAGE)
 
   if (isLoading) {
     return (
@@ -277,64 +300,77 @@ export default function ResultsPage() {
               className="py-12"
             />
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Student</TableHead>
-                  <TableHead className="hidden lg:table-cell">Course</TableHead>
-                  <TableHead>Score</TableHead>
-                  <TableHead>Questions</TableHead>
-                  <TableHead>Result</TableHead>
-                  <TableHead className="hidden lg:table-cell">Submitted</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredResults.map((result) => (
-                  <TableRow
-                    key={result.id}
-                    onClick={() => setSelectedResult(result)}
-                    className="cursor-pointer"
-                  >
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center flex-shrink-0">
-                          <span className="text-white text-xs font-medium">
-                            {result.studentName.split(' ').map(n => n[0]).join('').substring(0, 2)}
-                          </span>
-                        </div>
-                        <div className="min-w-0">
-                          <p className="theme-text-primary font-medium truncate">{result.studentName}</p>
-                          <p className="theme-text-muted text-xs truncate">{result.studentEmail}</p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      <p className="theme-text-primary">{result.courseName}</p>
-                    </TableCell>
-                    <TableCell>
-                      <span className={`text-lg font-bold ${
-                        result.scorePercentage >= 75 ? 'text-green-400' :
-                        result.scorePercentage >= 50 ? 'text-yellow-400' : 'text-red-400'
-                      }`}>
-                        {result.scorePercentage}%
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="theme-text-primary">{result.correctCount}</span>
-                      <span className="theme-text-muted">/{result.totalQuestions}</span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={result.passed ? 'success' : 'danger'}>
-                        {result.passed ? 'Passed' : 'Failed'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      <span className="theme-text-secondary">{formatDate(result.answeredAt)}</span>
-                    </TableCell>
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Student</TableHead>
+                    <TableHead className="hidden lg:table-cell">Course</TableHead>
+                    <TableHead>Score</TableHead>
+                    <TableHead>Questions</TableHead>
+                    <TableHead>Result</TableHead>
+                    <TableHead className="hidden lg:table-cell">Submitted</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {paginatedResults.map((result) => (
+                    <TableRow
+                      key={result.id}
+                      onClick={() => setSelectedResult(result)}
+                      className="cursor-pointer"
+                    >
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center flex-shrink-0">
+                            <span className="text-white text-xs font-medium">
+                              {result.studentName.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                            </span>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="theme-text-primary font-medium truncate">{result.studentName}</p>
+                            <p className="theme-text-muted text-xs truncate">{result.studentEmail}</p>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        <p className="theme-text-primary">{result.courseName}</p>
+                      </TableCell>
+                      <TableCell>
+                        <span className={`text-lg font-bold ${
+                          result.scorePercentage >= 75 ? 'text-green-400' :
+                          result.scorePercentage >= 50 ? 'text-yellow-400' : 'text-red-400'
+                        }`}>
+                          {result.scorePercentage}%
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="theme-text-primary">{result.correctCount}</span>
+                        <span className="theme-text-muted">/{result.totalQuestions}</span>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={result.passed ? 'success' : 'danger'}>
+                          {result.passed ? 'Passed' : 'Failed'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        <span className="theme-text-secondary">{formatDate(result.answeredAt)}</span>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {totalPages > 1 && (
+                <div className="px-6 py-4 border-t theme-border">
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    totalItems={filteredResults.length}
+                    itemsPerPage={ITEMS_PER_PAGE}
+                    onPageChange={setCurrentPage}
+                  />
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
@@ -355,44 +391,57 @@ export default function ResultsPage() {
             />
           </Card>
         ) : (
-          filteredResults.map((result) => (
-            <Card
-              key={result.id}
-              className="p-4 cursor-pointer"
-              onClick={() => setSelectedResult(result)}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center flex-shrink-0">
-                    <span className="text-white font-medium text-sm">
-                      {result.studentName.split(' ').map(n => n[0]).join('').substring(0, 2)}
+          <>
+            {paginatedResults.map((result) => (
+              <Card
+                key={result.id}
+                className="p-4 cursor-pointer"
+                onClick={() => setSelectedResult(result)}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center flex-shrink-0">
+                      <span className="text-white font-medium text-sm">
+                        {result.studentName.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                      </span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="theme-text-primary font-medium truncate">{result.studentName}</p>
+                      <p className="theme-text-muted text-xs truncate">{result.courseName}</p>
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <span className={`text-xl font-bold ${
+                      result.scorePercentage >= 75 ? 'text-green-400' :
+                      result.scorePercentage >= 50 ? 'text-yellow-400' : 'text-red-400'
+                    }`}>
+                      {result.scorePercentage}%
                     </span>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="theme-text-primary font-medium truncate">{result.studentName}</p>
-                    <p className="theme-text-muted text-xs truncate">{result.courseName}</p>
+                    <p className="text-xs theme-text-muted">
+                      {result.correctCount}/{result.totalQuestions}
+                    </p>
                   </div>
                 </div>
-                <div className="text-right flex-shrink-0">
-                  <span className={`text-xl font-bold ${
-                    result.scorePercentage >= 75 ? 'text-green-400' :
-                    result.scorePercentage >= 50 ? 'text-yellow-400' : 'text-red-400'
-                  }`}>
-                    {result.scorePercentage}%
-                  </span>
-                  <p className="text-xs theme-text-muted">
-                    {result.correctCount}/{result.totalQuestions}
-                  </p>
+                <div className="mt-3 flex items-center justify-between">
+                  <Badge variant={result.passed ? 'success' : 'danger'}>
+                    {result.passed ? 'Passed' : 'Failed'}
+                  </Badge>
+                  <span className="text-xs theme-text-muted">{formatDate(result.answeredAt)}</span>
                 </div>
+              </Card>
+            ))}
+            {totalPages > 1 && (
+              <div className="py-4">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalItems={filteredResults.length}
+                  itemsPerPage={ITEMS_PER_PAGE}
+                  onPageChange={setCurrentPage}
+                />
               </div>
-              <div className="mt-3 flex items-center justify-between">
-                <Badge variant={result.passed ? 'success' : 'danger'}>
-                  {result.passed ? 'Passed' : 'Failed'}
-                </Badge>
-                <span className="text-xs theme-text-muted">{formatDate(result.answeredAt)}</span>
-              </div>
-            </Card>
-          ))
+            )}
+          </>
         )}
       </div>
 

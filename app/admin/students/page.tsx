@@ -7,7 +7,7 @@
  * Fetches real data from Supabase via API.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Users, Mail, Calendar, Activity, Eye } from 'lucide-react'
 import { DashboardLayout } from '../components'
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card'
@@ -17,6 +17,13 @@ import { ProgressBar } from '../components/ui/ProgressBar'
 import { SearchInput } from '../components/ui/SearchInput'
 import { EmptyState } from '../components/ui/EmptyState'
 import { LoadingState } from '../components/ui/LoadingState'
+import { Pagination } from '../components/ui/Pagination'
+
+// =============================================================================
+// Constants
+// =============================================================================
+
+const ITEMS_PER_PAGE = 10
 
 // =============================================================================
 // Types
@@ -67,6 +74,7 @@ export default function StudentsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
 
   useEffect(() => {
     fetchStudents()
@@ -94,16 +102,31 @@ export default function StudentsPage() {
   }
 
   // Filter students
-  const filteredStudents = students.filter(student => {
-    const matchesSearch =
-      student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      student.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      student.institution.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredStudents = useMemo(() => {
+    return students.filter(student => {
+      const matchesSearch =
+        student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        student.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        student.institution.toLowerCase().includes(searchQuery.toLowerCase())
 
-    const matchesStatus = statusFilter === 'all' || student.status === statusFilter
+      const matchesStatus = statusFilter === 'all' || student.status === statusFilter
 
-    return matchesSearch && matchesStatus
-  })
+      return matchesSearch && matchesStatus
+    })
+  }, [students, searchQuery, statusFilter])
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery, statusFilter])
+
+  // Paginated students
+  const paginatedStudents = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE
+    return filteredStudents.slice(start, start + ITEMS_PER_PAGE)
+  }, [filteredStudents, currentPage])
+
+  const totalPages = Math.ceil(filteredStudents.length / ITEMS_PER_PAGE)
 
   if (isLoading) {
     return (
@@ -190,66 +213,79 @@ export default function StudentsPage() {
               className="py-12"
             />
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Student</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="hidden lg:table-cell">Progress</TableHead>
-                  <TableHead className="hidden lg:table-cell">Last Active</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredStudents.map((student) => (
-                  <TableRow key={student.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center flex-shrink-0">
-                          <span className="text-white font-medium text-sm">
-                            {student.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
-                          </span>
-                        </div>
-                        <div className="min-w-0">
-                          <p className="theme-text-primary font-medium truncate">{student.name}</p>
-                          <p className="text-gray-500 text-xs truncate">{student.email}</p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          student.status === 'completed' ? 'success' :
-                          student.status === 'active' ? 'info' : 'warning'
-                        }
-                      >
-                        {student.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      <div className="w-32">
-                        <div className="flex justify-between text-xs mb-1">
-                          <span className="text-gray-400">Progress</span>
-                          <span className="text-white">{student.progress}%</span>
-                        </div>
-                        <ProgressBar value={student.progress} size="sm" color="teal" />
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      <span className="text-gray-400">{formatDate(student.lastActive)}</span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <button
-                        onClick={() => setSelectedStudent(student)}
-                        className="p-2 text-gray-400 hover:text-white hover:bg-[#39BEAE] rounded-lg transition-colors"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                    </TableCell>
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Student</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="hidden lg:table-cell">Progress</TableHead>
+                    <TableHead className="hidden lg:table-cell">Last Active</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {paginatedStudents.map((student) => (
+                    <TableRow key={student.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center flex-shrink-0">
+                            <span className="text-white font-medium text-sm">
+                              {student.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                            </span>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="theme-text-primary font-medium truncate">{student.name}</p>
+                            <p className="text-gray-500 text-xs truncate">{student.email}</p>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            student.status === 'completed' ? 'success' :
+                            student.status === 'active' ? 'info' : 'warning'
+                          }
+                        >
+                          {student.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        <div className="w-32">
+                          <div className="flex justify-between text-xs mb-1">
+                            <span className="text-gray-400">Progress</span>
+                            <span className="text-white">{student.progress}%</span>
+                          </div>
+                          <ProgressBar value={student.progress} size="sm" color="teal" />
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        <span className="text-gray-400">{formatDate(student.lastActive)}</span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <button
+                          onClick={() => setSelectedStudent(student)}
+                          className="p-2 text-gray-400 hover:text-white hover:bg-[#39BEAE] rounded-lg transition-colors"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {totalPages > 1 && (
+                <div className="px-6 py-4 border-t theme-border">
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    totalItems={filteredStudents.length}
+                    itemsPerPage={ITEMS_PER_PAGE}
+                    onPageChange={setCurrentPage}
+                  />
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
@@ -270,58 +306,71 @@ export default function StudentsPage() {
             />
           </Card>
         ) : (
-          filteredStudents.map((student) => (
-            <Card key={student.id} className="p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center flex-shrink-0">
-                    <span className="text-white font-medium text-sm">
-                      {student.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
-                    </span>
+          <>
+            {paginatedStudents.map((student) => (
+              <Card key={student.id} className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center flex-shrink-0">
+                      <span className="text-white font-medium text-sm">
+                        {student.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                      </span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="theme-text-primary font-medium truncate">{student.name}</p>
+                      <p className="text-gray-500 text-xs truncate">{student.email}</p>
+                    </div>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="theme-text-primary font-medium truncate">{student.name}</p>
-                    <p className="text-gray-500 text-xs truncate">{student.email}</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setSelectedStudent(student)}
-                  className="p-2 text-gray-400 hover:text-white hover:bg-[#39BEAE] rounded-lg transition-colors flex-shrink-0"
-                >
-                  <Eye className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-                <div className="p-2 theme-bg-tertiary rounded-lg">
-                  <p className="text-sm font-bold theme-text-primary">{student.progress}%</p>
-                  <p className="text-xs text-gray-400">Progress</p>
-                </div>
-                <div className="p-2 theme-bg-tertiary rounded-lg">
-                  <p className={`text-sm font-bold ${
-                    student.averageScore >= 80 ? 'text-green-400' :
-                    student.averageScore >= 60 ? 'text-yellow-400' : 'text-red-400'
-                  }`}>
-                    {student.averageScore}%
-                  </p>
-                  <p className="text-xs text-gray-400">Score</p>
-                </div>
-                <div className="p-2 theme-bg-tertiary rounded-lg">
-                  <Badge
-                    variant={
-                      student.status === 'completed' ? 'success' :
-                      student.status === 'active' ? 'info' : 'warning'
-                    }
-                    className="text-xs"
+                  <button
+                    onClick={() => setSelectedStudent(student)}
+                    className="p-2 text-gray-400 hover:text-white hover:bg-[#39BEAE] rounded-lg transition-colors flex-shrink-0"
                   >
-                    {student.status}
-                  </Badge>
+                    <Eye className="w-4 h-4" />
+                  </button>
                 </div>
+                <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                  <div className="p-2 theme-bg-tertiary rounded-lg">
+                    <p className="text-sm font-bold theme-text-primary">{student.progress}%</p>
+                    <p className="text-xs text-gray-400">Progress</p>
+                  </div>
+                  <div className="p-2 theme-bg-tertiary rounded-lg">
+                    <p className={`text-sm font-bold ${
+                      student.averageScore >= 80 ? 'text-green-400' :
+                      student.averageScore >= 60 ? 'text-yellow-400' : 'text-red-400'
+                    }`}>
+                      {student.averageScore}%
+                    </p>
+                    <p className="text-xs text-gray-400">Score</p>
+                  </div>
+                  <div className="p-2 theme-bg-tertiary rounded-lg">
+                    <Badge
+                      variant={
+                        student.status === 'completed' ? 'success' :
+                        student.status === 'active' ? 'info' : 'warning'
+                      }
+                      className="text-xs"
+                    >
+                      {student.status}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <ProgressBar value={student.progress} size="sm" color="teal" />
+                </div>
+              </Card>
+            ))}
+            {totalPages > 1 && (
+              <div className="py-4">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalItems={filteredStudents.length}
+                  itemsPerPage={ITEMS_PER_PAGE}
+                  onPageChange={setCurrentPage}
+                />
               </div>
-              <div className="mt-3">
-                <ProgressBar value={student.progress} size="sm" color="teal" />
-              </div>
-            </Card>
-          ))
+            )}
+          </>
         )}
       </div>
 

@@ -8,13 +8,14 @@
  * - Teachers can only view users
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { DashboardLayout } from '../components/layout'
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { SearchInput } from '../components/ui/SearchInput'
 import { EmptyState } from '../components/ui/EmptyState'
 import { LoadingState, Spinner } from '../components/ui/LoadingState'
+import { Pagination } from '../components/ui/Pagination'
 import { DemoModeNotice } from '../context/AdminContext'
 import {
   Users,
@@ -25,6 +26,12 @@ import {
   Shield,
   GraduationCap,
 } from 'lucide-react'
+
+// =============================================================================
+// Constants
+// =============================================================================
+
+const ITEMS_PER_PAGE = 10
 
 // =============================================================================
 // Types
@@ -264,12 +271,12 @@ function DeleteConfirmModal({ isOpen, onClose, onConfirm, userName, isLoading }:
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([])
-  const [filteredUsers, setFilteredUsers] = useState<User[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [canEdit, setCanEdit] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
 
   // Modal states
   const [isFormModalOpen, setIsFormModalOpen] = useState(false)
@@ -282,22 +289,32 @@ export default function UsersPage() {
   }, [])
 
   // Filter users when search query changes
-  useEffect(() => {
+  const filteredUsers = useMemo(() => {
     if (searchQuery.trim() === '') {
-      setFilteredUsers(users)
-    } else {
-      const query = searchQuery.toLowerCase()
-      setFilteredUsers(
-        users.filter(
-          (user) =>
-            user.full_name.toLowerCase().includes(query) ||
-            user.email.toLowerCase().includes(query) ||
-            user.institution?.toLowerCase().includes(query) ||
-            user.role.toLowerCase().includes(query)
-        )
-      )
+      return users
     }
+    const query = searchQuery.toLowerCase()
+    return users.filter(
+      (user) =>
+        user.full_name.toLowerCase().includes(query) ||
+        user.email.toLowerCase().includes(query) ||
+        user.institution?.toLowerCase().includes(query) ||
+        user.role.toLowerCase().includes(query)
+    )
   }, [searchQuery, users])
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery])
+
+  // Paginated users
+  const paginatedUsers = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE
+    return filteredUsers.slice(start, start + ITEMS_PER_PAGE)
+  }, [filteredUsers, currentPage])
+
+  const totalPages = Math.ceil(filteredUsers.length / ITEMS_PER_PAGE)
 
   const fetchUsers = async () => {
     try {
@@ -469,73 +486,86 @@ export default function UsersPage() {
               }
             />
           ) : (
-            <div className="divide-y theme-divide">
-              {filteredUsers.map((user) => (
-                <div
-                  key={user.id}
-                  className="p-4 flex flex-col sm:flex-row sm:items-center gap-4 hover:theme-bg-hover transition-colors"
-                >
-                  {/* User Info */}
-                  <div className="flex items-center gap-3 flex-1">
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center theme-bg-tertiary flex-shrink-0">
-                      {user.role === 'admin' ? (
-                        <Shield className="w-5 h-5 text-purple-400" />
-                      ) : (
-                        <GraduationCap className="w-5 h-5 text-teal-400" />
-                      )}
+            <>
+              <div className="divide-y theme-divide">
+                {paginatedUsers.map((user) => (
+                  <div
+                    key={user.id}
+                    className="p-4 flex flex-col sm:flex-row sm:items-center gap-4 hover:theme-bg-hover transition-colors"
+                  >
+                    {/* User Info */}
+                    <div className="flex items-center gap-3 flex-1">
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center theme-bg-tertiary flex-shrink-0">
+                        {user.role === 'admin' ? (
+                          <Shield className="w-5 h-5 text-purple-400" />
+                        ) : (
+                          <GraduationCap className="w-5 h-5 text-teal-400" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium theme-text-primary truncate">
+                          {user.full_name}
+                        </p>
+                        <p className="text-sm theme-text-muted truncate">{user.email}</p>
+                      </div>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium theme-text-primary truncate">
-                        {user.full_name}
+
+                    {/* Institution */}
+                    <div className="hidden md:block w-40">
+                      <p className="text-sm theme-text-secondary truncate">
+                        {user.institution || '-'}
                       </p>
-                      <p className="text-sm theme-text-muted truncate">{user.email}</p>
                     </div>
-                  </div>
 
-                  {/* Institution */}
-                  <div className="hidden md:block w-40">
-                    <p className="text-sm theme-text-secondary truncate">
-                      {user.institution || '-'}
-                    </p>
-                  </div>
-
-                  {/* Role Badge */}
-                  <div className="flex items-center gap-2">
-                    <Badge variant={user.role === 'admin' ? 'info' : 'success'}>
-                      {user.role === 'admin' ? 'Admin' : 'Teacher'}
-                    </Badge>
-                  </div>
-
-                  {/* Last Login */}
-                  <div className="hidden lg:block w-44 text-right">
-                    <p className="text-xs theme-text-muted">Last login</p>
-                    <p className="text-sm theme-text-secondary">
-                      {formatDate(user.last_login)}
-                    </p>
-                  </div>
-
-                  {/* Actions */}
-                  {canEdit && (
-                    <div className="flex items-center gap-2 sm:ml-4">
-                      <button
-                        onClick={() => handleEditUser(user)}
-                        className="p-2 rounded-lg theme-btn-ghost hover:text-teal-400"
-                        title="Edit user"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteUser(user)}
-                        className="p-2 rounded-lg theme-btn-ghost hover:text-red-400"
-                        title="Delete user"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                    {/* Role Badge */}
+                    <div className="flex items-center gap-2">
+                      <Badge variant={user.role === 'admin' ? 'info' : 'success'}>
+                        {user.role === 'admin' ? 'Admin' : 'Teacher'}
+                      </Badge>
                     </div>
-                  )}
+
+                    {/* Last Login */}
+                    <div className="hidden lg:block w-44 text-right">
+                      <p className="text-xs theme-text-muted">Last login</p>
+                      <p className="text-sm theme-text-secondary">
+                        {formatDate(user.last_login)}
+                      </p>
+                    </div>
+
+                    {/* Actions */}
+                    {canEdit && (
+                      <div className="flex items-center gap-2 sm:ml-4">
+                        <button
+                          onClick={() => handleEditUser(user)}
+                          className="p-2 rounded-lg theme-btn-ghost hover:text-teal-400"
+                          title="Edit user"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteUser(user)}
+                          className="p-2 rounded-lg theme-btn-ghost hover:text-red-400"
+                          title="Delete user"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {totalPages > 1 && (
+                <div className="px-6 py-4 border-t theme-border">
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    totalItems={filteredUsers.length}
+                    itemsPerPage={ITEMS_PER_PAGE}
+                    onPageChange={setCurrentPage}
+                  />
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

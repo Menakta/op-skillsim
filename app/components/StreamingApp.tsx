@@ -68,8 +68,13 @@ import { useReduxSync } from '../store/useReduxSync'
 // Configuration
 // =============================================================================
 
-const projectId =process.env.NEXT_PUBLIC_PUREWEB_PROJECT_ID
+const projectId = process.env.NEXT_PUBLIC_PUREWEB_PROJECT_ID
 const modelId = process.env.NEXT_PUBLIC_PUREWEB_MODEL_ID
+
+// Validate required environment variables
+if (!projectId || !modelId) {
+  console.error('❌ Missing PureWeb environment variables:', { projectId, modelId })
+}
 
 // Retry configuration
 const MAX_RETRIES = 3
@@ -693,7 +698,7 @@ export default function StreamingApp() {
         return { message: 'Initializing platform', step: 'initializing' }
       case 'connecting':
         if (availableModels) {
-          return { message: 'Launching UE5 instance', step: 'launching' }
+          return { message: 'Launching', step: 'launching' }
         }
         return { message: 'Connecting to server', step: 'connecting' }
       case 'retrying':
@@ -711,12 +716,15 @@ export default function StreamingApp() {
   // Show loading screen after user starts stream and until fully connected
   const showLoadingScreen = streamStarted && !isConnected && !showErrorModal
 
+  // Force dark background when starter or loading screen is visible
+  const forcesDarkBg = showStarterScreen || showLoadingScreen
+
   // ==========================================================================
   // Main Render - Using New Modular Components
   // ==========================================================================
 
   return (
-    <div className={`h-screen w-screen relative overflow-hidden ${isDark ? 'bg-[#1E1E1E]' : 'bg-gray-100'}`}>
+    <div className={`h-screen w-screen relative overflow-hidden ${forcesDarkBg ? 'bg-[#1E1E1E]' : isDark ? 'bg-[#1E1E1E]' : 'bg-gray-100'}`}>
       {/* Sidebar - Only show when stream is connected */}
       {isConnected && (
         <Sidebar

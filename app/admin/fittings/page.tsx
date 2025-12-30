@@ -8,7 +8,7 @@
  * View-only - no editing capability.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { RefreshCw, AlertCircle, Wrench, Check, XCircle } from "lucide-react";
 import { DashboardLayout } from "../components/layout";
 import {
@@ -21,7 +21,14 @@ import { Badge } from "../components/ui/Badge";
 import { SearchInput } from "../components/ui/SearchInput";
 import { EmptyState } from "../components/ui/EmptyState";
 import { LoadingState } from "../components/ui/LoadingState";
+import { Pagination } from "../components/ui/Pagination";
 import type { FittingOption } from "@/app/types";
+
+// =============================================================================
+// Constants
+// =============================================================================
+
+const ITEMS_PER_PAGE = 10;
 
 // =============================================================================
 // Main Component
@@ -35,6 +42,7 @@ export default function FittingsPage() {
   const [filterType, setFilterType] = useState<
     "all" | "correct" | "distractor"
   >("all");
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Fetch fitting options
   useEffect(() => {
@@ -63,20 +71,35 @@ export default function FittingsPage() {
   }
 
   // Filter fittings
-  const filteredFittings = fittings.filter((fitting) => {
-    const matchesSearch =
-      fitting.fitting_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      fitting.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (fitting.description?.toLowerCase().includes(searchQuery.toLowerCase()) ??
-        false);
+  const filteredFittings = useMemo(() => {
+    return fittings.filter((fitting) => {
+      const matchesSearch =
+        fitting.fitting_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        fitting.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (fitting.description?.toLowerCase().includes(searchQuery.toLowerCase()) ??
+          false);
 
-    const matchesFilter =
-      filterType === "all" ||
-      (filterType === "correct" && fitting.is_correct) ||
-      (filterType === "distractor" && !fitting.is_correct);
+      const matchesFilter =
+        filterType === "all" ||
+        (filterType === "correct" && fitting.is_correct) ||
+        (filterType === "distractor" && !fitting.is_correct);
 
-    return matchesSearch && matchesFilter;
-  });
+      return matchesSearch && matchesFilter;
+    });
+  }, [fittings, searchQuery, filterType]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filterType]);
+
+  // Paginated fittings
+  const paginatedFittings = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredFittings.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredFittings, currentPage]);
+
+  const totalPages = Math.ceil(filteredFittings.length / ITEMS_PER_PAGE);
 
   // Stats
   const correctCount = fittings.filter((f) => f.is_correct).length;
@@ -195,11 +218,24 @@ export default function FittingsPage() {
 
       {/* Fittings Grid */}
       {!loading && !error && filteredFittings.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredFittings.map((fitting) => (
-            <FittingCard key={fitting.fitting_id} fitting={fitting} />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {paginatedFittings.map((fitting) => (
+              <FittingCard key={fitting.fitting_id} fitting={fitting} />
+            ))}
+          </div>
+          {totalPages > 1 && (
+            <div className="mt-6">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={filteredFittings.length}
+                itemsPerPage={ITEMS_PER_PAGE}
+                onPageChange={setCurrentPage}
+              />
+            </div>
+          )}
+        </>
       )}
 
       {/* No Results */}

@@ -7,7 +7,7 @@
  * Uses global theme classes - no isDark checks needed.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Users, BookOpen, Award, TrendingUp } from 'lucide-react'
 import { DashboardLayout } from './components/layout'
 import { StatCard } from './components/ui/StatCard'
@@ -16,6 +16,13 @@ import { Badge } from './components/ui/Badge'
 import { ProgressBar } from './components/ui/ProgressBar'
 import { EmptyState } from './components/ui/EmptyState'
 import { LoadingState } from './components/ui/LoadingState'
+import { Pagination } from './components/ui/Pagination'
+
+// =============================================================================
+// Constants
+// =============================================================================
+
+const ITEMS_PER_PAGE = 10
 
 // =============================================================================
 // Types
@@ -61,6 +68,34 @@ export default function TeacherDashboardPage() {
   const [topPerformers, setTopPerformers] = useState<Student[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Pagination state
+  const [activityPage, setActivityPage] = useState(1)
+  const [performersPage, setPerformersPage] = useState(1)
+  const [studentsPage, setStudentsPage] = useState(1)
+
+  // Paginated data
+  const paginatedActivity = useMemo(() => {
+    if (!stats?.recentActivity) return []
+    const start = (activityPage - 1) * ITEMS_PER_PAGE
+    return stats.recentActivity.slice(start, start + ITEMS_PER_PAGE)
+  }, [stats?.recentActivity, activityPage])
+
+  const paginatedPerformers = useMemo(() => {
+    // Filter top performers: 100% progress and high score
+    const filtered = topPerformers.filter(s => s.progress === 100)
+      .sort((a, b) => b.averageScore - a.averageScore)
+    const start = (performersPage - 1) * ITEMS_PER_PAGE
+    return {
+      items: filtered.slice(start, start + ITEMS_PER_PAGE),
+      total: filtered.length
+    }
+  }, [topPerformers, performersPage])
+
+  const paginatedStudents = useMemo(() => {
+    const start = (studentsPage - 1) * ITEMS_PER_PAGE
+    return students.slice(start, start + ITEMS_PER_PAGE)
+  }, [students, studentsPage])
 
   useEffect(() => {
     fetchDashboardData()
@@ -160,24 +195,37 @@ export default function TeacherDashboardPage() {
                 No recent activity yet
               </div>
             ) : (
-              <div className="divide-y theme-divide">
-                {stats.recentActivity.map((activity) => (
-                  <div key={activity.id} className="px-6 py-4 transition-colors theme-bg-hover">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="font-medium theme-text-primary">{activity.studentName}</p>
-                        <p className="text-sm theme-text-muted">{activity.action}</p>
-                        {activity.details && (
-                          <p className="text-xs mt-1 theme-text-tertiary">{activity.details}</p>
-                        )}
+              <>
+                <div className="divide-y theme-divide">
+                  {paginatedActivity.map((activity) => (
+                    <div key={activity.id} className="px-6 py-4 transition-colors theme-bg-hover">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="font-medium theme-text-primary">{activity.studentName}</p>
+                          <p className="text-sm theme-text-muted">{activity.action}</p>
+                          {activity.details && (
+                            <p className="text-xs mt-1 theme-text-tertiary">{activity.details}</p>
+                          )}
+                        </div>
+                        <span className="text-xs theme-text-muted">
+                          {formatTimeAgo(activity.timestamp)}
+                        </span>
                       </div>
-                      <span className="text-xs theme-text-muted">
-                        {formatTimeAgo(activity.timestamp)}
-                      </span>
                     </div>
+                  ))}
+                </div>
+                {stats.recentActivity.length > ITEMS_PER_PAGE && (
+                  <div className="px-6 py-4 border-t theme-border">
+                    <Pagination
+                      currentPage={activityPage}
+                      totalPages={Math.ceil(stats.recentActivity.length / ITEMS_PER_PAGE)}
+                      totalItems={stats.recentActivity.length}
+                      itemsPerPage={ITEMS_PER_PAGE}
+                      onPageChange={setActivityPage}
+                    />
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
@@ -188,31 +236,48 @@ export default function TeacherDashboardPage() {
             <CardTitle>Top Performers</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {topPerformers.length === 0 ? (
+            {paginatedPerformers.total === 0 ? (
               <div className="py-4 text-center theme-text-muted text-sm">
                 No performers yet
               </div>
             ) : (
-              topPerformers.map((student, index) => (
-                <div key={student.id} className="flex items-center gap-3">
-                  <div className={`
-                    w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold
-                    ${index === 0 ? 'bg-yellow-500 text-black' : ''}
-                    ${index === 1 ? 'bg-gray-400 text-black' : ''}
-                    ${index === 2 ? 'bg-amber-600 text-white' : ''}
-                    ${index > 2 ? 'theme-bg-tertiary theme-text-muted' : ''}
-                  `}>
-                    {index + 1}
+              <>
+                {paginatedPerformers.items.map((student, index) => {
+                  const rank = (performersPage - 1) * ITEMS_PER_PAGE + index
+                  return (
+                    <div key={student.id} className="flex items-center gap-3">
+                      <div className={`
+                        w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold
+                        ${rank === 0 ? 'bg-yellow-500 text-black' : ''}
+                        ${rank === 1 ? 'bg-gray-400 text-black' : ''}
+                        ${rank === 2 ? 'bg-amber-600 text-white' : ''}
+                        ${rank > 2 ? 'theme-bg-tertiary theme-text-muted' : ''}
+                      `}>
+                        {rank + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate theme-text-primary">{student.name}</p>
+                        <p className="text-xs theme-text-muted">Score: {student.averageScore}%</p>
+                      </div>
+                      <Badge variant={student.status === 'completed' ? 'success' : 'info'}>
+                        {student.status}
+                      </Badge>
+                    </div>
+                  )
+                })}
+                {paginatedPerformers.total > ITEMS_PER_PAGE && (
+                  <div className="pt-4 border-t theme-border">
+                    <Pagination
+                      currentPage={performersPage}
+                      totalPages={Math.ceil(paginatedPerformers.total / ITEMS_PER_PAGE)}
+                      totalItems={paginatedPerformers.total}
+                      itemsPerPage={ITEMS_PER_PAGE}
+                      onPageChange={setPerformersPage}
+                      showItemCount={false}
+                    />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate theme-text-primary">{student.name}</p>
-                    <p className="text-xs theme-text-muted">{student.progress}% progress</p>
-                  </div>
-                  <Badge variant={student.status === 'completed' ? 'success' : 'info'}>
-                    {student.status}
-                  </Badge>
-                </div>
-              ))
+                )}
+              </>
             )}
           </CardContent>
         </Card>
@@ -234,40 +299,53 @@ export default function TeacherDashboardPage() {
               No students enrolled yet
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {students.slice(0, 6).map((student) => (
-                <div
-                  key={student.id}
-                  className="p-4 rounded-lg border theme-bg-secondary theme-border"
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <p className="font-medium theme-text-primary">{student.name}</p>
-                      <p className="text-xs theme-text-muted">{student.email}</p>
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {paginatedStudents.map((student) => (
+                  <div
+                    key={student.id}
+                    className="p-4 rounded-lg border theme-bg-secondary theme-border"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <p className="font-medium theme-text-primary">{student.name}</p>
+                        <p className="text-xs theme-text-muted">{student.email}</p>
+                      </div>
+                      <Badge
+                        variant={
+                          student.status === 'completed' ? 'success' :
+                          student.status === 'active' ? 'info' : 'warning'
+                        }
+                      >
+                        {student.status}
+                      </Badge>
                     </div>
-                    <Badge
-                      variant={
-                        student.status === 'completed' ? 'success' :
-                        student.status === 'active' ? 'info' : 'warning'
-                      }
-                    >
-                      {student.status}
-                    </Badge>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="theme-text-muted">Progress</span>
+                        <span className="theme-text-primary">{student.progress}%</span>
+                      </div>
+                      <ProgressBar value={student.progress} color="teal" size="sm" />
+                      <div className="flex justify-between text-xs mt-2 theme-text-muted">
+                        <span>{student.completedModules}/{student.totalModules} phases</span>
+                        <span>Score: {student.averageScore}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="theme-text-muted">Progress</span>
-                      <span className="theme-text-primary">{student.progress}%</span>
-                    </div>
-                    <ProgressBar value={student.progress} color="teal" size="sm" />
-                    <div className="flex justify-between text-xs mt-2 theme-text-muted">
-                      <span>{student.completedModules}/{student.totalModules} phases</span>
-                      <span>Score: {student.averageScore}</span>
-                    </div>
-                  </div>
+                ))}
+              </div>
+              {students.length > ITEMS_PER_PAGE && (
+                <div className="mt-6 pt-4 border-t theme-border">
+                  <Pagination
+                    currentPage={studentsPage}
+                    totalPages={Math.ceil(students.length / ITEMS_PER_PAGE)}
+                    totalItems={students.length}
+                    itemsPerPage={ITEMS_PER_PAGE}
+                    onPageChange={setStudentsPage}
+                  />
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

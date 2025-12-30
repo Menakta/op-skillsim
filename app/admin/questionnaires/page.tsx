@@ -8,7 +8,7 @@
  * Uses global theme classes - no isDark checks needed.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Edit, Save, X, RefreshCw, AlertCircle, CheckCircle, HelpCircle } from 'lucide-react'
 import { DashboardLayout } from '../components/layout'
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card'
@@ -16,7 +16,14 @@ import { Badge } from '../components/ui/Badge'
 import { SearchInput } from '../components/ui/SearchInput'
 import { EmptyState } from '../components/ui/EmptyState'
 import { LoadingState } from '../components/ui/LoadingState'
+import { Pagination } from '../components/ui/Pagination'
 import { useAdmin, DemoModeNotice } from '../context/AdminContext'
+
+// =============================================================================
+// Constants
+// =============================================================================
+
+const ITEMS_PER_PAGE = 10
 
 // =============================================================================
 // Types
@@ -49,6 +56,7 @@ export default function QuestionnairesPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [phasePagination, setPhasePagination] = useState<Record<string, number>>({})
 
   // Fetch raw questions from admin endpoint
   useEffect(() => {
@@ -74,20 +82,44 @@ export default function QuestionnairesPage() {
   }, [])
 
   // Filter questions by search
-  const filteredQuestions = questions.filter(q =>
-    q.question_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    q.question_text.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    q.phase.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const filteredQuestions = useMemo(() => {
+    return questions.filter(q =>
+      q.question_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      q.question_text.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      q.phase.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+  }, [questions, searchQuery])
+
+  // Reset pagination when search changes
+  useEffect(() => {
+    setPhasePagination({})
+  }, [searchQuery])
 
   // Group questions by phase
-  const groupedQuestions = filteredQuestions.reduce((acc, q) => {
-    if (!acc[q.phase]) {
-      acc[q.phase] = []
-    }
-    acc[q.phase].push(q)
-    return acc
-  }, {} as Record<string, QuestionFromDB[]>)
+  const groupedQuestions = useMemo(() => {
+    return filteredQuestions.reduce((acc, q) => {
+      if (!acc[q.phase]) {
+        acc[q.phase] = []
+      }
+      acc[q.phase].push(q)
+      return acc
+    }, {} as Record<string, QuestionFromDB[]>)
+  }, [filteredQuestions])
+
+  // Get page for a phase
+  const getPhaseCurrentPage = (phase: string) => phasePagination[phase] || 1
+
+  // Set page for a phase
+  const setPhaseCurrentPage = (phase: string, page: number) => {
+    setPhasePagination(prev => ({ ...prev, [phase]: page }))
+  }
+
+  // Get paginated questions for a phase
+  const getPaginatedQuestions = (phase: string, phaseQuestions: QuestionFromDB[]) => {
+    const currentPage = getPhaseCurrentPage(phase)
+    const start = (currentPage - 1) * ITEMS_PER_PAGE
+    return phaseQuestions.slice(start, start + ITEMS_PER_PAGE)
+  }
 
   // Handle save
   const handleSave = async (question: QuestionFromDB) => {
@@ -251,32 +283,49 @@ export default function QuestionnairesPage() {
       {/* Questions by Phase */}
       {!loading && !error && Object.keys(groupedQuestions).length > 0 && (
         <div className="space-y-6">
-          {Object.entries(groupedQuestions).map(([phase, phaseQuestions]) => (
-            <Card key={phase}>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-3">
-                    <span>{formatPhase(phase)}</span>
-                    <Badge variant="info">{phaseQuestions.length} questions</Badge>
-                  </CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {phaseQuestions.map((question) => (
-                  <QuestionCard
-                    key={question.question_id}
-                    question={question}
-                    isEditing={editingId === question.question_id}
-                    onEdit={() => setEditingId(question.question_id)}
-                    onCancel={() => setEditingId(null)}
-                    onSave={handleSave}
-                    saving={saving}
-                    canEdit={isLti}
-                  />
-                ))}
-              </CardContent>
-            </Card>
-          ))}
+          {Object.entries(groupedQuestions).map(([phase, phaseQuestions]) => {
+            const paginatedQuestions = getPaginatedQuestions(phase, phaseQuestions)
+            const totalPages = Math.ceil(phaseQuestions.length / ITEMS_PER_PAGE)
+            const currentPage = getPhaseCurrentPage(phase)
+
+            return (
+              <Card key={phase}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-3">
+                      <span>{formatPhase(phase)}</span>
+                      <Badge variant="info">{phaseQuestions.length} questions</Badge>
+                    </CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {paginatedQuestions.map((question) => (
+                    <QuestionCard
+                      key={question.question_id}
+                      question={question}
+                      isEditing={editingId === question.question_id}
+                      onEdit={() => setEditingId(question.question_id)}
+                      onCancel={() => setEditingId(null)}
+                      onSave={handleSave}
+                      saving={saving}
+                      canEdit={isLti}
+                    />
+                  ))}
+                  {totalPages > 1 && (
+                    <div className="pt-4 border-t theme-border">
+                      <Pagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        totalItems={phaseQuestions.length}
+                        itemsPerPage={ITEMS_PER_PAGE}
+                        onPageChange={(page) => setPhaseCurrentPage(phase, page)}
+                      />
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
       )}
     </DashboardLayout>
