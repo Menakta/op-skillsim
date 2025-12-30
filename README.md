@@ -1,77 +1,160 @@
-# OP SkillSim
+# OP SkillSim - OPNZ Plumbing Training Platform
 
-VR Training Simulation Platform for plumbing skills training with real-time 3D streaming.
+**Project Type**: Educational VR Web Application
+**Client**: Open Polytechnic New Zealand Te Pukenga
+**Technology**: Next.js + PureWeb + UE5 + LTI 1.0
+**Status**: ~87% Complete | Production Ready for Core Features
+
+---
+
+## Project Overview
+
+OP SkillSim delivers browser-based VR plumbing training without requiring local UE5 installation. Students learn real-world NZS3500-compliant procedures through interactive tasks, assessments, and standards-compliant workflows.
+
+### Key Features
+
+- **Browser-based VR**: High-performance UE5 streaming via PureWeb
+- **Standards Integration**: NZS3500 New Zealand plumbing compliance
+- **Educational Assessment**: Interactive Q1-Q6 knowledge validation
+- **LMS Integration**: Secure LTI 1.0 launch from iQualify
+- **Teacher Dashboard**: Questionnaire and fitting management
+
+---
 
 ## Tech Stack
 
-- **Framework**: Next.js 16 (App Router)
-- **React**: 19.2.0
-- **TypeScript**: 5.x
-- **State Management**: Redux Toolkit
-- **Styling**: Tailwind CSS 4
-- **Streaming**: PureWeb Platform SDK
-- **Testing**: Vitest + React Testing Library
+| Category | Technology |
+|----------|------------|
+| **Framework** | Next.js 14 (App Router) |
+| **Language** | TypeScript 5.x |
+| **State Management** | Redux Toolkit |
+| **Styling** | Tailwind CSS |
+| **Database** | Supabase (PostgreSQL) |
+| **Streaming** | PureWeb Platform SDK |
+| **Authentication** | JWT + LTI 1.0 |
+| **Deployment** | Vercel |
+
+---
+
+## Project Progress
+
+### Completed Features
+
+| System | Status | Description |
+|--------|--------|-------------|
+| Authentication | 100% | LTI 1.0, JWT tokens, role-based access |
+| Teacher Dashboard | 95% | Questionnaires, fittings, students, results |
+| PureWeb Streaming | 100% | Full streaming with warm pool optimization |
+| Training System UI | 90% | Controls, sidebar, progress tracking |
+| Message Passing | 90% | Bidirectional React-UE5 communication |
+| Database/APIs | 95% | Complete CRUD operations |
+| Production Infrastructure | 85% | Vercel deployment, error handling |
+
+### 8-Phase Training System
+
+| Phase | Name | UE5 Status | Web Integration |
+|-------|------|------------|-----------------|
+| A | X-Ray Assessment | Complete | Complete |
+| B | Excavation | Complete | Complete |
+| C | Measurement Tool | Complete | Complete |
+| D | Fitting Selection | Complete | 70% - Needs Testing |
+| E | Pipe Connection | Complete | Complete |
+| F | Glue Application | Complete | Complete |
+| G | Pressure Testing | Complete | Complete |
+| H | Training Summary | Complete | Complete |
+
+---
 
 ## Project Structure
 
 ```
 app/
-├── api/                    # Next.js API routes
-│   ├── auth/              # Authentication endpoints
-│   └── stream/            # Streaming endpoints
-├── components/            # React components
-│   ├── ControlPanel/      # Training control UI
-│   ├── errors/            # Error boundaries
-│   ├── feedbacks/         # Modal feedback components
-│   ├── helper-screens/    # Loading/starter screens
-│   ├── layout/            # Layout components
-│   ├── shared/            # Reusable UI components
-│   └── ui/                # UI feature components
-├── config/                # Centralized configuration
-│   ├── app.config.ts      # App-wide settings
-│   ├── camera.config.ts   # Camera perspectives
-│   ├── questions.config.ts # Question database
-│   └── tasks.config.ts    # Training tasks
-├── features/              # Feature modules
-│   ├── camera/            # Camera control
-│   ├── explosion/         # Building explosion
-│   ├── feedback/          # Modal feedback
-│   ├── layers/            # Layer visibility
-│   ├── messaging/         # UE5 communication
-│   ├── onboarding/        # Loading/starter screens
-│   ├── questions/         # Question handling
-│   ├── streaming/         # Stream management
-│   └── training/          # Training flow
-├── lib/                   # Utilities
-│   ├── events/            # Event bus system
-│   ├── performance/       # Performance utilities
-│   ├── logger.ts          # Logging
-│   └── messageTypes.ts    # Message definitions
-├── services/              # Service layer
-│   ├── session.service.ts # Session management
-│   ├── stream.service.ts  # Stream API calls
-│   └── training.service.ts # Training utilities
-├── store/                 # Redux store
-│   ├── slices/            # Redux slices
-│   ├── hooks.ts           # Typed hooks
-│   └── selectors.ts       # Memoized selectors
-└── types/                 # Type definitions
-    ├── training.types.ts
-    ├── messages.types.ts
-    └── ui.types.ts
+├── admin/                  # Teacher Dashboard
+│   ├── components/         # Dashboard UI components
+│   ├── context/            # Admin context provider
+│   ├── fittings/           # Fitting options management
+│   ├── questionnaires/     # Q1-Q6 question editing
+│   ├── results/            # Quiz results viewer
+│   ├── students/           # Student management
+│   ├── users/              # User management
+│   └── settings/           # Admin settings
+├── api/                    # Next.js API Routes
+│   ├── admin/              # Admin API endpoints
+│   ├── auth/               # Authentication (login, session, LTI)
+│   ├── lti/                # LTI 1.0 launch endpoint
+│   ├── quiz/               # Quiz response handling
+│   ├── stream/             # PureWeb streaming APIs
+│   └── training/           # Training session APIs
+├── components/             # React Components
+│   ├── ControlPanel/       # Training control UI
+│   ├── Sidebar/            # Collapsible navigation
+│   ├── errors/             # Error boundaries
+│   ├── layout/             # Layout components
+│   └── shared/             # Reusable UI components
+├── config/                 # Configuration
+│   ├── tasks.config.ts     # Training task definitions
+│   └── index.ts            # App configuration
+├── features/               # Feature Modules
+│   ├── feedback/           # Modals (success, error, session)
+│   ├── messaging/          # UE5 message handling
+│   ├── onboarding/         # Loading/starter screens
+│   ├── questions/          # Quiz modal system
+│   ├── streaming/          # Stream management
+│   └── training/           # Training flow logic
+├── lib/                    # Utilities
+│   ├── supabase.ts         # Database client
+│   ├── warmPool.ts         # Stream optimization
+│   ├── logger.ts           # Logging system
+│   └── messageTypes.ts     # Message definitions
+├── services/               # Service Layer
+│   ├── session.service.ts  # Session management
+│   ├── stream.service.ts   # Stream API calls
+│   └── fitting.service.ts  # Fitting operations
+├── store/                  # Redux Store
+│   └── slices/             # State slices
+└── types/                  # TypeScript Definitions
 ```
+
+---
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 20+ (required for Next.js 16)
+- Node.js 20+
 - npm or yarn
+- Supabase account (for database)
+- PureWeb account (for streaming)
 
 ### Installation
 
 ```bash
 npm install
+```
+
+### Environment Variables
+
+Create a `.env.local` file:
+
+```env
+# PureWeb Configuration
+NEXT_PUBLIC_PUREWEB_PROJECT_ID=your_project_id
+NEXT_PUBLIC_PUREWEB_MODEL_ID=your_model_id
+PUREWEB_PROJECT_CLIENT_ID=your_client_id
+PUREWEB_PROJECT_CLIENT_SECRET=your_client_secret
+
+# Supabase Configuration
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_key
+
+# Authentication
+JWT_SECRET=your_jwt_secret
+LTI_KEY=your_lti_key
+LTI_SECRET=your_lti_secret
+
+# Warm Pool (Optional)
+WARM_POOL_ADMIN_SECRET=your_admin_secret
 ```
 
 ### Development
@@ -86,98 +169,76 @@ npm run dev
 npm run build
 ```
 
-### Testing
+### Production
 
 ```bash
-# Run tests in watch mode
-npm test
-
-# Run tests once
-npm run test:run
-
-# Run with coverage
-npm run test:coverage
+npm run start
 ```
 
-## Architecture
+---
 
-### State Management
+## Core Systems
 
-Redux Toolkit is used for global state management. The store is divided into:
+### Authentication Flow
 
-- **trainingSlice**: Training progress, tools, camera, layers
-- **uiSlice**: UI state, modals, theme
-- **connectionSlice**: Stream connection status
-
-Use the `useReduxSync` hook to bridge existing hooks with Redux state.
-
-### Feature Modules
-
-Each feature is self-contained with:
-- Components
-- Hooks
-- Types
-- Index exports
-
-Import from feature modules:
-```typescript
-import { useMessageBus } from '@/app/features/messaging'
-import { QuestionModal } from '@/app/features/questions'
+```
+iQualify LMS → LTI Launch → OAuth Validation → JWT Token → Session Creation
+                                                    ↓
+                                         Role-based Access Control
+                                                    ↓
+                              Student → Training Interface
+                              Teacher → Dashboard Access
 ```
 
-### Event Bus
+### Message Passing Protocol
 
-Decoupled pub/sub communication:
-```typescript
-import { eventBus, useEventBus } from '@/app/lib/events'
+Bidirectional JSON communication between React and UE5:
 
-// Subscribe
-useEventBus('training:started', (data) => {
-  console.log('Training started:', data.taskIndex)
-})
+| Direction | Message Types |
+|-----------|---------------|
+| UE5 → Web | Quiz triggers, progress updates, tool states, training complete |
+| Web → UE5 | Quiz responses, tool selections, training controls |
 
-// Emit
-eventBus.emit('training:started', { taskIndex: 0 })
-```
+### Teacher Dashboard
 
-### Services
+| Page | Features |
+|------|----------|
+| Dashboard | Stats overview, recent activity, top performers |
+| Students | Progress tracking, search, filters, pagination |
+| Users | Teacher/admin management with role permissions |
+| Questionnaires | Q1-Q6 question editing with NZS3500 references |
+| Fittings | Correct/distractor fitting management |
+| Results | Quiz results with detailed breakdown |
 
-API calls are abstracted through services:
-```typescript
-import { streamService, sessionService } from '@/app/services'
+---
 
-const result = await streamService.getCredentials()
-if (result.success) {
-  console.log(result.data.environmentId)
-}
-```
+## API Endpoints
 
-### Logging
+### Authentication
+- `POST /api/lti/launch` - LTI 1.0 launch from iQualify
+- `POST /api/auth/login` - Direct login
+- `GET /api/auth/session` - Get current session
+- `POST /api/auth/logout` - End session
 
-Enhanced logger with child loggers and timing:
-```typescript
-import { logger, getLogger } from '@/app/lib/logger'
+### Training
+- `POST /api/training/session` - Create training session
+- `PUT /api/training/progress` - Update progress
+- `PUT /api/training/phase` - Update phase
+- `POST /api/training/complete` - Complete training
 
-const log = getLogger('MyComponent')
-log.info({ userId: '123' }, 'User action')
+### Quiz
+- `POST /api/quiz/response` - Submit quiz answer
+- `GET /api/questions` - Get questions
 
-const end = logger.time('operation')
-// ... work
-end() // Logs duration
-```
+### Admin
+- `GET /api/admin/dashboard` - Dashboard stats
+- `GET/POST /api/admin/students` - Student management
+- `GET/POST/PUT/DELETE /api/admin/users` - User management
+- `GET/PUT /api/admin/questions` - Question management
+- `GET /api/admin/fittings` - Fitting options
+- `GET /api/admin/results` - Quiz results
 
-## Environment Variables
-
-```env
-# PureWeb Configuration
-NEXT_PUBLIC_PUREWEB_PROJECT_ID=
-NEXT_PUBLIC_PUREWEB_MODEL_ID=
-PUREWEB_PROJECT_CLIENT_ID=
-PUREWEB_PROJECT_CLIENT_SECRET=
-
-# Authentication
-JWT_SECRET=
-```
+---
 
 ## Scripts
 
@@ -187,10 +248,46 @@ JWT_SECRET=
 | `npm run build` | Build for production |
 | `npm run start` | Start production server |
 | `npm run lint` | Run ESLint |
-| `npm test` | Run tests in watch mode |
-| `npm run test:run` | Run tests once |
-| `npm run test:coverage` | Run tests with coverage |
+
+---
+
+## Deployment
+
+### Vercel Deployment
+
+1. Connect repository to Vercel
+2. Configure environment variables in Vercel dashboard
+3. Deploy (automatic on push to main)
+
+### Important Notes
+
+- Set all `NEXT_PUBLIC_*` variables for client-side access
+- Redeploy after adding new environment variables
+- Configure allowed domains for LTI in production
+
+---
+
+## Remaining Work
+
+### High Priority
+- [ ] End-to-end testing of Phase D fitting selection
+- [ ] Production LTI integration testing with iQualify
+- [ ] Complete message integration testing with UE5
+
+### Medium Priority
+- [ ] Results CSV export functionality
+- [ ] Question preview modal in dashboard
+- [ ] Mobile/tablet optimization testing
+
+### Future Enhancements
+- [ ] Advanced analytics dashboard
+- [ ] Email integration for results
+- [ ] Certificate generation
+- [ ] Multi-course support
+
+---
 
 ## License
 
 Private - All rights reserved
+Open Polytechnic New Zealand Te Pukenga
