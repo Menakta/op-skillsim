@@ -160,22 +160,27 @@ export default function QuestionnairesPage() {
   return (
     <DashboardLayout title="Questionnaires" subtitle="View and edit training questions">
       {/* Header Actions */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between mb-6">
+      <Card className="mb-6 lg:w-[49%] w-full">
+        <CardHeader className='p-4'>
+             <div className="flex flex-col sm:flex-row gap-2 justify-between">
         <SearchInput
           value={searchQuery}
           onChange={setSearchQuery}
           placeholder="Search questions..."
-          className="w-full sm:w-80"
+          className="w-full lg:w-1/2"
         />
-        <button
+        {/* <button
           onClick={handleRefresh}
           disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors theme-btn-secondary"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors theme-btn-secondary disabled:theme-btn-disabled disabled:cursor-not-allowed"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           Refresh
-        </button>
+        </button> */}
       </div>
+        </CardHeader>
+      </Card>
+   
 
       {/* Save Message */}
       {saveMessage && (

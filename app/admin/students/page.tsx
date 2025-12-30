@@ -126,7 +126,7 @@ export default function StudentsPage() {
   return (
     <DashboardLayout title="Students" subtitle="Manage and track student progress">
       {/* Stats Overview */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatMini label="Total Students" value={stats?.totalStudents || 0} icon={<Users className="w-5 h-5" />} />
         <StatMini label="Active" value={stats?.activeStudents || 0} icon={<Activity className="w-5 h-5" />} color="green" />
         <StatMini label="Completed" value={stats?.completedStudents || 0} icon={<Users className="w-5 h-5" />} color="blue" />
@@ -134,14 +134,14 @@ export default function StudentsPage() {
       </div>
 
       {/* Filters */}
-      <Card className="mb-6">
+      <Card className="mb-6 lg:w-[49%] w-full">
         <CardContent className="py-4">
           <div className="flex flex-col gap-4">
             <SearchInput
               value={searchQuery}
               onChange={setSearchQuery}
               placeholder="Search students by name, email, or institution..."
-              className="max-w-md"
+              className="w-full lg:w-1/2"
             />
             <div className="flex flex-wrap gap-2">
               <FilterButton

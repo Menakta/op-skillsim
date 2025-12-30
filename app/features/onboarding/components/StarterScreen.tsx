@@ -12,6 +12,7 @@ interface StarterScreenProps {
   title?: string
   subtitle?: string
   onStart: () => void
+  onHover?: () => void  // Called when user hovers on start button (for prefetching)
   buttonText?: string
 }
 
@@ -24,6 +25,7 @@ export function StarterScreen({
   title = 'Start Exercise',
   subtitle = 'Click the button below to begin your training session',
   onStart,
+  onHover,
   buttonText = 'Start'
 }: StarterScreenProps) {
   // Don't render if not open
@@ -45,6 +47,8 @@ export function StarterScreen({
           {/* Start Button */}
           <button
             onClick={onStart}
+            onMouseEnter={onHover}
+            onFocus={onHover}
             className="py-3 px-8 rounded-full font-medium bg-[#44CF8A] text-white  transition-all duration-300 shadow-lg shadow-[#39BEAE]/30 flex items-center gap-3 text-lg cursor-pointer hover:bg-[#39BEAE] hover:shadow-[#44CF8A]/30"
           >
             <Play size={30} />

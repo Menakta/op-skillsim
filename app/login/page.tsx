@@ -74,6 +74,9 @@ export default function LoginPage() {
         }
       } else if (data.user.role === 'student') {
         window.location.href = '/'
+      }
+      else if (data.user.role === 'teacher') {
+        window.location.href = '/admin'
       } else {
         window.location.href = '/admin'
       }
@@ -86,7 +89,7 @@ export default function LoginPage() {
   const isDark = theme === 'dark'
 
   return (
-    <div className={`min-h-screen flex items-center justify-center px-4 ${isDark ? 'bg-gray-900' : 'bg-gray-100'}`}>
+    <div className={`min-h-screen flex items-center justify-center px-4 ${isDark ? 'bg-[#000000]' : 'bg-gray-100'}`}>
 
         {/* Theme Toggle Button */}
         <button
@@ -106,8 +109,8 @@ export default function LoginPage() {
         </button>
 
         {/* Login Form */}
-        <div className="rounded-xl grid md:grid-cols-12 w-[947px] max-w-[947px] min-h-[611px]">
-          <div className={`md:col-span-7 col-span-12 px-6 py-10 md:px-20 md:py-20 md:rounded-l-xl rounded-t-xl rounded-b-xl md:rounded-br-none md:rounded-t-none ${isDark ? 'bg-gray-800' : 'bg-[#D9D9D9]'}`}>
+        <div className="rounded-xl grid md:grid-cols-12 w-[947px] max-w-[947px] min-h-[611px] border-[1px] border-gray-200 dark:border-gray-600 bg-[#D9D9D9] dark:bg-[#000000]">
+          <div className={`md:col-span-7 col-span-12 px-6 py-10 md:px-20 md:py-20 md:rounded-l-xl rounded-t-xl rounded-b-xl md:rounded-br-none md:rounded-t-none ${isDark ? 'bg-[#000000]' : 'bg-[#D9D9D9]'}`}>
              <h2 className={`text-xl font-semibold mb-2 ${isDark ? 'text-white' : 'text-black'}`}>Sign In</h2>
 
              {/* Demo Mode Notice */}
@@ -140,7 +143,7 @@ export default function LoginPage() {
                 id="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className={`w-full px-8 py-2 border-2 rounded-md focus:outline-none focus:ring-1 ${isDark ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:ring-gray-500' : 'bg-[#D9D9D9] border-[#848484] text-black placeholder-gray-900 focus:ring-gray-800'}`}
+                className={`w-full px-8 py-2 border-2 rounded-md focus:outline-none focus:ring-1 bg-[#FFFFFF] ${isDark ? ' text-white placeholder-gray-800 focus:ring-gray-500' : 'bg-[#D9D9D9] border-[#848484] text-black placeholder-gray-900 focus:ring-gray-800'}`}
                 placeholder="Email"
                 required
               />
@@ -153,7 +156,7 @@ export default function LoginPage() {
                 id="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className={`w-full px-8 py-2 border-2 rounded-md focus:outline-none focus:ring-1 ${isDark ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:ring-gray-500' : 'bg-[#D9D9D9] border-[#848484] text-black placeholder-gray-900 focus:ring-gray-800'}`}
+                className={`w-full px-8 py-2 border-2 rounded-md focus:outline-none focus:ring-1 bg-[#FFFFFF] ${isDark ? 'text-white placeholder-gray-800 focus:ring-gray-500' : 'bg-[#D9D9D9] border-[#848484] text-black placeholder-gray-900 focus:ring-gray-800'}`}
                 placeholder="Password"
                 required
               />
@@ -171,10 +174,10 @@ export default function LoginPage() {
           </form>
 
           </div>
-           <div className='col-span-5 hidden md:block'>
-            <div className='grid grid-rows-8 bg-[#0D1D40] rounded-r-xl overflow-hidden h-full w-full'>
-              <div className='row-span-6 bg-[#0D1D40] pt-40'>
-                <div className='w-[130px] rounded-full h-[130px] bg-[#39BEAE] mx-auto'></div>
+           <div className={'col-span-5 hidden md:block'}>
+            <div className={`grid grid-rows-8 rounded-r-xl overflow-hidden h-full w-full ${isDark ? 'bg-[#44CF8A]' : 'bg-[#0D1D40]' }`}>
+              <div className='row-span-6  pt-40'>
+                <div className='w-[130px] rounded-full h-[130px] bg-[#44CF8A] mx-auto border-1 border-white'></div>
                 <h1 className='text-white text-2xl font-semibold text-center mt-5 text-[40px]'>OP Skillsim</h1>
                 </div>
               <div className='row-span-2 flex flex-col justify-center items-center'>

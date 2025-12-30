@@ -6,6 +6,8 @@ import Image from 'next/image'
 // Props Interface
 // =============================================================================
 
+export type LoadingStep = 'initializing' | 'connecting' | 'launching' | 'streaming'
+
 interface LoadingScreenProps {
   isOpen: boolean
   title?: string
@@ -14,6 +16,7 @@ interface LoadingScreenProps {
   retryCount?: number
   maxRetries?: number
   showRetryInfo?: boolean
+  currentStep?: LoadingStep
 }
 
 // =============================================================================
@@ -27,42 +30,39 @@ export function LoadingScreen({
   statusMessage = 'Connecting to stream',
   retryCount = 0,
   maxRetries = 3,
-  showRetryInfo = false
+  showRetryInfo = false,
+  currentStep = 'initializing'
 }: LoadingScreenProps) {
   // Don't render if not open
   if (!isOpen) return null
 
+  // Step configuration with labels
+  const steps: { key: LoadingStep; label: string }[] = [
+    { key: 'initializing', label: 'Initializing' },
+    { key: 'connecting', label: 'Connecting' },
+    { key: 'launching', label: 'Launching' },
+    { key: 'streaming', label: 'Streaming' }
+  ]
+
+  const currentStepIndex = steps.findIndex(s => s.key === currentStep)
+
   return (
-    <div className="absolute inset-0 flex items-center justify-center backdrop-blur-sm">
+    <div className="absolute inset-0 flex items-center justify-center backdrop-blur-sm z-50">
       <div
-        className="backdrop-blur-md rounded-2xl w-full mx-2"
+        className="backdrop-blur-md rounded-2xl w-full max-w-md mx-4"
         style={{
           animation: 'modalFadeIn 0.3s ease-out'
         }}
       >
         {/* Header */}
-        <div className="flex items-center justify-center">
-          <h1 className="text-white text-[36px] text-base">{title}</h1>
+        <div className="flex items-center justify-center pt-6">
+          <h1 className="text-white text-2xl font-bold">{title}</h1>
         </div>
 
         {/* Content */}
-        <div className="px-5 py-8 flex flex-col items-center">
-          {/* Loading Icon with Animation */}
-          
-
-          {/* Subtitle */}
-          <p className="text-white text-xl font-semibold mb-2">{subtitle}</p>
-
-          {/* Status Message with animated dots */}
-          <div className="flex items-center gap-1 text-gray-300 text-xs mt-5 mb-2">
-            <span>{statusMessage}</span>
-            <span className="inline-flex">
-              <span className="animate-dot-1">.</span>
-              <span className="animate-dot-2">.</span>
-              <span className="animate-dot-3">.</span>
-            </span>
-          </div>
-          <div className="relative w-16 h-16 mt-6">
+        <div className="px-6 py-6 flex flex-col items-center">
+          {/* Loading Spinner */}
+          <div className="relative w-16 h-16 mb-6">
             <Image
               src="/icons/loading.png"
               alt="Loading"
@@ -72,9 +72,80 @@ export function LoadingScreen({
             />
           </div>
 
+          {/* Subtitle */}
+          <p className="text-white text-lg font-semibold mb-2">{subtitle}</p>
+
+          {/* Status Message with animated dots */}
+          <div className="flex items-center gap-1 text-gray-300 text-sm mb-6">
+            <span>{statusMessage}</span>
+            <span className="inline-flex">
+              <span className="animate-dot-1">.</span>
+              <span className="animate-dot-2">.</span>
+              <span className="animate-dot-3">.</span>
+            </span>
+          </div>
+
+          {/* Progress Steps */}
+          <div className="w-full flex items-center justify-between px-2 mb-4">
+            {steps.map((step, index) => {
+              const isCompleted = index < currentStepIndex
+              const isCurrent = index === currentStepIndex
+              const isPending = index > currentStepIndex
+
+              return (
+                <div key={step.key} className="flex flex-col items-center flex-1">
+                  {/* Step indicator */}
+                  <div className="flex items-center w-full">
+                    {/* Line before (except first) */}
+                    {index > 0 && (
+                      <div
+                        className={`h-0.5 flex-1 transition-colors duration-300 ${
+                          isCompleted ? 'bg-green-500' : 'bg-gray-600'
+                        }`}
+                      />
+                    )}
+
+                    {/* Circle */}
+                    <div
+                      className={`w-3 h-3 rounded-full flex-shrink-0 transition-all duration-300 ${
+                        isCompleted
+                          ? 'bg-green-500'
+                          : isCurrent
+                          ? 'bg-blue-500 ring-2 ring-blue-400 ring-opacity-50 animate-pulse'
+                          : 'bg-gray-600'
+                      }`}
+                    />
+
+                    {/* Line after (except last) */}
+                    {index < steps.length - 1 && (
+                      <div
+                        className={`h-0.5 flex-1 transition-colors duration-300 ${
+                          isCompleted ? 'bg-green-500' : 'bg-gray-600'
+                        }`}
+                      />
+                    )}
+                  </div>
+
+                  {/* Step label */}
+                  <span
+                    className={`text-[10px] mt-2 transition-colors duration-300 ${
+                      isCompleted
+                        ? 'text-green-400'
+                        : isCurrent
+                        ? 'text-blue-400 font-medium'
+                        : 'text-gray-500'
+                    }`}
+                  >
+                    {step.label}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+
           {/* Retry Info */}
           {showRetryInfo && retryCount > 0 && (
-            <p className="text-gray-500 text-xs mt-4">
+            <p className="text-gray-500 text-xs mt-2">
               Retry attempt {retryCount}/{maxRetries}
             </p>
           )}

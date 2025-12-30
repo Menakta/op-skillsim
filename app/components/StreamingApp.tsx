@@ -1,23 +1,54 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback, lazy, Suspense } from 'react'
+import dynamic from 'next/dynamic'
 import {PlatformNext,ModelDefinition, UndefinedModelDefinition,DefaultStreamerOptions,StreamerStatus} from '@pureweb/platform-sdk'
 import {useStreamer,useLaunchRequest,VideoStream} from '@pureweb/platform-sdk-react'
 
-// Feature imports - New modular components
-import { QuestionModal, useQuestions } from '../features/questions'
-import { CompletionPopup } from '../features/training'
-// LoadingOverlay removed - using LoadingScreen instead
-import { StatusBar } from '../components/layout'
-import {SessionModal,SuccessModal,ErrorModal} from '../features'
-import { LoadingScreen ,StarterScreen,NavigationWalkthrough} from '../features'
-import ControlPanel from '../components/ControlPanel'
-import MessageLog from '../components/MessageLog'
-
-// New composite hook that uses all the modular hooks
-import { useTrainingMessagesComposite } from '../hooks/useTrainingMessagesComposite'
+// Critical path imports - needed immediately
+import { useQuestions } from '../features/questions'
+import { LoadingScreen, StarterScreen, type LoadingStep } from '../features'
 import type { QuestionData } from '../lib/messageTypes'
 import { TASK_SEQUENCE } from '../config'
+
+// Lazy load heavy components - only loaded when stream connects
+const ControlPanel = dynamic(() => import('../components/ControlPanel'), {
+  ssr: false,
+  loading: () => null,
+})
+
+const MessageLog = dynamic(() => import('../components/MessageLog'), {
+  ssr: false,
+  loading: () => null,
+})
+
+const QuestionModal = dynamic(
+  () => import('../features/questions').then(mod => ({ default: mod.QuestionModal })),
+  { ssr: false, loading: () => null }
+)
+
+const CompletionPopup = dynamic(
+  () => import('../features/training').then(mod => ({ default: mod.CompletionPopup })),
+  { ssr: false, loading: () => null }
+)
+
+const NavigationWalkthrough = dynamic(
+  () => import('../features').then(mod => ({ default: mod.NavigationWalkthrough })),
+  { ssr: false, loading: () => null }
+)
+
+const SuccessModal = dynamic(
+  () => import('../features').then(mod => ({ default: mod.SuccessModal })),
+  { ssr: false, loading: () => null }
+)
+
+const ErrorModal = dynamic(
+  () => import('../features').then(mod => ({ default: mod.ErrorModal })),
+  { ssr: false, loading: () => null }
+)
+
+// Lazy load hooks - deferred until needed
+import { useTrainingMessagesComposite } from '../hooks/useTrainingMessagesComposite'
 
 // Redux sync - bridges hook state to Redux store
 import { useReduxSync } from '../store/useReduxSync'
@@ -49,12 +80,63 @@ export default function StreamingApp() {
 
   // Platform ref - persists across renders
   const platformRef = useRef<PlatformNext | null>(null)
+  const preWarmStartedRef = useRef(false)
 
   // Initialize platform on first render
   if (!platformRef.current) {
     platformRef.current = new PlatformNext()
     platformRef.current.initialize({ endpoint: 'https://api.pureweb.io' })
   }
+
+  // Warm environment from server-side pool
+  const warmEnvRef = useRef<{ environmentId: string; agentToken: string } | null>(null)
+
+  // Pre-warm platform connection AND claim warm environment on mount
+  useEffect(() => {
+    if (preWarmStartedRef.current) return
+    preWarmStartedRef.current = true
+
+    const preWarm = async () => {
+      try {
+        console.log('🔥 Pre-warming platform connection...')
+        const platform = platformRef.current
+        if (!platform) return
+
+        // Pre-authenticate with PureWeb (doesn't launch instance yet)
+        await platform.launchRequestAccess({ projectId, modelId })
+        const models = await platform.getModels()
+
+        if (models?.length) {
+          console.log('✅ Platform pre-warmed, models cached:', models.length)
+          setAvailableModels(models)
+        }
+
+        // Also pre-claim a warm environment from server pool
+        try {
+          console.log('🔥 Claiming warm environment from pool...')
+          const response = await fetch('/api/stream/warm-claim', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          })
+
+          if (response.ok) {
+            const data = await response.json()
+            warmEnvRef.current = {
+              environmentId: data.environmentId,
+              agentToken: data.agentToken,
+            }
+            console.log(`✅ Warm environment claimed (${data.source}): ${data.environmentId} in ${data.claimTimeMs}ms`)
+          }
+        } catch (err) {
+          console.log('⚠️ Warm pool claim failed (will use default flow):', err)
+        }
+      } catch (err) {
+        console.log('⚠️ Pre-warm failed (will retry on Start):', err)
+      }
+    }
+
+    preWarm()
+  }, [])
 
   // Platform state
   const [modelDefinition, setModelDefinition] = useState<ModelDefinition>(new UndefinedModelDefinition())
@@ -104,6 +186,16 @@ export default function StreamingApp() {
         throw new Error('Platform not initialized')
       }
 
+      // Skip if already pre-warmed (models already fetched)
+      if (availableModels?.length && attempt === 1) {
+        console.log('⚡ Using pre-warmed connection, skipping initialization')
+        if (platform.agent?.serviceCredentials?.iceServers) {
+          streamerOptions.iceServers = platform.agent.serviceCredentials.iceServers as RTCIceServer[]
+        }
+        setConnectionStatus('connecting')
+        return
+      }
+
       await platform.launchRequestAccess({
         projectId,
         modelId
@@ -138,7 +230,7 @@ export default function StreamingApp() {
         setShowErrorModal(true)
       }
     }
-  }, [])
+  }, [availableModels])
 
   // Only initialize platform when stream is started by user
   useEffect(() => {
@@ -156,6 +248,22 @@ export default function StreamingApp() {
   const handleStartStream = useCallback(() => {
     setShowStarterScreen(false)
     setStreamStarted(true)
+  }, [])
+
+  // Prefetch heavy components when user hovers on Start button
+  const prefetchedRef = useRef(false)
+  const handleStartHover = useCallback(() => {
+    if (prefetchedRef.current) return
+    prefetchedRef.current = true
+
+    console.log('🚀 Prefetching components on hover...')
+
+    // Prefetch dynamic imports
+    import('../components/ControlPanel')
+    import('../components/MessageLog')
+    import('../features/questions')
+    import('../features/training')
+    import('../features')
   }, [])
 
   // ==========================================================================
@@ -486,34 +594,38 @@ export default function StreamingApp() {
   }, [])
 
   // ==========================================================================
-  // Loading Status Message
+  // Loading Status Message & Step
   // ==========================================================================
 
-  const getLoadingStatusMessage = () => {
-    if (isRetrying) return 'Reconnecting to stream'
+  const getLoadingStatus = (): { message: string; step: LoadingStep } => {
+    if (isRetrying) {
+      return { message: 'Reconnecting to stream', step: 'connecting' }
+    }
 
     // Check streamer status first for more accurate messages
     if (streamerStatus === StreamerStatus.Connected) {
-      return 'Establishing video stream'
+      return { message: 'Establishing video stream', step: 'streaming' }
     }
 
     switch (connectionStatus) {
       case 'initializing':
-        return 'Initializing'
+        return { message: 'Initializing platform', step: 'initializing' }
       case 'connecting':
         if (availableModels) {
-          return 'Launching session'
+          return { message: 'Launching UE5 instance', step: 'launching' }
         }
-        return 'Connecting to server'
+        return { message: 'Connecting to server', step: 'connecting' }
       case 'retrying':
-        return 'Retrying connection'
+        return { message: 'Retrying connection', step: 'connecting' }
       default:
         if (loading) {
-          return 'Starting stream'
+          return { message: 'Starting stream', step: 'launching' }
         }
-        return 'Loading session'
+        return { message: 'Loading session', step: 'initializing' }
     }
   }
+
+  const loadingStatus = getLoadingStatus()
 
   // Show loading screen after user starts stream and until fully connected
   const showLoadingScreen = streamStarted && !isConnected && !showErrorModal
@@ -636,6 +748,7 @@ export default function StreamingApp() {
         title="Start exercise"
         subtitle="Click the button below to begin your training session"
         onStart={handleStartStream}
+        onHover={handleStartHover}
         buttonText="Start Session"
       />
 
@@ -644,7 +757,8 @@ export default function StreamingApp() {
         isOpen={showLoadingScreen}
         title="Please Wait!"
         subtitle="Session is loading"
-        statusMessage={getLoadingStatusMessage()}
+        statusMessage={loadingStatus.message}
+        currentStep={loadingStatus.step}
         retryCount={retryCount}
         maxRetries={MAX_RETRIES}
         showRetryInfo={retryCount > 0}

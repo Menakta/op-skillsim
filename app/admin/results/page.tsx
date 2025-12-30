@@ -211,14 +211,14 @@ export default function ResultsPage() {
       </Card>
 
       {/* Filters */}
-      <Card className="mb-6">
+      <Card className="mb-6 w-full lg:w-[49%]">
         <CardContent className="py-4">
-          <div className="flex flex-col lg:flex-row gap-4 justify-between">
+          <div className="flex flex-col gap-4 justify-between">
             <SearchInput
               value={searchQuery}
               onChange={setSearchQuery}
               placeholder="Search by student or course..."
-              className="w-full lg:w-80"
+              className="w-full lg:w-1/2"
             />
             <div className="flex flex-wrap gap-2">
               {/* Result Filter */}
