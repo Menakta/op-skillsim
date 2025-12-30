@@ -15,6 +15,7 @@ const nextConfig: NextConfig = {
       allowedOrigins: [
         'saltire.lti.app',
         'localhost:3000',
+        'localhost:3001',
         '*.ngrok-free.dev',
         '*.iqualify.com',
       ],

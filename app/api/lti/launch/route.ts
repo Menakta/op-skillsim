@@ -213,7 +213,9 @@ export async function POST(req: NextRequest) {
     const protocol = 'https'
     const absoluteRedirectUrl = new URL(redirectPath, `${protocol}://${host}`)
 
-    const response = NextResponse.redirect(absoluteRedirectUrl.toString(), 307)
+    // Use 303 (See Other) to force GET method on redirect
+    // 307 preserves POST method which causes 405 on Next.js pages
+    const response = NextResponse.redirect(absoluteRedirectUrl.toString(), 303)
 
     // Cookie options for iframe compatibility (iQualify)
     const cookieOptions = {
