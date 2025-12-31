@@ -434,17 +434,18 @@ export class SessionManager {
       institution?: string
     }
   ): Promise<string> {
-    // Build student JSONB data
+    // Build student JSONB data - use email prefix as fallback for name
+    const defaultName = studentDetails?.email?.split('@')[0] || 'Student'
     const student = studentDetails ? {
       user_id: studentDetails.userId,
       email: studentDetails.email,
-      full_name: studentDetails.fullName || 'Unknown Student',
+      full_name: studentDetails.fullName || defaultName,
       institution: studentDetails.institution || 'Unknown Institution',
       enrolled_at: new Date().toISOString(),
     } : {
       user_id: 'unknown',
       email: 'unknown@unknown.local',
-      full_name: 'Unknown Student',
+      full_name: 'Student',
       institution: 'Unknown Institution',
       enrolled_at: new Date().toISOString(),
     }

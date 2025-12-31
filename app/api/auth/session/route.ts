@@ -52,12 +52,16 @@ export async function GET(request: NextRequest) {
         .eq('session_id', session.sessionId)
         .single()
 
+      console.log('📋 [Session API] DB session lti_context:', dbSession?.lti_context)
+
       if (dbSession?.lti_context) {
         const ltiContext = typeof dbSession.lti_context === 'string'
           ? JSON.parse(dbSession.lti_context)
           : dbSession.lti_context
         returnUrl = ltiContext.returnUrl || null
         fullName = ltiContext.full_name || null
+
+        console.log('📋 [Session API] Parsed lti_context:', { returnUrl, fullName })
       }
     }
 

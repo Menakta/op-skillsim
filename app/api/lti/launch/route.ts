@@ -230,10 +230,17 @@ export async function POST(req: NextRequest) {
     // Student Flow: Create session with SessionManager
     // ==========================================================================
     if (appRole === 'student') {
+      // Build full name from available LTI params
+      const fullName = params.lis_person_name_full
+        || (params.lis_person_name_given && params.lis_person_name_family
+          ? `${params.lis_person_name_given} ${params.lis_person_name_family}`
+          : params.lis_person_name_given || params.lis_person_name_family)
+        || undefined // Let downstream handle default
+
       const ltiData = {
         userId: user.id,
         email: params.lis_person_contact_email_primary || `${user.id}@lti.local`,
-        fullName: params.lis_person_name_full,
+        fullName,
         courseId: params.context_id || '',
         courseName: params.context_title || 'Unknown Course',
         resourceId: params.resource_link_id,
@@ -278,10 +285,17 @@ export async function POST(req: NextRequest) {
     // Teacher/Admin Flow: Create session directly, redirect to admin
     // ==========================================================================
     else {
+      // Build full name from available LTI params
+      const fullName = params.lis_person_name_full
+        || (params.lis_person_name_given && params.lis_person_name_family
+          ? `${params.lis_person_name_given} ${params.lis_person_name_family}`
+          : params.lis_person_name_given || params.lis_person_name_family)
+        || undefined // Will use email prefix as fallback below
+
       const ltiData = {
         userId: user.id,
         email: params.lis_person_contact_email_primary || `${user.id}@lti.local`,
-        fullName: params.lis_person_name_full || 'Unknown User',
+        fullName: fullName || params.lis_person_contact_email_primary?.split('@')[0] || 'User',
         institution: params.tool_consumer_instance_name || 'Unknown Institution',
       }
 
