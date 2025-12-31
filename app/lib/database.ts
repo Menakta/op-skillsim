@@ -64,7 +64,7 @@ const externalUsers: Map<string, ExternalUser> = new Map([
   ['demo1@example.com', {
     id: 'ext-user-001',
     email: 'demo1@example.com',
-    name: 'Demo Student',
+    name: 'Demo User',
     role: 'student',
     provider: 'email',
     password_hash: 'Demo123!', // In production, use bcrypt
@@ -74,7 +74,7 @@ const externalUsers: Map<string, ExternalUser> = new Map([
   ['demo2@example.com', {
     id: 'ext-user-002',
     email: 'demo2@example.com',
-    name: 'Demo Teacher',
+    name: 'Teacher',
     role: 'teacher',
     provider: 'email',
     password_hash: 'Teacher123!', // In production, use bcrypt

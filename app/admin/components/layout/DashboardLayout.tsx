@@ -67,6 +67,16 @@ export function DashboardLayout({ children, title, subtitle }: DashboardLayoutPr
             isLti: data.session.isLti !== false, // Default to true for backward compatibility
           }
 
+          console.log('👤 User session details:', {
+            userId: userInfo.id,
+            email: userInfo.email,
+            name: userInfo.name,
+            role: userInfo.role,
+            isLti: userInfo.isLti,
+            sessionType: data.session.sessionType,
+            returnUrl: data.session.returnUrl || null,
+          })
+
           // Save to localStorage
           localStorage.setItem('user', JSON.stringify(userInfo))
           localStorage.setItem('userRole', role)

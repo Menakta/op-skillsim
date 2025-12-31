@@ -17,6 +17,7 @@ import { ProgressBar } from './components/ui/ProgressBar'
 import { EmptyState } from './components/ui/EmptyState'
 import { LoadingState } from './components/ui/LoadingState'
 import { Pagination } from './components/ui/Pagination'
+import { formatTimeAgo } from './utils'
 
 // =============================================================================
 // Constants
@@ -397,17 +398,3 @@ export default function TeacherDashboardPage() {
 }
 
 // Helper function to format timestamps
-function formatTimeAgo(timestamp: string): string {
-  const date = new Date(timestamp)
-  const now = new Date()
-  const diff = now.getTime() - date.getTime()
-
-  const minutes = Math.floor(diff / 60000)
-  const hours = Math.floor(diff / 3600000)
-  const days = Math.floor(diff / 86400000)
-
-  if (minutes < 1) return 'Just now'
-  if (minutes < 60) return `${minutes}m ago`
-  if (hours < 24) return `${hours}h ago`
-  return `${days}d ago`
-}
