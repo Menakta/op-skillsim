@@ -42,8 +42,9 @@ export async function GET(request: NextRequest) {
       role = 'admin'
     }
 
-    // Get return URL from database for LTI sessions
+    // Get return URL and user name from database for LTI sessions
     let returnUrl: string | null = null
+    let fullName: string | null = null
     if (session.sessionId) {
       const { data: dbSession } = await supabaseAdmin
         .from('user_sessions')
@@ -56,6 +57,7 @@ export async function GET(request: NextRequest) {
           ? JSON.parse(dbSession.lti_context)
           : dbSession.lti_context
         returnUrl = ltiContext.returnUrl || null
+        fullName = ltiContext.full_name || null
       }
     }
 
@@ -66,6 +68,7 @@ export async function GET(request: NextRequest) {
       session: {
         userId: session.userId,
         email: session.email,
+        fullName,
         role: role,
         sessionType: session.sessionType,
         sessionId: session.sessionId,

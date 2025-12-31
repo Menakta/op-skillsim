@@ -60,9 +60,9 @@ export function DashboardLayout({ children, title, subtitle }: DashboardLayoutPr
           const userInfo: UserInfo = {
             id: data.session.userId,
             email: data.session.email,
-            name: localStorage.getItem('user')
+            name: data.session.fullName || (localStorage.getItem('user')
               ? JSON.parse(localStorage.getItem('user')!).name
-              : 'User',
+              : 'User'),
             role: role,
             isLti: data.session.isLti !== false, // Default to true for backward compatibility
           }
