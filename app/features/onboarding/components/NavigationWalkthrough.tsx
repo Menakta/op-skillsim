@@ -55,6 +55,7 @@ export function NavigationWalkthrough({
                     alt="Choose"
                     width={60}
                     height={80}
+                    style={{ width: 'auto', height: 'auto' }}
                   />
                 </div>
                 <span className="text-gray-300 text-sm mt-2">Choose</span>
@@ -67,6 +68,7 @@ export function NavigationWalkthrough({
                     alt="Zoom In/Out"
                     width={70}
                     height={80}
+                    style={{ width: 'auto', height: 'auto' }}
                   />
                 </div>
                 <span className="text-gray-300 text-sm mt-2">Zoom In/Out</span>
@@ -79,6 +81,7 @@ export function NavigationWalkthrough({
                     alt="Rotate"
                     width={70}
                     height={80}
+                    style={{ width: 'auto', height: 'auto' }}
                   />
                 </div>
                 <span className="text-gray-300 text-sm mt-2">Rotate</span>
@@ -91,6 +94,7 @@ export function NavigationWalkthrough({
                     alt="Pan"
                     width={70}
                     height={80}
+                    style={{ width: 'auto', height: 'auto' }}
                   />
                 </div>
                 <span className="text-gray-300 text-sm mt-2">Pan</span>
@@ -110,6 +114,7 @@ export function NavigationWalkthrough({
                     alt="Choose"
                     width={50}
                     height={80}
+                    style={{ width: 'auto', height: 'auto' }}
                   />
                 </div>
                 <span className="text-gray-300 text-sm mt-2">Choose</span>
@@ -122,6 +127,7 @@ export function NavigationWalkthrough({
                     alt="Zoom In/Out"
                     width={50}
                     height={80}
+                    style={{ width: 'auto', height: 'auto' }}
                   />
                 </div>
                 <span className="text-gray-300 text-sm mt-2">Zoom In/Out</span>
@@ -136,6 +142,7 @@ export function NavigationWalkthrough({
                     alt="Rotate"
                     width={70}
                     height={80}
+                    style={{ width: 'auto', height: 'auto' }}
                   />
                 </div>
                 <span className="text-gray-300 text-sm mt-2">Rotate</span>
@@ -148,6 +155,7 @@ export function NavigationWalkthrough({
                     alt="Pan"
                     width={70}
                     height={80}
+                    style={{ width: 'auto', height: 'auto' }}
                   />
                 </div>
                 <span className="text-gray-300 text-sm mt-2">Pan</span>
@@ -160,6 +168,7 @@ export function NavigationWalkthrough({
                     alt="Pan with WASD"
                     width={80}
                     height={70}
+                    style={{ width: 'auto', height: 'auto' }}
                   />
                 </div>
                 <span className="text-gray-300 text-sm mt-2">Pan</span>

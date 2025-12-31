@@ -174,10 +174,12 @@ export async function POST(request: NextRequest) {
     }
 
     // 5. Calculate correct count and score from question data
-    const correctCount = Object.values(questionData).filter(q => q.correct).length
+    // Ensure correctCount doesn't exceed totalQuestions
+    const rawCorrectCount = Object.values(questionData).filter(q => q.correct).length
+    const correctCount = Math.min(rawCorrectCount, totalQuestions)
     const answeredCount = Object.keys(questionData).length
     const scorePercentage = finalScorePercentage ??
-      (totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0)
+      (totalQuestions > 0 ? Math.min(Math.round((correctCount / totalQuestions) * 100), 100) : 0)
 
     // 6. Check if a quiz response already exists for this session
     const { data: existingResponse, error: fetchError } = await supabase
@@ -196,9 +198,14 @@ export async function POST(request: NextRequest) {
       const existingQuestionData = existingResponse.question_data || {}
       const mergedQuestionData = { ...existingQuestionData, ...questionData }
 
-      const mergedCorrectCount = Object.values(mergedQuestionData as Record<string, { correct: boolean }>).filter((q) => q.correct).length
+      // Count correct answers from merged data (ensure we don't exceed totalQuestions)
+      const mergedCorrectCount = Math.min(
+        Object.values(mergedQuestionData as Record<string, { correct: boolean }>).filter((q) => q.correct).length,
+        totalQuestions
+      )
+      // Cap score at 100%
       const mergedScorePercentage = totalQuestions > 0
-        ? Math.round((mergedCorrectCount / totalQuestions) * 100)
+        ? Math.min(Math.round((mergedCorrectCount / totalQuestions) * 100), 100)
         : 0
 
       logger.info({

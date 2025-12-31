@@ -15,12 +15,10 @@ import {
   Users,
   ClipboardList,
   BarChart3,
-  Settings,
   Play,
   LogOut,
   X,
   Wrench,
-  UserCog,
 } from 'lucide-react'
 
 interface NavItem {
@@ -31,11 +29,10 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
-  { label: 'Students', href: '/admin/students', icon: Users },
+  { label: 'Sessions', href: '/admin/sessions', icon: Users },
   { label: 'Questionnaires', href: '/admin/questionnaires', icon: ClipboardList },
   { label: 'Fittings', href: '/admin/fittings', icon: Wrench },
   { label: 'Results', href: '/admin/results', icon: BarChart3 },
-  { label: 'Users', href: '/admin/users', icon: UserCog },
 ]
 
 const SECONDARY_ITEMS: NavItem[] = [

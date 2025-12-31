@@ -99,6 +99,7 @@ export function ToolBar({ state, onSelectTool }: ToolBarProps) {
                   width={30}
                   height={30}
                   className="transition-transform duration-200"
+                  style={{ width: 'auto', height: 'auto' }}
                 />
               </button>
 

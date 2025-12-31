@@ -9,3 +9,6 @@ export * from './layout'
 
 // UI components
 export * from './ui'
+
+// Modal components
+export * from './modals'

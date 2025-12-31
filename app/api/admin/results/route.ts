@@ -137,7 +137,7 @@ export async function GET(request: NextRequest) {
       }
 
       // Convert question_data to array format
-      const questions: QuestionDetail[] = Object.entries(questionData).map(([questionId, data]) => ({
+      const allQuestions: QuestionDetail[] = Object.entries(questionData).map(([questionId, data]) => ({
         questionId,
         answer: data.answer,
         correct: data.correct,
@@ -149,10 +149,20 @@ export async function GET(request: NextRequest) {
       const sessionInfo = sessionMap.get(quiz.session_id)
 
       // Calculate totals from question_data if not in quiz record
-      const totalQuestions = quiz.total_questions || questions.length
-      const correctCount = quiz.correct_count ?? questions.filter(q => q.correct).length
-      const scorePercentage = parseFloat(quiz.score_percentage) ||
+      const totalQuestions = quiz.total_questions || allQuestions.length
+
+      // Limit questions to totalQuestions (in case of corrupted data with extra entries)
+      // Sort by questionId to ensure consistent ordering (Q1, Q2, Q3, etc.)
+      const questions = allQuestions
+        .sort((a, b) => a.questionId.localeCompare(b.questionId))
+        .slice(0, totalQuestions)
+      // Ensure correctCount doesn't exceed totalQuestions (prevents >100% scores)
+      const rawCorrectCount = quiz.correct_count ?? questions.filter(q => q.correct).length
+      const correctCount = Math.min(rawCorrectCount, totalQuestions)
+      // Cap scorePercentage at 100%
+      const rawScorePercentage = parseFloat(quiz.score_percentage) ||
         (totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0)
+      const scorePercentage = Math.min(rawScorePercentage, 100)
 
       // Determine if passed (75% threshold)
       const passed = scorePercentage >= 75

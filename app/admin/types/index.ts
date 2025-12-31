@@ -129,3 +129,120 @@ export interface NavItem {
   icon: React.ComponentType<{ className?: string }>
   badge?: number
 }
+
+// =============================================================================
+// Quiz Result Types (for Results page)
+// =============================================================================
+
+export interface QuestionDetail {
+  questionId: string
+  answer: string
+  correct: boolean
+  attempts: number
+  time: number
+}
+
+export interface QuizResult {
+  id: string
+  sessionId: string
+  studentName: string
+  studentEmail: string
+  courseName: string
+  courseId: string
+  totalQuestions: number
+  correctCount: number
+  scorePercentage: number
+  passed: boolean
+  status: string
+  currentPhase: string
+  timeSpent: number
+  answeredAt: string
+  startedAt: string
+  questions: QuestionDetail[]
+}
+
+export interface ResultsStats {
+  totalResults: number
+  passedCount: number
+  failedCount: number
+  avgScore: number
+  passRate: number
+}
+
+// =============================================================================
+// Session Types (for Sessions page)
+// =============================================================================
+
+export interface SessionStudent {
+  id: string
+  sessionId: string
+  name: string
+  email: string
+  institution: string
+  courseName: string
+  courseId: string
+  enrolledDate: string
+  lastActive: string
+  progress: number
+  status: string
+  totalScore: number
+  phasesCompleted: number
+  timeSpent: number
+  ipAddress: string | null
+  userAgent: string | null
+  loginCount: number
+}
+
+export interface SessionTeacher {
+  id: string
+  sessionId: string
+  email: string
+  createdAt: string
+  lastActivity: string
+  status: string
+  ipAddress: string | null
+  userAgent: string | null
+  loginCount: number
+}
+
+export interface SessionAdmin {
+  id: string
+  sessionId: string
+  email: string
+  createdAt: string
+  lastActivity: string
+  status: string
+  ipAddress: string | null
+  userAgent: string | null
+  loginCount: number
+}
+
+export interface SessionsStats {
+  students: {
+    total: number
+    active: number
+    completed: number
+    avgProgress: number
+  }
+  teachers: {
+    total: number
+    active: number
+  }
+  admins: {
+    total: number
+    active: number
+  }
+}
+
+// =============================================================================
+// Common Filter Types
+// =============================================================================
+
+export interface Course {
+  id: string
+  title: string
+}
+
+export type StatusFilter = 'all' | 'active' | 'paused' | 'completed'
+export type ResultFilter = 'all' | 'passed' | 'failed'
+export type SessionTabType = 'students' | 'teachers' | 'admins'

@@ -6,6 +6,7 @@ import { StoreProvider } from "./store/StoreProvider";
 import { SessionProvider } from "./hooks";
 import { AppErrorBoundary } from "./components/errors";
 import { QuestionsProvider } from "./features/questions";
+import { QueryProvider } from "./providers";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,17 +33,19 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <StoreProvider>
-          <SessionProvider>
-            <ThemeProvider>
-              <QuestionsProvider>
-                <AppErrorBoundary>
-                  {children}
-                </AppErrorBoundary>
-              </QuestionsProvider>
-            </ThemeProvider>
-          </SessionProvider>
-        </StoreProvider>
+        <QueryProvider>
+          <StoreProvider>
+            <SessionProvider>
+              <ThemeProvider>
+                <QuestionsProvider>
+                  <AppErrorBoundary>
+                    {children}
+                  </AppErrorBoundary>
+                </QuestionsProvider>
+              </ThemeProvider>
+            </SessionProvider>
+          </StoreProvider>
+        </QueryProvider>
       </body>
     </html>
   );

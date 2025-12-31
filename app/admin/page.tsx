@@ -288,7 +288,7 @@ export default function TeacherDashboardPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Student Progress Overview</CardTitle>
-            <a href="/admin/students" className="text-sm theme-text-brand hover:opacity-80">
+            <a href="/admin/sessions" className="text-sm theme-text-brand hover:opacity-80">
               View all →
             </a>
           </div>

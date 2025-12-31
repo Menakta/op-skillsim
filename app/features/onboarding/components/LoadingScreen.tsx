@@ -69,6 +69,8 @@ export function LoadingScreen({
               width={80}
               height={80}
               className="animate-spin-slow"
+              style={{ width: 'auto', height: 'auto' }}
+              priority
             />
           </div>
 
