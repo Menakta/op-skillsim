@@ -45,6 +45,7 @@ interface SidebarProps {
   userRole?: string
   isOpen?: boolean
   onClose?: () => void
+  isLti?: boolean // Hide logout for LTI users (they should return via LMS)
 }
 
 export function Sidebar({
@@ -53,6 +54,7 @@ export function Sidebar({
   userRole = 'Instructor',
   isOpen = false,
   onClose,
+  isLti = true,
 }: SidebarProps) {
   const pathname = usePathname()
 
@@ -159,13 +161,16 @@ export function Sidebar({
           )
         })}
 
-        <button
-          onClick={onLogout}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all theme-text-tertiary hover:text-red-400 hover:bg-red-400/10"
-        >
-          <LogOut className="w-5 h-5 flex-shrink-0" />
-          <span className="font-medium">Logout</span>
-        </button>
+        {/* Only show logout button for non-LTI users (test users from login page) */}
+        {!isLti && (
+          <button
+            onClick={onLogout}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all theme-text-tertiary hover:text-red-400 hover:bg-red-400/10"
+          >
+            <LogOut className="w-5 h-5 flex-shrink-0" />
+            <span className="font-medium">Logout</span>
+          </button>
+        )}
       </div>
 
       {/* User Profile Section */}

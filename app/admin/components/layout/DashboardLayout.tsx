@@ -23,6 +23,7 @@ interface UserInfo {
   email: string
   name: string
   role: 'teacher' | 'admin'
+  isLti: boolean
 }
 
 export function DashboardLayout({ children, title, subtitle }: DashboardLayoutProps) {
@@ -63,6 +64,7 @@ export function DashboardLayout({ children, title, subtitle }: DashboardLayoutPr
               ? JSON.parse(localStorage.getItem('user')!).name
               : 'User',
             role: role,
+            isLti: data.session.isLti !== false, // Default to true for backward compatibility
           }
 
           // Save to localStorage
@@ -126,6 +128,7 @@ export function DashboardLayout({ children, title, subtitle }: DashboardLayoutPr
         userRole={displayRole}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        isLti={user?.isLti ?? true}
       />
 
       {/* Main Content */}
