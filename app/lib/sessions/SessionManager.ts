@@ -90,6 +90,7 @@ export class SessionManager {
       resourceId: ltiData.resourceId,
       institution: ltiData.institution,
       returnUrl: ltiData.returnUrl,
+      full_name: ltiData.fullName,
     }
 
     // Store session in database
@@ -132,14 +133,15 @@ export class SessionManager {
   }
 
   /**
-   * Create a teacher session from Supabase login
+   * Create a teacher session from Supabase login or LTI
    */
   async createTeacherSession(
     userId: string,
     email: string,
     fullName?: string,
     permissions?: TeacherPermissions,
-    requestInfo?: { ipAddress?: string; userAgent?: string }
+    requestInfo?: { ipAddress?: string; userAgent?: string },
+    ltiData?: { returnUrl?: string; institution?: string }
   ): Promise<{ sessionId: string; token: string }> {
     const sessionId = this.generateSessionId()
     const now = new Date()
@@ -168,6 +170,16 @@ export class SessionManager {
       // Ignore errors, use default login count
     }
 
+    // Build LTI context for teacher sessions (stores full_name and returnUrl)
+    const ltiContext: LtiContext = {
+      courseId: '',
+      courseName: '',
+      resourceId: '',
+      institution: ltiData?.institution || '',
+      returnUrl: ltiData?.returnUrl,
+      full_name: fullName,
+    }
+
     // Store session in database
     try {
       const sessionData: DbSessionInsert = {
@@ -176,6 +188,7 @@ export class SessionManager {
         session_type: 'teacher',
         email: email,
         role: 'teacher',
+        lti_context: ltiContext,
         expires_at: expiresAt.toISOString(),
         status: 'active',
         ip_address: requestInfo?.ipAddress,
@@ -215,14 +228,15 @@ export class SessionManager {
   }
 
   /**
-   * Create an admin session from Supabase login
+   * Create an admin session from Supabase login or LTI
    */
   async createAdminSession(
     userId: string,
     email: string,
     fullName?: string,
     permissions?: AdminPermissions,
-    requestInfo?: { ipAddress?: string; userAgent?: string }
+    requestInfo?: { ipAddress?: string; userAgent?: string },
+    ltiData?: { returnUrl?: string; institution?: string }
   ): Promise<{ sessionId: string; token: string }> {
     const sessionId = this.generateSessionId()
     const now = new Date()
@@ -253,6 +267,16 @@ export class SessionManager {
       // Ignore errors, use default login count
     }
 
+    // Build LTI context for admin sessions (stores full_name and returnUrl)
+    const ltiContext: LtiContext = {
+      courseId: '',
+      courseName: '',
+      resourceId: '',
+      institution: ltiData?.institution || '',
+      returnUrl: ltiData?.returnUrl,
+      full_name: fullName,
+    }
+
     // Store session in database
     try {
       const sessionData: DbSessionInsert = {
@@ -261,6 +285,7 @@ export class SessionManager {
         session_type: 'teacher' , // Admin uses 'teacher' session_type in DB schema
         email: email,
         role: 'admin',
+        lti_context: ltiContext,
         expires_at: expiresAt.toISOString(),
         status: 'active',
         ip_address: requestInfo?.ipAddress,

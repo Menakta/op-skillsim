@@ -376,13 +376,20 @@ export async function POST(req: NextRequest) {
       // Create session based on role
       let sessionResult: { sessionId: string; token: string }
 
+      // LTI data for session (returnUrl and institution)
+      const sessionLtiData = {
+        returnUrl: params.launch_presentation_return_url,
+        institution: ltiData.institution,
+      }
+
       if (appRole === 'admin') {
         sessionResult = await sessionManager.createAdminSession(
           ltiData.userId,
           ltiData.email,
           ltiData.fullName,
           adminPermissions,
-          requestInfo
+          requestInfo,
+          sessionLtiData
         )
       } else {
         sessionResult = await sessionManager.createTeacherSession(
@@ -390,7 +397,8 @@ export async function POST(req: NextRequest) {
           ltiData.email,
           ltiData.fullName,
           teacherPermissions,
-          requestInfo
+          requestInfo,
+          sessionLtiData
         )
       }
 

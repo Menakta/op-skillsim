@@ -25,6 +25,7 @@ export interface LtiContext {
   resourceId: string
   institution: string
   returnUrl?: string
+  full_name?: string
 }
 
 // =============================================================================
