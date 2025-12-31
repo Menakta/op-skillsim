@@ -85,6 +85,27 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    // Skip save for admin/teacher roles (they are just testing)
+    if (session.role === 'admin' || session.role === 'teacher') {
+      logger.info({ sessionId: session.sessionId, role: session.role }, 'Test mode: Returning mock training session for admin/teacher')
+      return NextResponse.json({
+        success: true,
+        session: {
+          id: `test_${session.sessionId}`,
+          session_id: session.sessionId,
+          course_id: 'test',
+          course_name: 'Test Training',
+          current_training_phase: 'Phase A',
+          overall_progress: 0,
+          status: 'active',
+          phases_completed: 0,
+          total_score: 0,
+        },
+        isNew: true,
+        testMode: true,
+      })
+    }
+
     const body = await request.json().catch(() => ({}))
     const { courseId, courseName } = body
 

@@ -196,6 +196,7 @@ export default function StreamingApp() {
   const [sessionReturnUrl, setSessionReturnUrl] = useState<string | null>(null)
   const [isLtiSession, setIsLtiSession] = useState(true) // Default to true for backward compatibility
   const [showSessionExpiryModal, setShowSessionExpiryModal] = useState(false)
+  const [userRole, setUserRole] = useState<'student' | 'teacher' | 'admin'>('student')
 
   // ==========================================================================
   // Check session info and track expiry on mount
@@ -213,6 +214,11 @@ export default function StreamingApp() {
             setIsLtiSession(isLti)
             setIsTestUser(!isLti)
 
+            // Store user role
+            if (data.session.role) {
+              setUserRole(data.session.role)
+            }
+
             // Store session expiry info
             if (data.session.expiresAt) {
               setSessionExpiresAt(data.session.expiresAt)
@@ -223,6 +229,7 @@ export default function StreamingApp() {
 
             console.log('📋 Session info:', {
               isLti,
+              role: data.session.role,
               expiresAt: data.session.expiresAt ? new Date(data.session.expiresAt).toISOString() : null,
               returnUrl: data.session.returnUrl
             })
@@ -566,10 +573,18 @@ export default function StreamingApp() {
   }, [streamerStatus])
 
   // ==========================================================================
-  // Submit Quiz Results when training completes
+  // Submit Quiz Results when training completes (students only)
   // ==========================================================================
 
   useEffect(() => {
+    // Skip saving progress for admin/teacher - they are just testing
+    if (userRole !== 'student') {
+      if (showCompletionPopup) {
+        console.log('📝 [StreamingApp] Skipping progress save for', userRole, '(test mode)')
+      }
+      return
+    }
+
     console.log('📝 [StreamingApp] Quiz submit effect triggered:', {
       showCompletionPopup,
       quizAnswersLength: training.quizAnswers.length,
@@ -612,7 +627,7 @@ export default function StreamingApp() {
         })
       })
     }
-  }, [showCompletionPopup, training.quizAnswers.length, questionCount, training, sessionStartTime])
+  }, [showCompletionPopup, training.quizAnswers.length, questionCount, training, sessionStartTime, userRole])
 
   // ==========================================================================
   // Question Handlers

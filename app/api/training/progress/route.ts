@@ -73,6 +73,17 @@ export async function PATCH(request: NextRequest) {
       })
     }
 
+    // Skip save for admin/teacher roles (they are just testing)
+    if (session.role === 'admin' || session.role === 'teacher') {
+      logger.info({ sessionId: session.sessionId, role: session.role, phase, progress }, 'Test mode: Skipping progress update for admin/teacher')
+      return NextResponse.json({
+        success: true,
+        phase: phase || 'Phase A',
+        progress: progress || 0,
+        testMode: true,
+      })
+    }
+
     const supabase = getSupabaseAdmin()
 
     // Get current active session

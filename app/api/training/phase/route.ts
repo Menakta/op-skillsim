@@ -88,6 +88,25 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    // Skip save for admin/teacher roles (they are just testing)
+    if (session.role === 'admin' || session.role === 'teacher') {
+      const phaseOrder = ['Phase A', 'Phase B', 'Phase C', 'Phase D']
+      const currentPhaseIndex = phaseOrder.indexOf(phase)
+      const nextPhase = currentPhaseIndex < phaseOrder.length - 1
+        ? phaseOrder[currentPhaseIndex + 1]
+        : phase
+
+      logger.info({ sessionId: session.sessionId, role: session.role, phase }, 'Test mode: Skipping phase completion save for admin/teacher')
+      return NextResponse.json({
+        success: true,
+        phasesCompleted: currentPhaseIndex + 1,
+        totalScore: score || 0,
+        nextPhase,
+        overallProgress: Math.min(((currentPhaseIndex + 1) / phaseOrder.length) * 100, 100),
+        testMode: true,
+      })
+    }
+
     const supabase = getSupabaseAdmin()
 
     // Get current active session

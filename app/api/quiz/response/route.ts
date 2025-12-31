@@ -122,11 +122,22 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // 3. Parse request body
+    // 3. Skip save for admin/teacher roles (they are just testing)
+    if (session.role === 'admin' || session.role === 'teacher') {
+      logger.info({ sessionId: session.sessionId, role: session.role }, 'Test mode: Skipping quiz response save for admin/teacher')
+      return NextResponse.json({
+        success: true,
+        response: null,
+        testMode: true,
+        message: `Test mode: Quiz response not saved for ${session.role}`,
+      })
+    }
+
+    // 4. Parse request body
     const body = await request.json()
     const { questionData, totalQuestions, finalScorePercentage } = body
 
-    // 4. Validate required fields
+    // 5. Validate required fields
     if (!questionData || totalQuestions === undefined) {
       return NextResponse.json(
         { success: false, error: 'Missing required fields: questionData, totalQuestions' },

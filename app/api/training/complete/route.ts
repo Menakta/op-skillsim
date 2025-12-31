@@ -70,6 +70,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Skip saving for admin/teacher roles (they are just testing)
+    if (session.role === 'admin' || session.role === 'teacher') {
+      logger.info({ sessionId: session.sessionId, role: session.role }, 'Test mode: Skipping training completion save for admin/teacher')
+      return NextResponse.json({
+        success: true,
+        session: null,
+        testMode: true,
+        message: `Test mode: Training completion not saved for ${session.role}`,
+      })
+    }
+
     const body: CompleteTrainingBody = await request.json()
     const { finalResults, totalTimeMs, phasesCompleted, quizData, totalQuestions } = body
 
