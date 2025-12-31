@@ -246,3 +246,58 @@ export interface Course {
 export type StatusFilter = 'all' | 'active' | 'paused' | 'completed'
 export type ResultFilter = 'all' | 'passed' | 'failed'
 export type SessionTabType = 'students' | 'teachers' | 'admins'
+
+// =============================================================================
+// Questionnaire Database Types
+// =============================================================================
+
+export interface QuestionFromDB {
+  id: number
+  question_id: string
+  phase: string
+  question_text: string
+  option_a: string
+  option_b: string
+  option_c: string
+  option_d: string
+  correct_answer: 'A' | 'B' | 'C' | 'D'
+  nzs3500_reference: string | null
+  updated_at?: string
+}
+
+// =============================================================================
+// UI Component Props Types
+// =============================================================================
+
+export interface Column<T> {
+  key: string
+  header: string
+  className?: string
+  headerClassName?: string
+  render: (item: T) => React.ReactNode
+}
+
+export type BadgeVariant = 'default' | 'success' | 'warning' | 'danger' | 'info' | 'purple'
+
+// =============================================================================
+// Fittings Types
+// =============================================================================
+
+export interface Fitting {
+  id: string
+  name: string
+  description: string | null
+  category: string
+  icon_url: string | null
+  is_active: boolean
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface FittingsStats {
+  total: number
+  active: number
+  inactive: number
+  categories: number
+}

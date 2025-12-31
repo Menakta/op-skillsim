@@ -7,24 +7,11 @@
 import { useState, useEffect } from 'react'
 import { Edit, Save, X } from 'lucide-react'
 import { Badge } from './Badge'
+import type { QuestionFromDB } from '../../types'
 
 // =============================================================================
 // Types
 // =============================================================================
-
-export interface QuestionFromDB {
-  id: number
-  question_id: string
-  phase: string
-  question_text: string
-  option_a: string
-  option_b: string
-  option_c: string
-  option_d: string
-  correct_answer: 'A' | 'B' | 'C' | 'D'
-  nzs3500_reference: string | null
-  updated_at?: string
-}
 
 interface QuestionCardProps {
   question: QuestionFromDB

@@ -9,18 +9,11 @@ import { Card, CardHeader, CardTitle, CardContent } from './Card'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from './Table'
 import { EmptyState } from './EmptyState'
 import { Pagination } from './Pagination'
+import type { Column } from '../../types'
 
 // =============================================================================
 // Types
 // =============================================================================
-
-export interface Column<T> {
-  key: string
-  header: string
-  className?: string
-  headerClassName?: string
-  render: (item: T) => React.ReactNode
-}
 
 interface DataTableProps<T> {
   title: string

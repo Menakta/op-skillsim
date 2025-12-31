@@ -64,6 +64,9 @@ export default function LoginPage() {
         localStorage.setItem('isLti', 'false')
       }
 
+      // Small delay to ensure cookie is set before redirect
+      await new Promise(resolve => setTimeout(resolve, 100))
+
       // Redirect based on role or to the requested path
       if (redirectPath) {
         // If there's a redirect path, go there (unless it's /admin for students)
@@ -74,11 +77,10 @@ export default function LoginPage() {
         }
       } else if (data.user.role === 'student') {
         window.location.href = '/'
-      }
-      else if (data.user.role === 'teacher') {
+      } else if (data.user.role === 'teacher' || data.user.role === 'admin') {
         window.location.href = '/admin'
       } else {
-        window.location.href = '/admin'
+        window.location.href = '/'
       }
     } catch (err) {
       setError('Network error. Please try again.')

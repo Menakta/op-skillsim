@@ -17,3 +17,6 @@ export * from './DataTable'
 export * from './TabButton'
 export * from './FilterButton'
 export * from './QuestionCard'
+
+// Re-export types from centralized types
+export type { Column, QuestionFromDB, BadgeVariant } from '../../types'

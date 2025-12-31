@@ -8,8 +8,7 @@
  */
 
 import { ReactNode } from 'react'
-
-type BadgeVariant = 'default' | 'success' | 'warning' | 'danger' | 'info' | 'purple'
+import type { BadgeVariant } from '../../types'
 
 interface BadgeProps {
   children: ReactNode

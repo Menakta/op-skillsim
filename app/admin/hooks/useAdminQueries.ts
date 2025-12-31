@@ -13,8 +13,8 @@ import type {
   SessionAdmin,
   SessionsStats,
   Course,
+  QuestionFromDB,
 } from '../types'
-import type { QuestionFromDB } from '../components'
 
 // =============================================================================
 // Query Keys

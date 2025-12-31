@@ -40,13 +40,13 @@ const ICON_BG_CLASSES = {
 
 export function StatCard({ label, value, icon, trend, color = 'default' }: StatCardProps) {
   return (
-    <div className="bg-[#39BEAE] rounded-xl p-6">
+    <div className="bg-[#39BEAE] rounded-xl p-3 sm:p-6 ">
       <div className="flex items-start justify-between">
         <div>
           <div className={`text-3xl font-bold mb-1 text-white`}>
             {value}
           </div>
-          <div className="text-sm theme-text-secondary">{label}</div>
+          <div className="text-xs md:text-sm theme-text-secondary mt-2">{label}</div>
           {trend && (
             <div className={`text-xs mt-2 flex items-center gap-1 ${trend.isPositive ? 'text-gray-700' : 'text-red-900'}`}>
               {trend.isPositive ? (

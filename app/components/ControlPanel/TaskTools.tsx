@@ -39,8 +39,8 @@ export function TaskTools({
   // Show loading state for pipe selection
   if (showPipeSelection && fittingsLoading) {
     return (
-      <div className="fixed left-5 top-1/2 -translate-y-1/2 flex flex-col gap-2" style={{ zIndex: 2147483647 }}>
-        <span className="text-white">Materials</span>
+      <div className="fixed left-[70px] top-1/2 -translate-y-1/2 flex flex-col gap-2" style={{ zIndex: 50 }}>
+        <span className="text-white text-sm font-medium">Materials</span>
         <div className="w-12 h-12 rounded-xl bg-gray-700/80 flex items-center justify-center">
           <span className="text-white text-xs">...</span>
         </div>
@@ -49,7 +49,7 @@ export function TaskTools({
   }
 
   return (
-    <div className="fixed left-5 top-1/2 -translate-y-1/2 flex flex-col gap-2" style={{ zIndex: 2147483647 }}>
+    <div className="fixed left-[70px] top-1/2 -translate-y-1/2 flex flex-col gap-2" style={{ zIndex: 50 }}>
       <span className='text-white'>Materials</span>
       {/* Pipe Selection Icons - Only when PipeConnection tool is selected */}
       {showPipeSelection && (

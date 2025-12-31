@@ -33,10 +33,6 @@ const QuestionModal = dynamic(
   { ssr: false, loading: () => null }
 )
 
-const CompletionPopup = dynamic(
-  () => import('../features/training').then(mod => ({ default: mod.CompletionPopup })),
-  { ssr: false, loading: () => null }
-)
 
 const NavigationWalkthrough = dynamic(
   () => import('../features').then(mod => ({ default: mod.NavigationWalkthrough })),
@@ -55,6 +51,16 @@ const ErrorModal = dynamic(
 
 const SessionModal = dynamic(
   () => import('../features').then(mod => ({ default: mod.SessionModal })),
+  { ssr: false, loading: () => null }
+)
+
+const TrainingCompleteModal = dynamic(
+  () => import('../features').then(mod => ({ default: mod.TrainingCompleteModal })),
+  { ssr: false, loading: () => null }
+)
+
+const SessionExpiryModal = dynamic(
+  () => import('../features').then(mod => ({ default: mod.SessionExpiryModal })),
   { ssr: false, loading: () => null }
 )
 
@@ -185,8 +191,14 @@ export default function StreamingApp() {
   const wasConnectedRef = useRef(false) // Track if we were ever connected
   const [isTestUser, setIsTestUser] = useState(false) // Track if user is a test user (non-LTI)
 
+  // Session tracking state
+  const [sessionExpiresAt, setSessionExpiresAt] = useState<number | null>(null)
+  const [sessionReturnUrl, setSessionReturnUrl] = useState<string | null>(null)
+  const [isLtiSession, setIsLtiSession] = useState(true) // Default to true for backward compatibility
+  const [showSessionExpiryModal, setShowSessionExpiryModal] = useState(false)
+
   // ==========================================================================
-  // Check if user is a test user (non-LTI) on mount
+  // Check session info and track expiry on mount
   // ==========================================================================
 
   useEffect(() => {
@@ -195,9 +207,25 @@ export default function StreamingApp() {
         const response = await fetch('/api/auth/session')
         if (response.ok) {
           const data = await response.json()
-          // Test user = isLti is false (coming from direct login, not LTI)
-          if (data.session && data.session.isLti === false) {
-            setIsTestUser(true)
+          if (data.session) {
+            // Test user = isLti is false (coming from direct login, not LTI)
+            const isLti = data.session.isLti !== false
+            setIsLtiSession(isLti)
+            setIsTestUser(!isLti)
+
+            // Store session expiry info
+            if (data.session.expiresAt) {
+              setSessionExpiresAt(data.session.expiresAt)
+            }
+            if (data.session.returnUrl) {
+              setSessionReturnUrl(data.session.returnUrl)
+            }
+
+            console.log('📋 Session info:', {
+              isLti,
+              expiresAt: data.session.expiresAt ? new Date(data.session.expiresAt).toISOString() : null,
+              returnUrl: data.session.returnUrl
+            })
           }
         }
       } catch (err) {
@@ -206,6 +234,37 @@ export default function StreamingApp() {
     }
     checkSession()
   }, [])
+
+  // ==========================================================================
+  // Track session expiry and show warning modal
+  // ==========================================================================
+
+  useEffect(() => {
+    if (!sessionExpiresAt) return
+
+    const SESSION_WARNING_THRESHOLD = 5 * 60 * 1000 // 5 minutes in milliseconds
+
+    const checkExpiry = () => {
+      const now = Date.now()
+      const timeRemaining = sessionExpiresAt - now
+
+      // Show warning modal when 5 minutes or less remain
+      if (timeRemaining <= SESSION_WARNING_THRESHOLD && timeRemaining > 0) {
+        if (!showSessionExpiryModal) {
+          console.log('⏰ Session expiring soon, showing warning modal')
+          setShowSessionExpiryModal(true)
+        }
+      }
+    }
+
+    // Check immediately
+    checkExpiry()
+
+    // Check every 30 seconds
+    const interval = setInterval(checkExpiry, 30000)
+
+    return () => clearInterval(interval)
+  }, [sessionExpiresAt, showSessionExpiryModal])
 
   // ==========================================================================
   // Platform Initialization with Retry Logic
@@ -603,39 +662,6 @@ export default function StreamingApp() {
   }, [completedPhase, training])
 
   // ==========================================================================
-  // Training Complete Handler - Reset to Starter Screen
-  // ==========================================================================
-
-  const handleTrainingCompleteReset = useCallback(() => {
-    setShowCompletionPopup(false)
-    training.resetTraining()
-
-    // Reset to starter screen
-    setShowNavigationWalkthrough(false)
-    setShowStarterScreen(true)
-    setStreamStarted(false)
-
-    // Reset connection state
-    setAvailableModels(undefined)
-    setModelDefinition(new UndefinedModelDefinition())
-    setLoading(false)
-    setConnectionStatus('initializing')
-    setRetryCount(0)
-    setInitError(null)
-
-    // Disconnect platform
-    try {
-      platformRef.current?.disconnect()
-    } catch (e) {
-      console.log('Disconnect error (ignored):', e)
-    }
-
-    // Reinitialize platform for next session
-    platformRef.current = new PlatformNext()
-    platformRef.current.initialize({ endpoint: 'https://api.pureweb.io' })
-  }, [training])
-
-  // ==========================================================================
   // Derived State
   // ==========================================================================
 
@@ -678,6 +704,24 @@ export default function StreamingApp() {
       setShowSessionEndModal(false)
     }
   }, [isTestUser])
+
+  // ==========================================================================
+  // Session Expiry Handler - Called when session expires from countdown modal
+  // ==========================================================================
+
+  const handleSessionExpiry = useCallback(() => {
+    setShowSessionExpiryModal(false)
+    // The modal itself handles redirection based on isLti and returnUrl
+  }, [])
+
+  // ==========================================================================
+  // Training Complete Handler - Close modal and redirect appropriately
+  // ==========================================================================
+
+  const handleTrainingCompleteClose = useCallback(() => {
+    setShowCompletionPopup(false)
+    // TrainingCompleteModal handles redirect based on isLti and returnUrl
+  }, [])
 
   // ==========================================================================
   // Loading Status Message & Step
@@ -795,13 +839,14 @@ export default function StreamingApp() {
         onClose={handleCloseQuestion}
       />
 
-      {/* Completion Popup - New Component */}
-      <CompletionPopup
-        isVisible={showCompletionPopup}
+      {/* Training Complete Modal - Shows when all phases are completed */}
+      <TrainingCompleteModal
+        isOpen={showCompletionPopup}
         totalTasks={training.state.totalTasks}
         progress={training.state.progress}
-        onReset={handleTrainingCompleteReset}
-        onClose={handleTrainingCompleteReset}
+        isLti={isLtiSession}
+        returnUrl={sessionReturnUrl}
+        onClose={handleTrainingCompleteClose}
       />
 
       {/* Phase Success Modal */}
@@ -864,6 +909,15 @@ export default function StreamingApp() {
         reason={sessionEndReason}
         onLogin={handleSessionEndLogin}
         loginButtonText={isTestUser ? "Back to Login" : "Close"}
+      />
+
+      {/* Session Expiry Modal - Shows countdown when session is about to expire */}
+      <SessionExpiryModal
+        isOpen={showSessionExpiryModal}
+        expiresAt={sessionExpiresAt || Date.now()}
+        isLti={isLtiSession}
+        returnUrl={sessionReturnUrl}
+        onSessionEnd={handleSessionExpiry}
       />
 
       {/* Video Styles */}

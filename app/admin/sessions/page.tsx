@@ -316,7 +316,7 @@ export default function SessionsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-6">
+      <div className="flex flex-wrap gap-4 mb-6">
         <TabButton
           active={activeTab === 'students'}
           onClick={() => setActiveTab('students')}
