@@ -434,12 +434,17 @@ export class SessionManager {
       institution?: string
     }
   ): Promise<string> {
-    // Build student JSONB data - use email prefix as fallback for name
-    const defaultName = studentDetails?.email?.split('@')[0] || 'Student'
+    // Build student JSONB data
+    // Don't use email prefix as name if it's a fake LTI email (lti-* or contains user id)
+    const email = studentDetails?.email || ''
+    const isFakeLtiEmail = email.startsWith('lti-') || email.endsWith('@lti.local')
+    const emailPrefix = !isFakeLtiEmail ? email.split('@')[0] : undefined
+    const defaultName = studentDetails?.fullName || emailPrefix || 'Student'
+
     const student = studentDetails ? {
       user_id: studentDetails.userId,
       email: studentDetails.email,
-      full_name: studentDetails.fullName || defaultName,
+      full_name: defaultName,
       institution: studentDetails.institution || 'Unknown Institution',
       enrolled_at: new Date().toISOString(),
     } : {

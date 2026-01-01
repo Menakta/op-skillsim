@@ -180,6 +180,11 @@ export async function POST(req: NextRequest) {
       resource_link_id: params.resource_link_id,
     }
 
+    // Log ALL LTI params for debugging (to see exactly what the LTI provider sends)
+    console.log('=== ALL LTI Launch Params ===')
+    console.log(JSON.stringify(params, null, 2))
+    console.log('=============================')
+
     // Log LTI user data for debugging
     console.log('=== LTI Launch User Data ===')
     console.log({
@@ -231,15 +236,25 @@ export async function POST(req: NextRequest) {
     // ==========================================================================
     if (appRole === 'student') {
       // Build full name from available LTI params
+      // Fallback chain: full_name -> given+family -> given -> family -> email prefix -> 'Student'
+      const emailPrefix = params.lis_person_contact_email_primary?.split('@')[0]
       const fullName = params.lis_person_name_full
         || (params.lis_person_name_given && params.lis_person_name_family
           ? `${params.lis_person_name_given} ${params.lis_person_name_family}`
           : params.lis_person_name_given || params.lis_person_name_family)
-        || undefined // Let downstream handle default
+        || emailPrefix
+        || 'Student'
+
+      // Use real email if available, otherwise create a placeholder
+      const email = params.lis_person_contact_email_primary || `lti-${params.user_id}@lti.local`
+
+      console.log('=== LTI Student Session Data ===')
+      console.log({ fullName, email, emailPrefix, rawUserId: params.user_id })
+      console.log('================================')
 
       const ltiData = {
         userId: user.id,
-        email: params.lis_person_contact_email_primary || `${user.id}@lti.local`,
+        email,
         fullName,
         courseId: params.context_id || '',
         courseName: params.context_title || 'Unknown Course',
@@ -286,16 +301,27 @@ export async function POST(req: NextRequest) {
     // ==========================================================================
     else {
       // Build full name from available LTI params
+      // Fallback chain: full_name -> given+family -> given -> family -> email prefix -> 'Teacher'/'Admin'
+      const emailPrefix = params.lis_person_contact_email_primary?.split('@')[0]
+      const defaultName = appRole === 'admin' ? 'Admin' : 'Teacher'
       const fullName = params.lis_person_name_full
         || (params.lis_person_name_given && params.lis_person_name_family
           ? `${params.lis_person_name_given} ${params.lis_person_name_family}`
           : params.lis_person_name_given || params.lis_person_name_family)
-        || undefined // Will use email prefix as fallback below
+        || emailPrefix
+        || defaultName
+
+      // Use real email if available, otherwise create a placeholder
+      const email = params.lis_person_contact_email_primary || `lti-${params.user_id}@lti.local`
+
+      console.log('=== LTI Teacher/Admin Session Data ===')
+      console.log({ fullName, email, emailPrefix, rawUserId: params.user_id, role: appRole })
+      console.log('======================================')
 
       const ltiData = {
         userId: user.id,
-        email: params.lis_person_contact_email_primary || `${user.id}@lti.local`,
-        fullName: fullName || params.lis_person_contact_email_primary?.split('@')[0] || 'User',
+        email,
+        fullName,
         institution: params.tool_consumer_instance_name || 'Unknown Institution',
       }
 

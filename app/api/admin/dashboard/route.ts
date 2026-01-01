@@ -82,6 +82,28 @@ export async function GET(request: NextRequest) {
       logger.error({ error: quizError.message }, 'Failed to fetch quiz responses')
     }
 
+    // Fetch user sessions to get lti_context with full_name as fallback
+    const { data: userSessions, error: userSessionsError } = await supabase
+      .from('user_sessions')
+      .select('session_id, email, lti_context')
+      .eq('role', 'student')
+
+    if (userSessionsError) {
+      logger.error({ error: userSessionsError.message }, 'Failed to fetch user sessions')
+    }
+
+    // Create a map of session_id to lti_context for name fallback
+    const userSessionMap = new Map<string, { email: string; full_name?: string }>()
+    for (const us of userSessions || []) {
+      const ltiContext = typeof us.lti_context === 'string'
+        ? JSON.parse(us.lti_context)
+        : us.lti_context
+      userSessionMap.set(us.session_id, {
+        email: us.email,
+        full_name: ltiContext?.full_name,
+      })
+    }
+
     // Calculate statistics
     const allSessions = trainingSessions || []
     const allQuizzes = quizResponses || []
@@ -143,9 +165,19 @@ export async function GET(request: NextRequest) {
         existing.totalScore += session.total_score || 0
         existing.sessionsCount++
       } else {
+        // Get name from: training session -> lti_context -> email prefix (if real email)
+        // Don't use email prefix if it's a fake LTI email (lti-* or ends with @lti.local)
+        const userSessionInfo = userSessionMap.get(session.session_id)
+        const isFakeLtiEmail = email.startsWith('lti-') || email.endsWith('@lti.local')
+        const emailPrefix = !isFakeLtiEmail ? email.split('@')[0] : undefined
+        const studentName = session.student?.full_name
+          || userSessionInfo?.full_name
+          || emailPrefix
+          || 'Student'
+
         studentsMap.set(email, {
           id: session.id,
-          name: session.student?.full_name || 'Unknown Student',
+          name: studentName,
           email: email,
           enrolledDate: session.created_at,
           lastActive: session.updated_at,
@@ -188,9 +220,20 @@ export async function GET(request: NextRequest) {
           details = `${session.current_training_phase} - ${session.overall_progress}%`
         }
 
+        // Get name from: training session -> lti_context -> email prefix (if real email)
+        // Don't use email prefix if it's a fake LTI email (lti-* or ends with @lti.local)
+        const userSessionInfo = userSessionMap.get(session.session_id)
+        const studentEmail = session.student?.email || ''
+        const isFakeLtiEmail = studentEmail.startsWith('lti-') || studentEmail.endsWith('@lti.local')
+        const emailPrefix = !isFakeLtiEmail && studentEmail ? studentEmail.split('@')[0] : undefined
+        const studentName = session.student?.full_name
+          || userSessionInfo?.full_name
+          || emailPrefix
+          || 'Student'
+
         return {
           id: session.id,
-          studentName: session.student?.full_name || 'Unknown Student',
+          studentName,
           action,
           timestamp: session.updated_at,
           details,

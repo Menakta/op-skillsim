@@ -88,15 +88,38 @@ export async function GET(request: NextRequest) {
     // Note: quiz_responses.session_id matches training_sessions.id (not session_id)
     const { data: trainingSessions, error: sessionsError } = await supabase
       .from('training_sessions')
-      .select('id, student, course_name, course_id, status, current_training_phase, start_time, total_time_spent, overall_progress')
+      .select('id, session_id, student, course_name, course_id, status, current_training_phase, start_time, total_time_spent, overall_progress')
 
     if (sessionsError) {
       logger.error({ error: sessionsError.message }, 'Failed to fetch training sessions')
     }
 
+    // Fetch user sessions to get lti_context with full_name as fallback
+    const { data: userSessions, error: userSessionsError } = await supabase
+      .from('user_sessions')
+      .select('session_id, email, lti_context')
+      .eq('role', 'student')
+
+    if (userSessionsError) {
+      logger.error({ error: userSessionsError.message }, 'Failed to fetch user sessions')
+    }
+
+    // Create a map of session_id to lti_context for name fallback
+    const userSessionMap = new Map<string, { email: string; full_name?: string }>()
+    for (const us of userSessions || []) {
+      const ltiContext = typeof us.lti_context === 'string'
+        ? JSON.parse(us.lti_context)
+        : us.lti_context
+      userSessionMap.set(us.session_id, {
+        email: us.email,
+        full_name: ltiContext?.full_name,
+      })
+    }
+
     // Create a map of training_sessions.id to session data
     // quiz_responses.session_id references training_sessions.id
     const sessionMap = new Map<string, {
+      userSessionId: string
       student: { full_name?: string; email?: string; user_id?: string; institution?: string } | null
       courseName: string
       courseId: string
@@ -110,6 +133,7 @@ export async function GET(request: NextRequest) {
     for (const session of trainingSessions || []) {
       // Use session.id as the key (this is what quiz_responses.session_id references)
       sessionMap.set(session.id, {
+        userSessionId: session.session_id, // This links to user_sessions
         student: session.student,
         courseName: session.course_name || 'VR Pipe Training',
         courseId: session.course_id,
@@ -167,12 +191,25 @@ export async function GET(request: NextRequest) {
       // Determine if passed (75% threshold)
       const passed = scorePercentage >= 75
 
+      // Get name from: training session -> lti_context -> email prefix (if real email)
+      // Don't use email prefix if it's a fake LTI email (lti-* or ends with @lti.local)
+      const userSessionInfo = sessionInfo?.userSessionId
+        ? userSessionMap.get(sessionInfo.userSessionId)
+        : undefined
+      const studentEmail = sessionInfo?.student?.email || ''
+      const isFakeLtiEmail = studentEmail.startsWith('lti-') || studentEmail.endsWith('@lti.local')
+      const emailPrefix = !isFakeLtiEmail && studentEmail ? studentEmail.split('@')[0] : undefined
+      const studentName = sessionInfo?.student?.full_name
+        || userSessionInfo?.full_name
+        || emailPrefix
+        || 'Student'
+
       return {
         id: quiz.id,
         sessionId: quiz.session_id,
-        // Student details from training_sessions.student JSONB column
-        studentName: sessionInfo?.student?.full_name || 'Unknown Student',
-        studentEmail: sessionInfo?.student?.email || 'unknown@email.com',
+        // Student details from training_sessions.student JSONB column with fallbacks
+        studentName,
+        studentEmail: sessionInfo?.student?.email || userSessionInfo?.email || 'unknown@email.com',
         studentInstitution: sessionInfo?.student?.institution || '',
         // Course info
         courseName: sessionInfo?.courseName || 'VR Pipe Training',

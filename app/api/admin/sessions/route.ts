@@ -27,6 +27,7 @@ interface LtiContext {
   institution?: string
   returnUrl?: string
   resourceId?: string
+  full_name?: string
 }
 
 interface UserSession {
@@ -208,10 +209,19 @@ export async function GET(request: NextRequest) {
           effectiveStatus = 'completed'
         }
 
+        // Get name from: training session -> lti_context -> email prefix (if real email)
+        // Don't use email prefix if it's a fake LTI email (lti-* or ends with @lti.local)
+        const isFakeLtiEmail = userSession.email.startsWith('lti-') || userSession.email.endsWith('@lti.local')
+        const emailPrefix = !isFakeLtiEmail ? userSession.email.split('@')[0] : undefined
+        const studentName = trainingSession?.student?.full_name
+          || userSession.lti_context?.full_name
+          || emailPrefix
+          || 'Student'
+
         students.push({
           id: userSession.id,
           sessionId: userSession.session_id,
-          name: trainingSession?.student?.full_name || userSession.email.split('@')[0] || 'Unknown',
+          name: studentName,
           email: userSession.email,
           institution: trainingSession?.student?.institution || userSession.lti_context?.institution || 'Unknown',
           courseName: trainingSession?.course_name || userSession.lti_context?.courseName || 'VR Pipe Training',
