@@ -86,7 +86,7 @@ class FittingService {
         icon:
           f.image_url || f.fitting_id ==='y-junction'
             ? "/icons/y-junction.png"
-            : "/icons/pipe.png",
+            : "/icons/pipe-90-deg.png",
         description: f.description,
         isCorrect: f.is_correct,
       }));
@@ -102,7 +102,7 @@ class FittingService {
     return fittings.map((f) => ({
       id: f.fitting_id,
       label: f.name,
-      icon: f.image_url || f.fitting_id ==='y-junction' ? "/icons/y-junction.png" : "/icons/pipe.png",
+      icon: f.image_url || f.fitting_id ==='y-junction' ? "/icons/y-junction.png" : "/icons/pipe-90-deg.png",
       description: f.description,
       isCorrect: f.is_correct,
     }));
