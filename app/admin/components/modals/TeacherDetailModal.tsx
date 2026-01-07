@@ -4,10 +4,10 @@
  * Displays detailed information about a teacher session.
  */
 
-import { Users, Calendar, Activity, Globe } from 'lucide-react'
+import { Calendar, Activity, Globe } from 'lucide-react'
 import { BaseModal } from './BaseModal'
 import type { SessionTeacher } from '../../types'
-import { formatDate } from '../../utils'
+import { formatDate, getInitials } from '../../utils'
 
 interface TeacherDetailModalProps {
   teacher: SessionTeacher
@@ -20,10 +20,10 @@ export function TeacherDetailModal({ teacher, onClose }: TeacherDetailModalProps
       {/* Header with avatar */}
       <div className="flex items-center gap-3 mb-6 p-3 theme-bg-tertiary rounded-lg">
         <div className="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center">
-          <Users className="w-6 h-6 text-white" />
+          <span className="text-white font-medium">{getInitials(teacher.name)}</span>
         </div>
         <div>
-          <p className="theme-text-primary font-medium">Teacher</p>
+          <p className="theme-text-primary font-medium">{teacher.name}</p>
           <p className="theme-text-muted text-sm truncate">{teacher.email}</p>
         </div>
       </div>

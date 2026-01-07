@@ -176,6 +176,7 @@ export async function GET(request: NextRequest) {
     const teachers: Array<{
       id: string
       sessionId: string
+      name: string
       email: string
       createdAt: string
       lastActivity: string
@@ -188,6 +189,7 @@ export async function GET(request: NextRequest) {
     const admins: Array<{
       id: string
       sessionId: string
+      name: string
       email: string
       createdAt: string
       lastActivity: string
@@ -240,9 +242,18 @@ export async function GET(request: NextRequest) {
       }
       // Teachers: role = 'teacher'
       else if (userSession.role === 'teacher') {
+        // Get name from: lti_context -> email prefix (if real email)
+        // Don't use email prefix if it's a fake LTI email (lti-* or ends with @lti.local)
+        const isFakeLtiEmail = userSession.email.startsWith('lti-') || userSession.email.endsWith('@lti.local')
+        const emailPrefix = !isFakeLtiEmail ? userSession.email.split('@')[0] : undefined
+        const teacherName = userSession.lti_context?.full_name
+          || emailPrefix
+          || 'Teacher'
+
         teachers.push({
           id: userSession.id,
           sessionId: userSession.session_id,
+          name: teacherName,
           email: userSession.email,
           createdAt: userSession.created_at,
           lastActivity: userSession.last_activity,
@@ -254,9 +265,18 @@ export async function GET(request: NextRequest) {
       }
       // Admins: role = 'admin'
       else if (userSession.role === 'admin') {
+        // Get name from: lti_context -> email prefix (if real email)
+        // Don't use email prefix if it's a fake LTI email (lti-* or ends with @lti.local)
+        const isFakeLtiEmail = userSession.email.startsWith('lti-') || userSession.email.endsWith('@lti.local')
+        const emailPrefix = !isFakeLtiEmail ? userSession.email.split('@')[0] : undefined
+        const adminName = userSession.lti_context?.full_name
+          || emailPrefix
+          || 'Admin'
+
         admins.push({
           id: userSession.id,
           sessionId: userSession.session_id,
+          name: adminName,
           email: userSession.email,
           createdAt: userSession.created_at,
           lastActivity: userSession.last_activity,

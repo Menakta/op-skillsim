@@ -4,10 +4,10 @@
  * Displays detailed information about an admin session.
  */
 
-import { Shield, Calendar, Activity, Globe } from 'lucide-react'
+import { Calendar, Activity, Globe } from 'lucide-react'
 import { BaseModal } from './BaseModal'
 import type { SessionAdmin } from '../../types'
-import { formatDate } from '../../utils'
+import { formatDate, getInitials } from '../../utils'
 
 interface AdminDetailModalProps {
   admin: SessionAdmin
@@ -20,10 +20,10 @@ export function AdminDetailModal({ admin, onClose }: AdminDetailModalProps) {
       {/* Header with avatar */}
       <div className="flex items-center gap-3 mb-6 p-3 theme-bg-tertiary rounded-lg">
         <div className="w-12 h-12 rounded-full bg-yellow-600 flex items-center justify-center">
-          <Shield className="w-6 h-6 text-white" />
+          <span className="text-white font-medium">{getInitials(admin.name)}</span>
         </div>
         <div>
-          <p className="theme-text-primary font-medium">Admin</p>
+          <p className="theme-text-primary font-medium">{admin.name}</p>
           <p className="theme-text-muted text-sm truncate">{admin.email}</p>
         </div>
       </div>

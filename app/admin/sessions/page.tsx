@@ -86,7 +86,9 @@ export default function SessionsPage() {
   // Filter teachers
   const filteredTeachers = useMemo(() => {
     return teachers.filter(teacher => {
-      const matchesSearch = teacher.email.toLowerCase().includes(searchQuery.toLowerCase())
+      const matchesSearch =
+        teacher.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        teacher.email.toLowerCase().includes(searchQuery.toLowerCase())
       const matchesStatus = statusFilter === 'all' || teacher.status === statusFilter
       return matchesSearch && matchesStatus
     })
@@ -95,7 +97,9 @@ export default function SessionsPage() {
   // Filter admins
   const filteredAdmins = useMemo(() => {
     return admins.filter(admin => {
-      const matchesSearch = admin.email.toLowerCase().includes(searchQuery.toLowerCase())
+      const matchesSearch =
+        admin.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        admin.email.toLowerCase().includes(searchQuery.toLowerCase())
       const matchesStatus = statusFilter === 'all' || admin.status === statusFilter
       return matchesSearch && matchesStatus
     })
@@ -187,16 +191,18 @@ export default function SessionsPage() {
 
   const teacherColumns: Column<SessionTeacher>[] = useMemo(() => [
     {
-      key: 'email',
-      header: 'Email',
+      key: 'teacher',
+      header: 'Teacher',
       render: (teacher) => (
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-green-600 flex items-center justify-center flex-shrink-0">
-            <Users className="w-5 h-5 text-white" />
+            <span className="text-white font-medium text-sm">
+              {getInitials(teacher.name)}
+            </span>
           </div>
           <div className="min-w-0">
-            <p className="theme-text-primary font-medium truncate">{teacher.email}</p>
-            <p className="text-gray-500 text-xs truncate">Teacher</p>
+            <p className="theme-text-primary font-medium truncate">{teacher.name}</p>
+            <p className="text-gray-500 text-xs truncate">{teacher.email}</p>
           </div>
         </div>
       ),
@@ -228,16 +234,18 @@ export default function SessionsPage() {
 
   const adminColumns: Column<SessionAdmin>[] = useMemo(() => [
     {
-      key: 'email',
-      header: 'Email',
+      key: 'admin',
+      header: 'Admin',
       render: (admin) => (
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-yellow-600 flex items-center justify-center flex-shrink-0">
-            <Shield className="w-5 h-5 text-white" />
+            <span className="text-white font-medium text-sm">
+              {getInitials(admin.name)}
+            </span>
           </div>
           <div className="min-w-0">
-            <p className="theme-text-primary font-medium truncate">{admin.email}</p>
-            <p className="text-gray-500 text-xs truncate">Admin</p>
+            <p className="theme-text-primary font-medium truncate">{admin.name}</p>
+            <p className="text-gray-500 text-xs truncate">{admin.email}</p>
           </div>
         </div>
       ),
@@ -478,11 +486,13 @@ export default function SessionsPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0 flex-1">
                     <div className="w-10 h-10 rounded-full bg-green-600 flex items-center justify-center flex-shrink-0">
-                      <Users className="w-5 h-5 text-white" />
+                      <span className="text-white font-medium text-sm">
+                        {getInitials(teacher.name)}
+                      </span>
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="theme-text-primary font-medium truncate">{teacher.email}</p>
-                      <p className="text-gray-500 text-xs">Logins: {teacher.loginCount}</p>
+                      <p className="theme-text-primary font-medium truncate">{teacher.name}</p>
+                      <p className="text-gray-500 text-xs truncate">{teacher.email}</p>
                     </div>
                   </div>
                   <Badge variant={teacher.status === 'active' ? 'success' : 'warning'}>
@@ -531,11 +541,13 @@ export default function SessionsPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0 flex-1">
                     <div className="w-10 h-10 rounded-full bg-yellow-600 flex items-center justify-center flex-shrink-0">
-                      <Shield className="w-5 h-5 text-white" />
+                      <span className="text-white font-medium text-sm">
+                        {getInitials(admin.name)}
+                      </span>
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="theme-text-primary font-medium truncate">{admin.email}</p>
-                      <p className="text-gray-500 text-xs">Logins: {admin.loginCount}</p>
+                      <p className="theme-text-primary font-medium truncate">{admin.name}</p>
+                      <p className="text-gray-500 text-xs truncate">{admin.email}</p>
                     </div>
                   </div>
                   <Badge variant={admin.status === 'active' ? 'success' : 'warning'}>

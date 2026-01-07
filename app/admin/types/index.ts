@@ -196,6 +196,7 @@ export interface SessionStudent {
 export interface SessionTeacher {
   id: string
   sessionId: string
+  name: string
   email: string
   createdAt: string
   lastActivity: string
@@ -208,6 +209,7 @@ export interface SessionTeacher {
 export interface SessionAdmin {
   id: string
   sessionId: string
+  name: string
   email: string
   createdAt: string
   lastActivity: string
