@@ -98,6 +98,20 @@ export function useQuestionFlow(
           return
         }
 
+        // Prevent duplicate question requests from resetting current question
+        // This fixes the issue where Q6 (plug phase) disappears unexpectedly
+        if (state.currentQuestion?.id === questionId) {
+          console.log('Question already displayed, ignoring duplicate request:', questionId)
+          return
+        }
+
+        // Don't allow new questions while Q6 is being displayed
+        // Q6 requires user to explicitly click Continue (even after answering correctly)
+        if (state.currentQuestion?.id === 'Q6') {
+          console.log('Q6 is active (answered:', state.questionAnsweredCorrectly, '), ignoring new question request:', questionId)
+          return
+        }
+
         const question = getQuestion(questionId)
 
         if (question) {
@@ -118,7 +132,7 @@ export function useQuestionFlow(
     })
 
     return unsubscribe
-  }, [messageBus, questionsLoading, getQuestion])
+  }, [messageBus, questionsLoading, getQuestion, state.currentQuestion, state.questionAnsweredCorrectly])
 
   // ==========================================================================
   // Submit Answer (accumulates in memory, does NOT save to DB)

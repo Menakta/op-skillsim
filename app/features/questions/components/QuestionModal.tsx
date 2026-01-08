@@ -42,6 +42,13 @@ export function QuestionModal({
     setAnswerFeedback(null)
   }, [])
 
+  const handleClose = useCallback(() => {
+    setSelectedAnswer(null)
+    setWrongAnswer(null)
+    setAnswerFeedback(null)
+    onClose()
+  }, [onClose])
+
   const handleAnswerSubmit = useCallback(() => {
     if (selectedAnswer === null || !question) return
 
@@ -66,14 +73,7 @@ export function QuestionModal({
         message: result?.message || 'Incorrect. Try again!'
       })
     }
-  }, [selectedAnswer, question, onSubmitAnswer])
-
-  const handleClose = useCallback(() => {
-    setSelectedAnswer(null)
-    setWrongAnswer(null)
-    setAnswerFeedback(null)
-    onClose()
-  }, [onClose])
+  }, [selectedAnswer, question, onSubmitAnswer, handleClose])
 
   // Don't render if no question
   if (!question) return null

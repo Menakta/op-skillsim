@@ -7,7 +7,8 @@ import {useStreamer,useLaunchRequest,VideoStream} from '@pureweb/platform-sdk-re
 
 // Critical path imports - needed immediately
 import { useQuestions } from '../features/questions'
-import { LoadingScreen, StarterScreen, type LoadingStep } from '../features'
+import { LoadingScreen, StarterScreen, CinematicTimer, CinematicMobileControls, type LoadingStep } from '../features'
+import { IdleWarningModal, useIdleDetection } from '../features/idle'
 import type { QuestionData } from '../lib/messageTypes'
 import { TASK_SEQUENCE } from '../config'
 import { useTheme } from '../context/ThemeContext'
@@ -18,7 +19,7 @@ const ControlPanel = dynamic(() => import('../components/ControlPanel'), {
   loading: () => null,
 })
 
-const Sidebar = dynamic(() => import('../components/Sidebar'), {
+const ThemeToggle = dynamic(() => import('../components/ThemeToggle'), {
   ssr: false,
   loading: () => null,
 })
@@ -198,6 +199,10 @@ export default function StreamingApp() {
   const [showSessionExpiryModal, setShowSessionExpiryModal] = useState(false)
   const [userRole, setUserRole] = useState<'student' | 'teacher' | 'admin'>('student')
 
+  // Cinematic mode state
+  const [isCinematicMode, setIsCinematicMode] = useState(true) // Start in cinematic mode
+  const [showExplosionControls, setShowExplosionControls] = useState(true) // Show explosion controls in cinematic mode
+
   // ==========================================================================
   // Check session info and track expiry on mount
   // ==========================================================================
@@ -373,7 +378,7 @@ export default function StreamingApp() {
 
     // Prefetch dynamic imports
     import('../components/ControlPanel')
-    import('../components/Sidebar')
+    import('../components/ThemeToggle')
     import('../components/MessageLog')
     import('../features/questions')
     import('../features/training')
@@ -506,9 +511,11 @@ export default function StreamingApp() {
     if (streamerStatus === StreamerStatus.Connected) {
       setConnectionStatus('connected')
       setRetryCount(0)
+      // Show navigation walkthrough only on FIRST connection, not on reconnection
+      if (!wasConnectedRef.current) {
+        setShowNavigationWalkthrough(true)
+      }
       wasConnectedRef.current = true // Mark that we were connected
-      // Show navigation walkthrough when stream is connected
-      setShowNavigationWalkthrough(true)
     } else if (streamerStatus === StreamerStatus.Failed) {
       console.log('❌ Streamer failed, attempting to reconnect...')
       setConnectionStatus('failed')
@@ -563,14 +570,28 @@ export default function StreamingApp() {
   useEffect(() => {
     if (streamerStatus === StreamerStatus.Connected) {
       console.log('📤 Connection established - Requesting initial data from UE5...')
-      setTimeout(() => {
+      // Initial request after connection stabilizes
+      const initialTimer = setTimeout(() => {
         training.testConnection()
         training.refreshWaypoints()
         training.refreshHierarchicalLayers()
         console.log('📤 Initial data requests sent')
-      }, 1000)
+      }, 1500)
+
+      // Retry waypoints after a bit more time in case first request was missed
+      const retryTimer = setTimeout(() => {
+        if (training.state.waypoints.length === 0) {
+          console.log('📤 Retrying waypoint fetch...')
+          training.refreshWaypoints()
+        }
+      }, 3500)
+
+      return () => {
+        clearTimeout(initialTimer)
+        clearTimeout(retryTimer)
+      }
     }
-  }, [streamerStatus])
+  }, [streamerStatus, training])
 
   // ==========================================================================
   // Submit Quiz Results when training completes (students only)
@@ -677,10 +698,28 @@ export default function StreamingApp() {
   }, [completedPhase, training])
 
   // ==========================================================================
+  // Cinematic Mode Handlers
+  // ==========================================================================
+
+  const handleSkipToTraining = useCallback(() => {
+    console.log('⏭️ Skipping to training mode')
+    setIsCinematicMode(false)
+    setShowExplosionControls(false)
+    // Start training when skipping cinematic mode
+    training.startTraining()
+  }, [training])
+
+  // ==========================================================================
   // Derived State
   // ==========================================================================
 
   const isConnected = streamerStatus === StreamerStatus.Connected
+
+  // Idle detection - only active when stream is connected
+  const { isIdle, resetIdle } = useIdleDetection({
+    idleTimeout: 5 * 60 * 1000, // 5 minutes
+    enabled: isConnected // Only detect idle when connected
+  })
 
   // ==========================================================================
   // Manual Retry Handler
@@ -728,6 +767,37 @@ export default function StreamingApp() {
     setShowSessionExpiryModal(false)
     // The modal itself handles redirection based on isLti and returnUrl
   }, [])
+
+  // ==========================================================================
+  // Idle Timeout Handler - Called when user doesn't respond to idle warning
+  // ==========================================================================
+
+  const handleIdleTimeout = useCallback(() => {
+    console.log('⏰ [StreamingApp] Idle timeout - ending session due to inactivity')
+
+    // Complete training session due to idle timeout
+    import('@/app/services').then(({ trainingSessionService }) => {
+      trainingSessionService.completeTraining({
+        totalTimeMs: Date.now() - (sessionStartTime || Date.now()),
+        phasesCompleted: training.state.totalTasks
+      }).then(result => {
+        if (result.success) {
+          console.log('✅ [StreamingApp] Training session ended due to idle timeout')
+        }
+      })
+    })
+
+    // Redirect based on session type
+    if (isLtiSession && sessionReturnUrl) {
+      window.location.href = sessionReturnUrl
+    } else if (isTestUser) {
+      window.location.href = '/login'
+    } else {
+      // Fallback - show session end modal
+      setSessionEndReason('inactive')
+      setShowSessionEndModal(true)
+    }
+  }, [sessionStartTime, training.state.totalTasks, isLtiSession, sessionReturnUrl, isTestUser])
 
   // ==========================================================================
   // Training Complete Handler - Close modal and redirect appropriately
@@ -784,34 +854,53 @@ export default function StreamingApp() {
 
   return (
     <div className={`h-screen w-screen relative overflow-hidden ${forcesDarkBg ? 'bg-[#1E1E1E]' : isDark ? 'bg-[#1E1E1E]' : 'bg-gray-100'}`}>
-      {/* Sidebar - Only show when stream is connected */}
-      {isConnected && (
-        <Sidebar
-          onStartTraining={training.startTraining}
-          onPauseTraining={training.pauseTraining}
-          onResetTraining={training.resetTraining}
-          onSetCameraPerspective={training.setCameraPerspective}
-          onToggleAutoOrbit={training.toggleAutoOrbit}
-          onResetCamera={training.resetCamera}
-          onSetExplosionLevel={training.setExplosionLevel}
-          onExplodeBuilding={training.explodeBuilding}
-          onAssembleBuilding={training.assembleBuilding}
-          onRefreshWaypoints={training.refreshWaypoints}
-          onActivateWaypoint={training.activateWaypoint}
-          onDeactivateWaypoint={training.deactivateWaypoint}
-          onRefreshLayers={training.refreshLayers}
-          onRefreshHierarchicalLayers={training.refreshHierarchicalLayers}
-          onToggleLayer={training.toggleLayer}
-          onShowAllLayers={training.showAllLayers}
-          onHideAllLayers={training.hideAllLayers}
-          onToggleMainGroup={training.toggleMainGroup}
-          onToggleChildGroup={training.toggleChildGroup}
-          onQuitApplication={training.quitApplication}
+      {/* Theme Toggle - Show when stream is connected (both cinematic and training modes) */}
+      {isConnected && <ThemeToggle />}
+
+      {/* Cinematic Mode Timer - Show when connected and in cinematic mode */}
+      {isConnected && isCinematicMode && (
+        <CinematicTimer
+          duration={7200} // 2 hours
+          onSkipToTraining={handleSkipToTraining}
+          isActive={isCinematicMode}
         />
       )}
 
-      {/* Control Panel (ToolBar) - Only show when stream is connected */}
-      {isConnected && (
+      {/* Cinematic Controls - Mobile toggle buttons + Desktop panels */}
+      {isConnected && isCinematicMode && (
+        <CinematicMobileControls
+          // Explosion Controls Props
+          explosionValue={training.state.explosionValue}
+          onExplosionValueChange={training.setExplosionLevel}
+          onExplode={training.explodeBuilding}
+          onAssemble={training.assembleBuilding}
+          // Waypoint Controls Props
+          waypoints={training.state.waypoints}
+          activeWaypointIndex={training.state.activeWaypointIndex}
+          activeWaypointName={training.state.activeWaypointName}
+          onRefreshWaypoints={training.refreshWaypoints}
+          onActivateWaypoint={training.activateWaypoint}
+          onDeactivateWaypoint={training.deactivateWaypoint}
+          onWaypointProgressChange={training.setExplosionLevel}
+          // Camera Controls Props
+          cameraPerspective={training.state.cameraPerspective}
+          cameraMode={training.state.cameraMode}
+          onSetCameraPerspective={training.setCameraPerspective}
+          onToggleAutoOrbit={training.toggleAutoOrbit}
+          onResetCamera={training.resetCamera}
+          // Layer Controls Props
+          hierarchicalGroups={training.state.hierarchicalGroups}
+          onRefreshLayers={training.refreshHierarchicalLayers}
+          onToggleMainGroup={training.toggleMainGroup}
+          onToggleChildGroup={training.toggleChildGroup}
+          onShowAllLayers={training.showAllLayers}
+          onHideAllLayers={training.hideAllLayers}
+          isVisible={true}
+        />
+      )}
+
+      {/* Control Panel (ToolBar) - Only show when stream is connected and NOT in cinematic mode */}
+      {isConnected && !isCinematicMode && (
         <ControlPanel
           isDark={isDark}
           onSelectTool={training.selectTool}
@@ -820,8 +909,8 @@ export default function StreamingApp() {
         />
       )}
 
-      {/* Message Log - Only show when stream is connected */}
-      {isConnected && (
+      {/* Message Log - Only show when stream is connected and NOT in cinematic mode */}
+      {isConnected && !isCinematicMode && (
         <MessageLog
           messages={training.messageLog}
           lastMessage={training.lastMessage}
@@ -933,6 +1022,14 @@ export default function StreamingApp() {
         isLti={isLtiSession}
         returnUrl={sessionReturnUrl}
         onSessionEnd={handleSessionExpiry}
+      />
+
+      {/* Idle Warning Modal - Shows when user is inactive for 5 minutes */}
+      <IdleWarningModal
+        isOpen={isIdle}
+        countdownDuration={300}
+        onStayActive={resetIdle}
+        onTimeout={handleIdleTimeout}
       />
 
       {/* Video Styles */}

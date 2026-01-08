@@ -108,7 +108,7 @@ export interface PDFExportOptions {
 /**
  * Load an image and convert to base64
  */
-async function loadImageAsBase64(url: string): Promise<string> {
+async function loadImageAsBase64(path: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image()
     img.crossOrigin = 'anonymous'
@@ -126,7 +126,9 @@ async function loadImageAsBase64(url: string): Promise<string> {
       resolve(dataUrl)
     }
     img.onerror = () => reject(new Error('Failed to load image'))
-    img.src = url
+    // Use absolute URL based on current origin
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
+    img.src = `${baseUrl}${path}`
   })
 }
 

@@ -321,11 +321,11 @@ export default function ResultsPage() {
                 <select
                   value={courseFilter}
                   onChange={(e) => setCourseFilter(e.target.value)}
-                  className="px-4 py-2 bg-[#181818] border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#39BEAE]"
+                  className="px-4 bg-[#181818] border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#39BEAE]"
                 >
                   <option value="all">All Courses</option>
                   {courses.map((course) => (
-                    <option key={course.id} value={course.title}>
+                    <option key={course.id} value={course.title} className='theme-bg-secondary'>
                       {course.title}
                     </option>
                   ))}
@@ -333,7 +333,7 @@ export default function ResultsPage() {
               )}
 
               {/* Export Dropdown */}
-              <div className="relative" ref={exportMenuRef}>
+              <div className="relative ml-auto" ref={exportMenuRef}>
                 <button
                   onClick={() => setShowExportMenu(!showExportMenu)}
                   className="flex items-center gap-2 px-4 py-2 bg-[#39BEAE] hover:bg-[#2ea89a] text-white rounded-lg transition-colors"

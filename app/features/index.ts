@@ -8,6 +8,9 @@
 // Camera feature
 export * from './camera'
 
+// Cinematic mode feature
+export * from './cinematic'
+
 // Explosion feature
 export * from './explosion'
 
