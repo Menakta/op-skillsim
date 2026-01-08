@@ -19,7 +19,7 @@
 
   /* Background colors (white shades) */
   --color-bg-primary: #FFFFFF;
-  --color-bg-secondary: #dcdcdc;
+  --color-bg-secondary: #b9b9b94e;
   --color-bg-tertiary: #ffffff;
   --color-bg-elevated: #FFFFFF;
   --color-bg-hover: #EBEBEB;
@@ -67,8 +67,8 @@
   --color-info-border: rgba(57, 190, 174, 0.3);
 
   /* Component specific */
-  --color-card-bg: #e6e6e6;
-  --color-card-border: #c3c3c3;
+  --color-card-bg: #ffffff;
+  --color-card-border: #dddddd;
   --color-input-bg: #FFFFFF;
   --color-input-border: #D9D9D9;
   --color-sidebar-bg: #39BEAE;
@@ -86,8 +86,8 @@
 
 .dark {
   /* Background colors (black shades) */
-  --color-bg-primary: #000000;
-  --color-bg-secondary: #191919;
+  --color-bg-primary: #222222;
+  --color-bg-secondary: #212121;
   --color-bg-tertiary: #141414;
   --color-bg-elevated: #141414;
   --color-bg-hover: #1A1A1A;

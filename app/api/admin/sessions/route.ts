@@ -139,6 +139,26 @@ export async function GET(request: NextRequest) {
       logger.error({ error: trainingSessionsError.message }, 'Failed to fetch training sessions')
     }
 
+    // Fetch teacher profiles (for teacher/admin real names)
+    const { data: teacherProfiles, error: teacherProfilesError } = await supabase
+      .from('teacher_profiles')
+      .select('id, email, full_name, role')
+
+    if (teacherProfilesError) {
+      logger.error({ error: teacherProfilesError.message }, 'Failed to fetch teacher profiles')
+    }
+
+    // Create a map of email to teacher profile for quick lookup
+    const teacherProfileMap = new Map<string, { fullName?: string; role?: string }>()
+    for (const profile of teacherProfiles || []) {
+      if (profile.email) {
+        teacherProfileMap.set(profile.email, {
+          fullName: profile.full_name,
+          role: profile.role,
+        })
+      }
+    }
+
     const allUserSessions = (userSessions || []) as UserSession[]
     const allTrainingSessions = (trainingSessions || []) as TrainingSession[]
 
@@ -242,11 +262,13 @@ export async function GET(request: NextRequest) {
       }
       // Teachers: role = 'teacher'
       else if (userSession.role === 'teacher') {
-        // Get name from: lti_context -> email prefix (if real email)
+        // Get name from: teacher_profiles -> lti_context -> email prefix (if real email)
         // Don't use email prefix if it's a fake LTI email (lti-* or ends with @lti.local)
+        const teacherProfile = teacherProfileMap.get(userSession.email)
         const isFakeLtiEmail = userSession.email.startsWith('lti-') || userSession.email.endsWith('@lti.local')
         const emailPrefix = !isFakeLtiEmail ? userSession.email.split('@')[0] : undefined
-        const teacherName = userSession.lti_context?.full_name
+        const teacherName = teacherProfile?.fullName
+          || userSession.lti_context?.full_name
           || emailPrefix
           || 'Teacher'
 
@@ -265,11 +287,13 @@ export async function GET(request: NextRequest) {
       }
       // Admins: role = 'admin'
       else if (userSession.role === 'admin') {
-        // Get name from: lti_context -> email prefix (if real email)
+        // Get name from: teacher_profiles -> lti_context -> email prefix (if real email)
         // Don't use email prefix if it's a fake LTI email (lti-* or ends with @lti.local)
+        const adminProfile = teacherProfileMap.get(userSession.email)
         const isFakeLtiEmail = userSession.email.startsWith('lti-') || userSession.email.endsWith('@lti.local')
         const emailPrefix = !isFakeLtiEmail ? userSession.email.split('@')[0] : undefined
-        const adminName = userSession.lti_context?.full_name
+        const adminName = adminProfile?.fullName
+          || userSession.lti_context?.full_name
           || emailPrefix
           || 'Admin'
 

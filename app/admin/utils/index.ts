@@ -84,3 +84,177 @@ export function formatPhase(phase: string): string {
     .toLowerCase()
     .replace(/\b\w/g, c => c.toUpperCase())
 }
+
+// =============================================================================
+// PDF Export Utilities
+// =============================================================================
+
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
+
+export interface ExportColumn<T> {
+  key: string
+  header: string
+  getValue?: (item: T) => unknown
+  width?: number
+}
+
+export interface PDFExportOptions {
+  title?: string
+  subtitle?: string
+  orientation?: 'portrait' | 'landscape'
+}
+
+/**
+ * Load an image and convert to base64
+ */
+async function loadImageAsBase64(url: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = img.width
+      canvas.height = img.height
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        reject(new Error('Could not get canvas context'))
+        return
+      }
+      ctx.drawImage(img, 0, 0)
+      const dataUrl = canvas.toDataURL('image/png')
+      resolve(dataUrl)
+    }
+    img.onerror = () => reject(new Error('Failed to load image'))
+    img.src = url
+  })
+}
+
+/**
+ * Export data to PDF and trigger download
+ */
+export async function exportToPDF<T>(
+  data: T[],
+  columns: ExportColumn<T>[],
+  filename: string,
+  options: PDFExportOptions = {}
+): Promise<void> {
+  const {
+    title = 'Export',
+    subtitle,
+    orientation = 'landscape'
+  } = options
+
+  // Create PDF document
+  const doc = new jsPDF({
+    orientation,
+    unit: 'mm',
+    format: 'a4'
+  })
+
+  const pageWidth = doc.internal.pageSize.getWidth()
+  const pageHeight = doc.internal.pageSize.getHeight()
+
+  // Try to load the logo
+  let logoBase64: string | null = null
+  try {
+    logoBase64 = await loadImageAsBase64('/logos/Dark_Logo.png')
+  } catch (error) {
+    console.warn('Could not load logo for PDF:', error)
+  }
+
+  // Add title
+  doc.setFontSize(18)
+  doc.setTextColor(57, 190, 174) // #39BEAE
+  doc.text(title, 14, 20)
+
+  // Add subtitle if provided
+  let startY = 28
+  if (subtitle) {
+    doc.setFontSize(11)
+    doc.setTextColor(100)
+    doc.text(subtitle, 14, startY)
+    startY += 8
+  }
+
+  // Add timestamp
+  doc.setFontSize(9)
+  doc.setTextColor(128)
+  const timestamp = new Date().toLocaleString('en-NZ', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+  doc.text(`Generated: ${timestamp}`, 14, startY)
+  startY += 6
+
+  // Add total count
+  doc.text(`Total Records: ${data.length}`, 14, startY)
+  startY += 8
+
+  // Prepare table data
+  const headers = columns.map(col => col.header)
+  const rows = data.map(item =>
+    columns.map(col => {
+      const value = col.getValue
+        ? col.getValue(item)
+        : (item as Record<string, unknown>)[col.key]
+      return value === null || value === undefined ? '' : String(value)
+    })
+  )
+
+  // Generate table
+  autoTable(doc, {
+    head: [headers],
+    body: rows,
+    startY: startY,
+    styles: {
+      fontSize: 8,
+      cellPadding: 3,
+    },
+    headStyles: {
+      fillColor: [57, 190, 174], // #39BEAE
+      textColor: 255,
+      fontStyle: 'bold',
+    },
+    alternateRowStyles: {
+      fillColor: [245, 245, 245],
+    },
+    margin: { left: 14, right: 14 },
+    tableWidth: 'auto',
+  })
+
+  // Add footer with page numbers and logo
+  const pageCount = doc.getNumberOfPages()
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i)
+    doc.setFontSize(8)
+    doc.setTextColor(128)
+    doc.text(
+      `Page ${i} of ${pageCount}`,
+      pageWidth / 2,
+      pageHeight - 10,
+      { align: 'center' }
+    )
+
+    // Add logo to footer (right side)
+    if (logoBase64) {
+      // Logo dimensions: width ~40mm, maintain aspect ratio
+      const logoWidth = 35
+      const logoHeight = 8
+      doc.addImage(
+        logoBase64,
+        'PNG',
+        pageWidth - 14 - logoWidth,
+        pageHeight - 14,
+        logoWidth,
+        logoHeight
+      )
+    }
+  }
+
+  // Save the PDF
+  doc.save(filename)
+}

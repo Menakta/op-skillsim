@@ -31,11 +31,11 @@ export function BaseModal({
 }: BaseModalProps) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm sm:p-4"
+      className="fixed inset-0 z-50 flex items-center sm:items-center justify-center bg-black/50 backdrop-blur-sm sm:p-2"
       onClick={onClose}
     >
       <div
-        className={`theme-bg-secondary rounded-t-xl sm:rounded-xl w-full ${maxWidthClasses[maxWidth]} max-h-[90vh] overflow-hidden`}
+        className={`theme-bg-secondary rounded-t-xl sm:rounded-xl w-11/12 sm:w-full ${maxWidthClasses[maxWidth]} max-h-[90vh] overflow-hidden`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

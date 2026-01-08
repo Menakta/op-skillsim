@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { jwtVerify } from 'jose'
 import { createServerSupabaseClient } from '@/app/lib/supabase/server'
+import { getSupabaseAdmin } from '@/app/lib/supabase/admin'
 
 const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'your-super-secret-jwt-key-min-32-chars'
@@ -192,7 +193,8 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    const supabase = await createServerSupabaseClient()
+    // Use admin client to bypass RLS for write operations
+    const supabase = getSupabaseAdmin()
     const body = await request.json()
 
     const {
@@ -222,6 +224,7 @@ export async function PUT(request: NextRequest) {
       .single()
 
     if (checkError || !existing) {
+      console.error('Question not found:', { question_id, checkError })
       return NextResponse.json(
         { error: 'Question not found' },
         { status: 404 }
@@ -256,7 +259,10 @@ export async function PUT(request: NextRequest) {
       .select()
       .single()
 
-    if (error) throw error
+    if (error) {
+      console.error('Failed to update question:', { question_id, error: error.message, code: error.code })
+      throw error
+    }
 
     return NextResponse.json({
       success: true,
@@ -265,9 +271,10 @@ export async function PUT(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Error updating question:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    console.error('Error updating question:', errorMessage, error)
     return NextResponse.json(
-      { error: 'Failed to update question' },
+      { error: 'Failed to update question', details: errorMessage },
       { status: 500 }
     )
   }
