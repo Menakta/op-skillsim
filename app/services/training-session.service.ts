@@ -7,6 +7,7 @@
 
 import type {
   TrainingSession,
+  PersistedTrainingState,
   StartTrainingRequest,
   UpdateProgressRequest,
   CompletePhaseRequest,
@@ -277,6 +278,78 @@ export const trainingSessionService = {
       return {
         success: false,
         error: 'Network error: Failed to record time',
+      }
+    }
+  },
+
+  /**
+   * Save training state for session resume
+   * Stores the complete UI state (mode, tool selections, camera, etc.)
+   */
+  async saveState(
+    trainingState: PersistedTrainingState
+  ): Promise<ServiceResult<{ saved: boolean }>> {
+    try {
+      const response = await fetch('/api/training/state', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ trainingState }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        return {
+          success: false,
+          error: data.error || 'Failed to save state',
+        }
+      }
+
+      return {
+        success: true,
+        data: { saved: true },
+      }
+    } catch (error) {
+      console.error('Training session service error:', error)
+      return {
+        success: false,
+        error: 'Network error: Failed to save state',
+      }
+    }
+  },
+
+  /**
+   * Get saved training state for session resume
+   */
+  async getState(): Promise<ServiceResult<{ trainingState: PersistedTrainingState | null; sessionId?: string }>> {
+    try {
+      const response = await fetch('/api/training/state', {
+        method: 'GET',
+        credentials: 'include',
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        return {
+          success: false,
+          error: data.error || 'Failed to get state',
+        }
+      }
+
+      return {
+        success: true,
+        data: {
+          trainingState: data.trainingState || null,
+          sessionId: data.sessionId,
+        },
+      }
+    } catch (error) {
+      console.error('Training session service error:', error)
+      return {
+        success: false,
+        error: 'Network error: Failed to get state',
       }
     }
   },

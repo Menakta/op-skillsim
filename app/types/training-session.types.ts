@@ -12,6 +12,40 @@
 export type TrainingSessionStatus = 'active' | 'paused' | 'completed' | 'abandoned'
 
 // =============================================================================
+// Persisted Training State - For database storage (JSONB)
+// =============================================================================
+
+export interface PersistedTrainingState {
+  // Mode state
+  mode: 'cinematic' | 'training'
+  uiMode: 'normal' | 'waypoint' | 'task'
+
+  // Training progress
+  currentTaskIndex: number
+  taskName: string | null
+  phase: string | null
+  progress: number
+
+  // Tool selections
+  selectedTool: string | null
+  selectedPipe: string | null
+  airPlugSelected: boolean
+
+  // Camera state
+  cameraMode: string | null
+  cameraPerspective: string | null
+
+  // Explosion state
+  explosionLevel: number
+
+  // Cinematic timer (remaining seconds)
+  cinematicTimeRemaining: number | null
+
+  // Timestamp for staleness check
+  lastUpdated: string
+}
+
+// =============================================================================
 // Student Details (JSONB)
 // =============================================================================
 
@@ -40,7 +74,7 @@ export interface TrainingSession {
   current_training_phase: string
   overall_progress: number
 
-  // Training state
+  // Training timeline
   start_time: string
   end_time: string | null
   total_time_spent: number
@@ -51,6 +85,9 @@ export interface TrainingSession {
 
   // Completion status
   status: TrainingSessionStatus
+
+  // Persisted training state for session resume (JSONB)
+  training_state: PersistedTrainingState | null
 
   // Results data
   final_results: TrainingFinalResults | null

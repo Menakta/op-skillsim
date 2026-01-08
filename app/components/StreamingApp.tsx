@@ -9,7 +9,9 @@ import {useStreamer,useLaunchRequest,VideoStream} from '@pureweb/platform-sdk-re
 import { useQuestions } from '../features/questions'
 import { LoadingScreen, StarterScreen, CinematicTimer, CinematicMobileControls, type LoadingStep } from '../features'
 import { IdleWarningModal, useIdleDetection } from '../features/idle'
+import { useStatePersistence } from '../features/training'
 import type { QuestionData } from '../lib/messageTypes'
+import type { PersistedTrainingState } from '../types'
 import { TASK_SEQUENCE } from '../config'
 import { useTheme } from '../context/ThemeContext'
 
@@ -202,6 +204,11 @@ export default function StreamingApp() {
   // Cinematic mode state
   const [isCinematicMode, setIsCinematicMode] = useState(true) // Start in cinematic mode
   const [showExplosionControls, setShowExplosionControls] = useState(true) // Show explosion controls in cinematic mode
+
+  // State persistence - for session resume
+  const [restoredState, setRestoredState] = useState<PersistedTrainingState | null>(null)
+  const [cinematicTimeRemaining, setCinematicTimeRemaining] = useState<number | null>(null)
+  const hasRestoredStateRef = useRef(false)
 
   // ==========================================================================
   // Check session info and track expiry on mount
@@ -478,6 +485,19 @@ export default function StreamingApp() {
   useReduxSync(training)
 
   // ==========================================================================
+  // State Persistence - Save and Restore training state
+  // ==========================================================================
+
+  const statePersistence = useStatePersistence({
+    enabled: isLtiSession && userRole === 'student',
+    saveInterval: 5000,
+    onStateRestored: (state) => {
+      console.log('📂 State restored callback:', state)
+      setRestoredState(state)
+    }
+  })
+
+  // ==========================================================================
   // Launch
   // ==========================================================================
 
@@ -592,6 +612,92 @@ export default function StreamingApp() {
       }
     }
   }, [streamerStatus, training])
+
+  // ==========================================================================
+  // Restore State on Connection (for session resume)
+  // ==========================================================================
+
+  useEffect(() => {
+    if (streamerStatus !== StreamerStatus.Connected) return
+    if (hasRestoredStateRef.current) return
+    if (!isLtiSession || userRole !== 'student') return
+
+    const restoreSession = async () => {
+      console.log('📂 Checking for saved training state...')
+      const savedState = await statePersistence.restoreState()
+
+      if (savedState) {
+        hasRestoredStateRef.current = true
+        console.log('📂 Restoring training session state:', savedState)
+
+        // Restore cinematic/training mode
+        if (savedState.mode === 'training') {
+          setIsCinematicMode(false)
+          setShowExplosionControls(false)
+          // Start training mode in UE5
+          training.startTraining()
+        } else {
+          setIsCinematicMode(true)
+          setShowExplosionControls(true)
+          // Restore cinematic timer if available
+          if (savedState.cinematicTimeRemaining !== null) {
+            setCinematicTimeRemaining(savedState.cinematicTimeRemaining)
+          }
+        }
+
+        // Skip navigation walkthrough on session resume
+        setShowNavigationWalkthrough(false)
+      }
+    }
+
+    // Give a small delay for connection to stabilize
+    const timer = setTimeout(restoreSession, 2000)
+    return () => clearTimeout(timer)
+  }, [streamerStatus, isLtiSession, userRole, statePersistence, training])
+
+  // ==========================================================================
+  // Auto-Save State on Changes
+  // ==========================================================================
+
+  useEffect(() => {
+    if (streamerStatus !== StreamerStatus.Connected) return
+    if (!isLtiSession || userRole !== 'student') return
+
+    // Save current state
+    statePersistence.saveState({
+      mode: isCinematicMode ? 'cinematic' : 'training',
+      uiMode: training.state.uiMode,
+      currentTaskIndex: training.state.currentTaskIndex,
+      taskName: training.state.taskName,
+      phase: training.state.phase,
+      progress: training.state.progress,
+      selectedTool: training.state.selectedTool,
+      selectedPipe: training.state.selectedPipe,
+      airPlugSelected: training.state.airPlugSelected,
+      cameraMode: training.state.cameraMode,
+      cameraPerspective: training.state.cameraPerspective,
+      explosionLevel: training.state.explosionValue,
+      cinematicTimeRemaining: cinematicTimeRemaining
+    })
+  }, [
+    streamerStatus,
+    isLtiSession,
+    userRole,
+    isCinematicMode,
+    training.state.uiMode,
+    training.state.currentTaskIndex,
+    training.state.taskName,
+    training.state.phase,
+    training.state.progress,
+    training.state.selectedTool,
+    training.state.selectedPipe,
+    training.state.airPlugSelected,
+    training.state.cameraMode,
+    training.state.cameraPerspective,
+    training.state.explosionValue,
+    cinematicTimeRemaining,
+    statePersistence
+  ])
 
   // ==========================================================================
   // Submit Quiz Results when training completes (students only)
@@ -861,7 +967,9 @@ export default function StreamingApp() {
       {isConnected && isCinematicMode && (
         <CinematicTimer
           duration={7200} // 2 hours
+          initialTimeRemaining={cinematicTimeRemaining}
           onSkipToTraining={handleSkipToTraining}
+          onTimeChange={setCinematicTimeRemaining}
           isActive={isCinematicMode}
         />
       )}

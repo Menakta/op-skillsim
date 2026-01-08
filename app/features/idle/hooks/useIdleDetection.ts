@@ -28,7 +28,7 @@ interface UseIdleDetectionReturn {
 // Default Configuration
 // =============================================================================
 
-const DEFAULT_IDLE_TIMEOUT = 2 * 60 * 1000 // 5 minutes
+const DEFAULT_IDLE_TIMEOUT = 5 * 60 * 1000 // 5 minutes
 const DEFAULT_EVENTS = [
   'mousedown',
   'mousemove',

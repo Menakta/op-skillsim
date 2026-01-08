@@ -11,8 +11,12 @@ import { useTheme } from '@/app/context/ThemeContext'
 interface CinematicTimerProps {
   /** Duration in seconds (default: 7200 = 2 hours) */
   duration?: number
+  /** Initial time remaining (for session restore). If not provided, uses duration. */
+  initialTimeRemaining?: number | null
   /** Called when timer expires or user clicks skip */
   onSkipToTraining: () => void
+  /** Called when time remaining changes (for state persistence) */
+  onTimeChange?: (timeRemaining: number) => void
   /** Whether the cinematic mode is active */
   isActive: boolean
 }
@@ -34,25 +38,38 @@ function formatTime(seconds: number): string {
 
 export function CinematicTimer({
   duration = 7200, // 2 hours default
+  initialTimeRemaining,
   onSkipToTraining,
+  onTimeChange,
   isActive
 }: CinematicTimerProps) {
   const [timeRemaining, setTimeRemaining] = useState(duration)
   const onSkipRef = useRef(onSkipToTraining)
+  const onTimeChangeRef = useRef(onTimeChange)
   const hasInitializedRef = useRef(false)
+  const lastReportedTimeRef = useRef<number>(duration)
 
-  // Keep callback ref updated
+  // Keep callback refs updated
   useEffect(() => {
     onSkipRef.current = onSkipToTraining
   }, [onSkipToTraining])
+
+  useEffect(() => {
+    onTimeChangeRef.current = onTimeChange
+  }, [onTimeChange])
 
   // Initialize timer once when becoming active
   useEffect(() => {
     if (isActive && !hasInitializedRef.current) {
       hasInitializedRef.current = true
-      setTimeRemaining(duration)
+      // Use restored time if available, otherwise use full duration
+      const startTime = initialTimeRemaining !== null && initialTimeRemaining !== undefined
+        ? initialTimeRemaining
+        : duration
+      setTimeRemaining(startTime)
+      lastReportedTimeRef.current = startTime
     }
-  }, [isActive, duration])
+  }, [isActive, duration, initialTimeRemaining])
 
   // Countdown timer
   useEffect(() => {
@@ -62,10 +79,20 @@ export function CinematicTimer({
       setTimeRemaining(prev => {
         if (prev <= 1) {
           clearInterval(interval)
-          onSkipRef.current()
+          // Schedule callback outside of state setter to avoid React warning
+          setTimeout(() => onSkipRef.current(), 0)
           return 0
         }
-        return prev - 1
+        const newTime = prev - 1
+
+        // Report time changes every 30 seconds (to reduce saves)
+        // Schedule callback outside of state setter to avoid React warning
+        if (lastReportedTimeRef.current - newTime >= 30) {
+          lastReportedTimeRef.current = newTime
+          setTimeout(() => onTimeChangeRef.current?.(newTime), 0)
+        }
+
+        return newTime
       })
     }, 1000)
 

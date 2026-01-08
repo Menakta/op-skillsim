@@ -177,6 +177,7 @@ export {
 
 export type {
   TrainingSessionStatus,
+  PersistedTrainingState,
   TrainingSession,
   TrainingFinalResults,
   PhaseScore,
