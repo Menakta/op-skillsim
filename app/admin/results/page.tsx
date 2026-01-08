@@ -108,19 +108,16 @@ export default function ResultsPage() {
   // Export handlers
   const handleExportAll = async () => {
     const timestamp = new Date().toISOString().split('T')[0]
-    await exportToPDF(results, PDF_COLUMNS, `quiz-results-all-${timestamp}.pdf`, {
-      title: 'Quiz Results - All',
-      subtitle: `Complete export of all quiz submissions`,
+    await exportToPDF(results, PDF_COLUMNS, `quiz-results-${timestamp}.pdf`, {
+      title: 'Quiz Results',
     })
     setShowExportMenu(false)
   }
 
   const handleExportFiltered = async () => {
     const timestamp = new Date().toISOString().split('T')[0]
-    const filterDesc = resultFilter !== 'all' ? ` (${resultFilter})` : ''
-    await exportToPDF(filteredResults, PDF_COLUMNS, `quiz-results-filtered-${timestamp}.pdf`, {
-      title: 'Quiz Results - Filtered',
-      subtitle: `Filtered results${filterDesc}${searchQuery ? ` matching "${searchQuery}"` : ''}`,
+    await exportToPDF(filteredResults, PDF_COLUMNS, `quiz-results-${timestamp}.pdf`, {
+      title: 'Quiz Results',
     })
     setShowExportMenu(false)
   }
@@ -128,9 +125,8 @@ export default function ResultsPage() {
   const handleExportSelected = async () => {
     const selectedResults = results.filter(r => selectedKeys.has(r.id))
     const timestamp = new Date().toISOString().split('T')[0]
-    await exportToPDF(selectedResults, PDF_COLUMNS, `quiz-results-selected-${timestamp}.pdf`, {
-      title: 'Quiz Results - Selected',
-      subtitle: `${selectedResults.length} manually selected records`,
+    await exportToPDF(selectedResults, PDF_COLUMNS, `quiz-results-${timestamp}.pdf`, {
+      title: 'Quiz Results',
     })
     setShowExportMenu(false)
   }
