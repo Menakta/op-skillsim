@@ -322,7 +322,12 @@ export const trainingSessionService = {
   /**
    * Get saved training state for session resume
    */
-  async getState(): Promise<ServiceResult<{ trainingState: PersistedTrainingState | null; sessionId?: string }>> {
+  async getState(): Promise<ServiceResult<{
+    trainingState: PersistedTrainingState | null
+    sessionId?: string
+    currentTrainingPhase?: string
+    overallProgress?: number
+  }>> {
     try {
       const response = await fetch('/api/training/state', {
         method: 'GET',
@@ -343,6 +348,8 @@ export const trainingSessionService = {
         data: {
           trainingState: data.trainingState || null,
           sessionId: data.sessionId,
+          currentTrainingPhase: data.currentTrainingPhase,
+          overallProgress: data.overallProgress,
         },
       }
     } catch (error) {

@@ -307,15 +307,14 @@ export function useTrainingState(
       await trainingSessionService.recordTimeSpent(timeSpentMs)
     }
 
-    // Update status to paused
-    await trainingSessionService.updateStatus('paused')
+    // Save current state (session remains 'active' - user can resume)
 
     messageBus.sendMessage(WEB_TO_UE_MESSAGES.TRAINING_CONTROL, 'pause')
   }, [messageBus])
 
   const resetTraining = useCallback(async () => {
-    // Mark session as abandoned
-    await trainingSessionService.updateStatus('abandoned')
+    // Mark session as completed (training is being reset/ended)
+    await trainingSessionService.updateStatus('completed')
 
     // Reset timer
     sessionStartTimeRef.current = null

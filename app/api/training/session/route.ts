@@ -111,18 +111,46 @@ export async function POST(request: NextRequest) {
 
     const supabase = getSupabaseAdmin()
 
-    // Check for existing active session
+    // Check for any existing session (regardless of status)
     const { data: existingSession } = await supabase
       .from('training_sessions')
       .select('*')
       .eq('session_id', session.sessionId)
-      .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(1)
       .single()
 
     if (existingSession) {
-      logger.info({ sessionId: existingSession.id }, 'Returning existing training session')
+      // If session exists but is not active, reactivate it
+      if (existingSession.status !== 'active') {
+        const { data: reactivatedSession, error: updateError } = await supabase
+          .from('training_sessions')
+          .update({
+            status: 'active',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existingSession.id)
+          .select()
+          .single()
+
+        if (updateError) {
+          logger.error({ error: updateError.message }, 'Failed to reactivate training session')
+          return NextResponse.json(
+            { success: false, error: 'Failed to reactivate training session' },
+            { status: 500 }
+          )
+        }
+
+        logger.info({ sessionId: existingSession.id, previousStatus: existingSession.status }, 'Reactivated existing training session')
+        return NextResponse.json({
+          success: true,
+          session: reactivatedSession,
+          isNew: false,
+          reactivated: true,
+        })
+      }
+
+      logger.info({ sessionId: existingSession.id }, 'Returning existing active training session')
       return NextResponse.json({
         success: true,
         session: existingSession,
@@ -139,7 +167,7 @@ export async function POST(request: NextRequest) {
       enrolled_at: new Date().toISOString(),
     }
 
-    // Create new training session
+    // Create new training session (only if none exists for this session_id)
     const { data: newSession, error: createError } = await supabase
       .from('training_sessions')
       .insert({
@@ -157,6 +185,26 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (createError) {
+      // If insert failed due to duplicate (race condition), fetch the existing one
+      if (createError.code === '23505') {
+        const { data: raceSession } = await supabase
+          .from('training_sessions')
+          .select('*')
+          .eq('session_id', session.sessionId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single()
+
+        if (raceSession) {
+          logger.info({ sessionId: raceSession.id }, 'Returning session after race condition')
+          return NextResponse.json({
+            success: true,
+            session: raceSession,
+            isNew: false,
+          })
+        }
+      }
+
       logger.error({ error: createError.message }, 'Failed to create training session')
       return NextResponse.json(
         { success: false, error: 'Failed to create training session' },
@@ -211,7 +259,7 @@ export async function GET(request: NextRequest) {
       .from('training_sessions')
       .select('*')
       .eq('session_id', session.sessionId)
-      .in('status', ['active', 'paused'])
+      .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(1)
       .single()
@@ -267,21 +315,21 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json()
     const { status } = body as { status: TrainingSessionStatus }
 
-    if (!status || !['active', 'paused', 'completed', 'abandoned'].includes(status)) {
+    if (!status || !['active', 'completed'].includes(status)) {
       return NextResponse.json(
-        { success: false, error: 'Invalid status' },
+        { success: false, error: 'Invalid status. Must be "active" or "completed"' },
         { status: 400 }
       )
     }
 
     const supabase = getSupabaseAdmin()
 
-    // Get current active/paused session
+    // Get current active session
     const { data: currentSession } = await supabase
       .from('training_sessions')
       .select('id')
       .eq('session_id', session.sessionId)
-      .in('status', ['active', 'paused'])
+      .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(1)
       .single()
@@ -298,8 +346,8 @@ export async function PATCH(request: NextRequest) {
       updated_at: new Date().toISOString(),
     }
 
-    // Set end_time if completing or abandoning
-    if (status === 'completed' || status === 'abandoned') {
+    // Set end_time if completing
+    if (status === 'completed') {
       updateData.end_time = new Date().toISOString()
     }
 

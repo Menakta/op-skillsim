@@ -56,17 +56,18 @@ async function getSessionFromRequest(request: NextRequest): Promise<SessionPaylo
 async function getTrainingSessionId(userSessionId: string): Promise<string | null> {
   const supabase = getSupabaseAdmin()
 
+  // Find training session regardless of status (active, completed, etc.)
+  // Quiz responses should be saved even if training just completed
   const { data, error } = await supabase
     .from('training_sessions')
     .select('id')
     .eq('session_id', userSessionId)
-    .eq('status', 'active')
     .order('created_at', { ascending: false })
     .limit(1)
     .single()
 
   if (error || !data) {
-    logger.warn({ userSessionId, error: error?.message }, 'No active training session found')
+    logger.warn({ userSessionId, error: error?.message }, 'No training session found')
     return null
   }
 
@@ -154,34 +155,16 @@ export async function POST(request: NextRequest) {
 
     // 4. Get training session ID
     const supabase = getSupabaseAdmin()
-    let trainingSessionId = await getTrainingSessionId(session.sessionId)
+    const trainingSessionId = await getTrainingSessionId(session.sessionId)
 
     if (!trainingSessionId) {
-      // Create a placeholder training session if none exists
-      logger.warn({ sessionId: session.sessionId }, 'No training session - creating placeholder')
-
-      const { data: newSession, error: createError } = await supabase
-        .from('training_sessions')
-        .insert({
-          session_id: session.sessionId,
-          course_id: 'default',
-          course_name: 'Training Session',
-          current_training_phase: 'Phase A',
-          overall_progress: 0,
-          status: 'active',
-        })
-        .select('id')
-        .single()
-
-      if (createError || !newSession) {
-        logger.error({ error: createError?.message }, 'Failed to create training session')
-        return NextResponse.json(
-          { success: false, error: 'Failed to create training session' },
-          { status: 500 }
-        )
-      }
-
-      trainingSessionId = newSession.id
+      // No training session exists - this shouldn't happen in normal flow
+      // Training session should be created when training starts, not here
+      logger.error({ sessionId: session.sessionId }, 'No training session found - cannot save quiz response')
+      return NextResponse.json(
+        { success: false, error: 'No training session found' },
+        { status: 404 }
+      )
     }
 
     // 5. Calculate correct count and score from question data

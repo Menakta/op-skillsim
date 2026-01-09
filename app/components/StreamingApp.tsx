@@ -624,24 +624,64 @@ export default function StreamingApp() {
 
     const restoreSession = async () => {
       console.log('📂 Checking for saved training state...')
-      const savedState = await statePersistence.restoreState()
+      const restoredData = await statePersistence.restoreState()
 
-      if (savedState) {
-        hasRestoredStateRef.current = true
-        console.log('📂 Restoring training session state:', savedState)
+      // Mark restoration as attempted (even if no state was found)
+      // This allows auto-save to start after we've checked for existing state
+      hasRestoredStateRef.current = true
 
-        // Restore cinematic/training mode
-        if (savedState.mode === 'training') {
+      if (restoredData) {
+        const { trainingState, currentTrainingPhase, overallProgress } = restoredData
+
+        console.log('📂 Restoring training session:', {
+          currentTrainingPhase,
+          overallProgress,
+          hasTrainingState: !!trainingState,
+          stateMode: trainingState?.mode,
+          statePhase: trainingState?.phase,
+          stateTaskIndex: trainingState?.currentTaskIndex,
+        })
+
+        // Determine the phase to restore - use currentTrainingPhase from DB as primary source
+        const phaseToRestore = currentTrainingPhase || trainingState?.phase
+        const taskIndexToRestore = trainingState?.currentTaskIndex
+        const modeToRestore = trainingState?.mode || 'training'
+
+        // Check if we should resume training (not in cinematic mode and has progress)
+        const shouldResumeTraining = modeToRestore === 'training' ||
+          (phaseToRestore && phaseToRestore !== 'Phase A') ||
+          (overallProgress && overallProgress > 0)
+
+        if (shouldResumeTraining) {
           setIsCinematicMode(false)
           setShowExplosionControls(false)
+
+          // Restore phase from database (currentTrainingPhase is authoritative)
+          if (phaseToRestore) {
+            training.hooks.trainingState.setPhase(phaseToRestore)
+            console.log('📂 Restored phase from DB:', phaseToRestore)
+          }
+
+          // Restore task index from training_state if available
+          if (taskIndexToRestore !== undefined && taskIndexToRestore > 0) {
+            training.hooks.trainingState.setCurrentTaskIndex(taskIndexToRestore)
+            console.log('📂 Restored task index:', taskIndexToRestore)
+          }
+
           // Start training mode in UE5
           training.startTraining()
-        } else {
+
+          console.log('📂 Training resumed:', {
+            phase: phaseToRestore,
+            taskIndex: taskIndexToRestore,
+            progress: overallProgress
+          })
+        } else if (trainingState?.mode === 'cinematic') {
           setIsCinematicMode(true)
           setShowExplosionControls(true)
           // Restore cinematic timer if available
-          if (savedState.cinematicTimeRemaining !== null) {
-            setCinematicTimeRemaining(savedState.cinematicTimeRemaining)
+          if (trainingState.cinematicTimeRemaining !== null) {
+            setCinematicTimeRemaining(trainingState.cinematicTimeRemaining)
           }
         }
 
@@ -662,6 +702,10 @@ export default function StreamingApp() {
   useEffect(() => {
     if (streamerStatus !== StreamerStatus.Connected) return
     if (!isLtiSession || userRole !== 'student') return
+
+    // Don't auto-save until we've attempted to restore state
+    // This prevents overwriting saved state with initial "Phase A" on mount
+    if (!hasRestoredStateRef.current) return
 
     // Save current state
     statePersistence.saveState({

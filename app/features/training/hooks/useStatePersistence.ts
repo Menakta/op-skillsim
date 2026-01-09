@@ -51,11 +51,17 @@ export interface UseStatePersistenceOptions {
   onStateRestored?: (state: PersistedTrainingState) => void
 }
 
+export interface RestoredStateData {
+  trainingState: PersistedTrainingState | null
+  currentTrainingPhase?: string
+  overallProgress?: number
+}
+
 export interface UseStatePersistenceReturn {
   /** Save current state to database */
   saveState: (state: StatePersistenceState) => Promise<void>
-  /** Restore state from database */
-  restoreState: () => Promise<PersistedTrainingState | null>
+  /** Restore state from database - returns both trainingState and currentTrainingPhase */
+  restoreState: () => Promise<RestoredStateData | null>
   /** Whether state has been restored */
   isRestored: boolean
 }
@@ -168,7 +174,7 @@ export function useStatePersistence(
   // Restore State from Database
   // ==========================================================================
 
-  const restoreState = useCallback(async (): Promise<PersistedTrainingState | null> => {
+  const restoreState = useCallback(async (): Promise<RestoredStateData | null> => {
     if (!enabled) return null
 
     try {
@@ -179,20 +185,27 @@ export function useStatePersistence(
         return null
       }
 
-      const { trainingState } = result.data
+      const { trainingState, currentTrainingPhase, overallProgress } = result.data
 
-      if (trainingState) {
-        console.log('📂 Restored training state:', {
-          mode: trainingState.mode,
-          phase: trainingState.phase,
-          taskIndex: trainingState.currentTaskIndex,
-          progress: trainingState.progress,
-          lastUpdated: trainingState.lastUpdated
-        })
+      console.log('📂 Restored training data:', {
+        hasTrainingState: !!trainingState,
+        currentTrainingPhase,
+        overallProgress,
+        statePhase: trainingState?.phase,
+        stateTaskIndex: trainingState?.currentTaskIndex,
+      })
 
+      // If we have either trainingState or currentTrainingPhase, we can resume
+      if (trainingState || currentTrainingPhase) {
         isRestoredRef.current = true
-        onStateRestored?.(trainingState)
-        return trainingState
+        if (trainingState) {
+          onStateRestored?.(trainingState)
+        }
+        return {
+          trainingState,
+          currentTrainingPhase,
+          overallProgress,
+        }
       }
 
       return null

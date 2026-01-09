@@ -17,7 +17,7 @@ export { useStatePersistence } from './hooks/useStatePersistence'
 export type { TrainingStateData, UseTrainingStateReturn, TrainingStateCallbacks } from './hooks/useTrainingState'
 export type { ToolStateData, UseToolSelectionReturn, ToolSelectionCallbacks } from './hooks/useToolSelection'
 export type { UseFittingOptionsReturn } from './hooks/useFittingOptions'
-export type { StatePersistenceState, UseStatePersistenceOptions, UseStatePersistenceReturn } from './hooks/useStatePersistence'
+export type { StatePersistenceState, UseStatePersistenceOptions, UseStatePersistenceReturn, RestoredStateData } from './hooks/useStatePersistence'
 
 // Re-export composite hook types from canonical location
 export type { TrainingMessageCallbacks, UseTrainingMessagesConfig, TrainingState } from '@/app/hooks/useTrainingMessagesComposite'

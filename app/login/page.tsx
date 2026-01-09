@@ -11,6 +11,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
+import Link from 'next/link'
 import { useTheme } from '../context/ThemeContext'
 
 export default function LoginPage() {
@@ -190,6 +191,13 @@ export default function LoginPage() {
                 {loading ? 'Signing in' : 'Sign In'}
               </button>
             </div>
+
+            <p className={`text-sm text-center mt-4 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+              Don&apos;t have an account?{' '}
+              <Link href="/register" className="text-[#39BEAE] hover:underline">
+                Register
+              </Link>
+            </p>
           </form>
 
           </div>

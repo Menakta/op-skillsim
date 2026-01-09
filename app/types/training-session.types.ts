@@ -9,7 +9,7 @@
 // Training Session Status
 // =============================================================================
 
-export type TrainingSessionStatus = 'active' | 'paused' | 'completed' | 'abandoned'
+export type TrainingSessionStatus = 'active' | 'completed'
 
 // =============================================================================
 // Persisted Training State - For database storage (JSONB)

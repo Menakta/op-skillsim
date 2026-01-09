@@ -86,21 +86,30 @@ export async function POST(request: NextRequest) {
 
     const supabase = getSupabaseAdmin()
 
-    // Get current active session
+    // Get training session (any status - for idempotency)
     const { data: currentSession } = await supabase
       .from('training_sessions')
       .select('*')
       .eq('session_id', session.sessionId)
-      .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(1)
       .single()
 
     if (!currentSession) {
       return NextResponse.json(
-        { success: false, error: 'No active training session found' },
+        { success: false, error: 'No training session found' },
         { status: 404 }
       )
+    }
+
+    // If already completed, return success (idempotent)
+    if (currentSession.status === 'completed') {
+      logger.info({ sessionId: currentSession.id }, 'Training session already completed')
+      return NextResponse.json({
+        success: true,
+        session: currentSession,
+        alreadyCompleted: true,
+      })
     }
 
     // Calculate quiz performance from quiz data

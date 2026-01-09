@@ -71,7 +71,7 @@ export function WaypointControls({
   if (!isVisible) return null
 
   return (
-    <div className={`fixed right-4 top-1/4 -translate-y-1/2 z-30 w-53 max-h-[80vh] backdrop-blur-md rounded-xl border overflow-hidden ${
+    <div className={`fixed right-4 top-1/3 -translate-y-1/2 z-30 w-53 max-h-[80vh] backdrop-blur-md rounded-xl border overflow-hidden ${
       isDark
         ? 'bg-black/80 border-white/10'
         : 'bg-white/90 border-gray-200 shadow-lg'

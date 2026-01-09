@@ -81,12 +81,12 @@ export async function GET(request: NextRequest) {
 
     const supabase = getSupabaseAdmin()
 
-    // Get the most recent active or paused session with training_state
+    // Get the most recent active session with training_state
     const { data: trainingSession, error } = await supabase
       .from('training_sessions')
       .select('id, training_state, status, current_training_phase, overall_progress')
       .eq('session_id', session.sessionId)
-      .in('status', ['active', 'paused'])
+      .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(1)
       .single()
@@ -109,6 +109,8 @@ export async function GET(request: NextRequest) {
     logger.info({
       sessionId: trainingSession.id,
       hasState: !!trainingSession.training_state,
+      currentPhase: trainingSession.current_training_phase,
+      progress: trainingSession.overall_progress,
     }, 'Training state retrieved')
 
     return NextResponse.json({
@@ -116,6 +118,9 @@ export async function GET(request: NextRequest) {
       trainingState: trainingSession.training_state,
       sessionId: trainingSession.id,
       status: trainingSession.status,
+      // Always include these from the database as fallback/primary source
+      currentTrainingPhase: trainingSession.current_training_phase,
+      overallProgress: trainingSession.overall_progress,
     })
 
   } catch (error) {
@@ -177,7 +182,7 @@ export async function PATCH(request: NextRequest) {
       .from('training_sessions')
       .select('id')
       .eq('session_id', session.sessionId)
-      .in('status', ['active', 'paused'])
+      .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(1)
       .single()

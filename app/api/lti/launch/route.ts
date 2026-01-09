@@ -89,29 +89,94 @@ function encodeRFC3986(str: string): string {
 function createParameterString(params: LtiLaunchParams): string {
   return Object.entries(params)
     .filter(([key]) => key !== 'oauth_signature')
-    .filter(([, value]) => value !== undefined && value !== '')
+    .filter(([, value]) => value !== undefined)  // Include empty strings - they're part of the signature!
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, value]) => `${encodeRFC3986(key)}=${encodeRFC3986(value!)}`)
+    .map(([key, value]) => {
+      // Values from URLSearchParams are already decoded, so we need to encode them
+      return `${encodeRFC3986(key)}=${encodeRFC3986(value || '')}`
+    })
     .join('&')
 }
 
-function calculateOAuthSignature(
+// Alternative: Use standard percent encoding as per OAuth spec
+function createParameterStringOAuth(params: LtiLaunchParams): string {
+  return Object.entries(params)
+    .filter(([key]) => key !== 'oauth_signature')
+    .filter(([, value]) => value !== undefined)  // Include empty strings - they're part of the signature!
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, value]) => {
+      return `${encodeURIComponent(key)}=${encodeURIComponent(value || '')}`
+    })
+    .join('&')
+}
+
+interface SignatureResult {
+  rfc3986: string
+  oauth: string
+  debug?: {
+    signatureBaseRFC3986: string
+    signatureBaseOAuth: string
+    signingKey: string
+  }
+}
+
+function calculateOAuthSignatures(
   method: string,
   url: string,
   params: LtiLaunchParams,
-  consumerSecret: string
-): string {
+  consumerSecret: string,
+  debug: boolean = false
+): SignatureResult {
   const baseUrl = url.split('?')[0]
-  const paramString = createParameterString(params)
-  const signatureBase = [
+
+  // Try both encoding methods
+  const paramStringRFC3986 = createParameterString(params)
+  const paramStringOAuth = createParameterStringOAuth(params)
+
+  const signatureBaseRFC3986 = [
     method.toUpperCase(),
     encodeRFC3986(baseUrl),
-    encodeRFC3986(paramString),
+    encodeRFC3986(paramStringRFC3986),
   ].join('&')
-  const signingKey = `${encodeURIComponent(consumerSecret)}&`
-  const hmac = createHmac('sha1', signingKey)
-  hmac.update(signatureBase)
-  return hmac.digest('base64')
+
+  const signatureBaseOAuth = [
+    method.toUpperCase(),
+    encodeURIComponent(baseUrl),
+    encodeURIComponent(paramStringOAuth),
+  ].join('&')
+
+  // OAuth 1.0 signing key is: consumer_secret&token_secret
+  // For LTI 1.0, there's no token secret, so it's just: consumer_secret&
+  const trimmedSecret = consumerSecret.trim()
+  const signingKey = `${trimmedSecret}&`
+
+  // Calculate both signatures
+  const hmac1 = createHmac('sha1', signingKey)
+  hmac1.update(signatureBaseRFC3986)
+  const sig1 = hmac1.digest('base64')
+
+  const hmac2 = createHmac('sha1', signingKey)
+  hmac2.update(signatureBaseOAuth)
+  const sig2 = hmac2.digest('base64')
+
+  if (debug) {
+    console.log('=== OAuth Signature Calculation Debug ===')
+    console.log('Method:', method.toUpperCase())
+    console.log('Base URL:', baseUrl)
+    console.log('Raw secret length:', consumerSecret.length)
+    console.log('Trimmed secret length:', trimmedSecret.length)
+    console.log('Signing Key:', signingKey)
+    console.log('Signature (RFC3986):', sig1)
+    console.log('Signature (OAuth/encodeURIComponent):', sig2)
+    console.log('Signature Base (RFC3986):', signatureBaseRFC3986.substring(0, 200) + '...')
+    console.log('=========================================')
+  }
+
+  return {
+    rfc3986: sig1,
+    oauth: sig2,
+    debug: debug ? { signatureBaseRFC3986, signatureBaseOAuth, signingKey } : undefined
+  }
 }
 
 function timingSafeEqual(a: string, b: string): boolean {
@@ -163,14 +228,114 @@ export async function POST(req: NextRequest) {
 
     const launchUrl = getLaunchUrl(req)
 
-    // Validate OAuth Signature
-    const expectedSignature = calculateOAuthSignature('POST', launchUrl, params, credentials.secret)
-    const providedSignature = decodeURIComponent(params.oauth_signature || '')
+    // Debug logging for signature validation
+    console.log('=== LTI Signature Debug ===')
+    console.log('Launch URL used for signature:', launchUrl)
+    console.log('Consumer Key from request:', params.oauth_consumer_key)
+    console.log('Consumer Key from env:', credentials.key)
+    console.log('Keys match:', params.oauth_consumer_key === credentials.key)
+    console.log('Secret length from env:', credentials.secret?.length || 0)
+    console.log('Secret first 4 chars:', credentials.secret?.substring(0, 4) || 'N/A')
+    console.log('x-forwarded-proto:', req.headers.get('x-forwarded-proto'))
+    console.log('x-forwarded-host:', req.headers.get('x-forwarded-host'))
+    console.log('host:', req.headers.get('host'))
+    console.log('req.url:', req.url)
+    console.log('===========================')
 
-    if (!timingSafeEqual(providedSignature, expectedSignature)) {
-      logger.warn({ providedSignature, expectedSignature }, 'LTI Signature Mismatch')
+    // Try multiple URL variations - some LTI providers calculate signature differently
+    const urlVariations = [
+      launchUrl,                                    // Standard URL
+      launchUrl.replace(/\/$/, ''),                // Without trailing slash
+      launchUrl + '/',                             // With trailing slash
+      req.url,                                     // Original request URL
+    ]
+
+    // Also try with HTTP if HTTPS doesn't work (some providers misconfigure)
+    const httpUrl = launchUrl.replace('https://', 'http://')
+    if (httpUrl !== launchUrl) {
+      urlVariations.push(httpUrl)
+      urlVariations.push(httpUrl.replace(/\/$/, ''))
+    }
+
+    const providedSignature = decodeURIComponent(params.oauth_signature || '')
+    let signatureValid = false
+    let matchedUrl = ''
+    let matchedMethod = ''
+
+    console.log('=== Trying URL Variations ===')
+    for (const url of urlVariations) {
+      const signatures = calculateOAuthSignatures('POST', url, params, credentials.secret, false)
+
+      if (timingSafeEqual(providedSignature, signatures.rfc3986)) {
+        signatureValid = true
+        matchedUrl = url
+        matchedMethod = 'RFC3986'
+        console.log(`✓ MATCH found with URL: ${url} (RFC3986)`)
+        break
+      }
+      if (timingSafeEqual(providedSignature, signatures.oauth)) {
+        signatureValid = true
+        matchedUrl = url
+        matchedMethod = 'OAuth'
+        console.log(`✓ MATCH found with URL: ${url} (OAuth)`)
+        break
+      }
+      console.log(`✗ No match for URL: ${url}`)
+    }
+    console.log('=============================')
+
+    // Full debug output if no match
+    if (!signatureValid) {
+      const signatures = calculateOAuthSignatures('POST', launchUrl, params, credentials.secret, true)
+      console.log('Provided signature:', providedSignature)
+
+      // Log raw POST body for comparison
+      console.log('=== Raw params count:', Object.keys(params).length)
+      console.log('=== All param keys:', Object.keys(params).sort().join(', '))
+
+      // Check if roles parameter exists (common missing param)
+      console.log('=== Has roles param:', 'roles' in params, '- value:', params.roles || 'MISSING')
+
+      // Show the exact encoded parameter string we're using
+      const paramEntries = Object.entries(params)
+        .filter(([key]) => key !== 'oauth_signature')
+        .filter(([, value]) => value !== undefined)
+        .sort(([a], [b]) => a.localeCompare(b))
+
+      console.log('=== Parameter string components ===')
+      paramEntries.forEach(([key, value]) => {
+        console.log(`  ${key} = "${value || ''}" → encoded: ${encodeRFC3986(key)}=${encodeRFC3986(value || '')}`)
+      })
+      console.log('===================================')
+    }
+
+    if (!signatureValid) {
+      // Log the parameter string used for signature (for debugging)
+      const paramString = Object.entries(params)
+        .filter(([key]) => key !== 'oauth_signature')
+        .filter(([, value]) => value !== undefined && value !== '')
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, value]) => `${key}=${value}`)
+        .join('&')
+
+      console.log('=== LTI Signature FAILED - Details ===')
+      console.log('OAuth params used for signature:')
+      console.log(paramString)
+      console.log('======================================')
+
+      const signatures = calculateOAuthSignatures('POST', launchUrl, params, credentials.secret, false)
+      logger.warn({
+        providedSignature,
+        expectedRFC3986: signatures.rfc3986,
+        expectedOAuth: signatures.oauth,
+        launchUrl,
+        consumerKey: params.oauth_consumer_key,
+        urlsAttempted: urlVariations,
+      }, 'LTI Signature Mismatch - tried all URL variations')
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
     }
+
+    console.log(`=== LTI Signature VALID (${matchedMethod} with URL: ${matchedUrl}) ===`)
 
     // Extract user data from LTI params
     const ltiPayload: LtiPayload = {
@@ -232,7 +397,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ==========================================================================
-    // Student Flow: Create session with SessionManager
+    // Student Flow: Check for existing active training or create new session
     // ==========================================================================
     if (appRole === 'student') {
       // Build full name from available LTI params
@@ -266,24 +431,96 @@ export async function POST(req: NextRequest) {
       // Get request info for session tracking
       const requestInfo = await sessionManager.getRequestInfo()
 
-      // Create student session
-      const { sessionId, token } = await sessionManager.createStudentSession(ltiData, requestInfo)
+      // Check for existing active training session for this user BY EMAIL
+      // Email is the stable identifier since LTI userId changes every launch
+      const supabase = getSupabaseAdmin()
+      const { data: existingTrainingSession } = await supabase
+        .from('training_sessions')
+        .select('id, session_id, current_training_phase, overall_progress, training_state, student')
+        .eq('student->>email', email)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
 
-      // Create training session with student details
-      try {
-        await sessionManager.createTrainingSession(
+      let sessionId: string
+      let token: string
+      let isResuming = false
+
+      if (existingTrainingSession) {
+        // Found an active training session - resume it
+        isResuming = true
+        console.log('=== Resuming Existing Training Session (by email) ===')
+        console.log({
+          email,
+          trainingSessionId: existingTrainingSession.id,
+          existingSessionId: existingTrainingSession.session_id,
+          phase: existingTrainingSession.current_training_phase,
+          progress: existingTrainingSession.overall_progress,
+          hasState: !!existingTrainingSession.training_state,
+        })
+        console.log('=====================================================')
+
+        // Create a new user_session but link it to the existing training_session
+        const result = await sessionManager.createStudentSession(ltiData, requestInfo)
+        sessionId = result.sessionId
+        token = result.token
+
+        // Update the training_session to use the new user_session_id
+        // Also update the student.user_id to the new LTI userId (it changes each launch)
+        const updatedStudent = {
+          ...(existingTrainingSession.student as Record<string, unknown>),
+          user_id: ltiData.userId, // Update to current LTI userId
+        }
+
+        const { error: updateError } = await supabase
+          .from('training_sessions')
+          .update({
+            session_id: sessionId,
+            student: updatedStudent,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existingTrainingSession.id)
+
+        if (updateError) {
+          logger.warn({ error: updateError }, 'Failed to update training session with new session_id')
+        }
+
+        logger.info({
+          email,
+          userId: user.id,
           sessionId,
-          ltiData.courseId,
-          ltiData.courseName,
-          {
-            userId: ltiData.userId,
-            email: ltiData.email,
-            fullName: ltiData.fullName,
-            institution: ltiData.institution,
-          }
-        )
-      } catch (error) {
-        logger.warn({ error }, 'Failed to create training session - continuing without it')
+          trainingSessionId: existingTrainingSession.id,
+          phase: existingTrainingSession.current_training_phase,
+          progress: existingTrainingSession.overall_progress,
+        }, 'LTI Student Resume - Linked new session to existing training (by email)')
+      } else {
+        // No active training session - create new session and training
+        const result = await sessionManager.createStudentSession(ltiData, requestInfo)
+        sessionId = result.sessionId
+        token = result.token
+
+        // Create training session with student details
+        try {
+          await sessionManager.createTrainingSession(
+            sessionId,
+            ltiData.courseId,
+            ltiData.courseName,
+            {
+              userId: ltiData.userId,
+              email: ltiData.email,
+              fullName: ltiData.fullName,
+              institution: ltiData.institution,
+            }
+          )
+        } catch (error) {
+          logger.warn({ error }, 'Failed to create training session - continuing without it')
+        }
+
+        logger.info({
+          userId: user.id,
+          sessionId,
+        }, 'LTI Student Launch - Created new training session')
       }
 
       // Set session token cookie
@@ -293,6 +530,7 @@ export async function POST(req: NextRequest) {
         userId: user.id,
         sessionId,
         role: appRole,
+        isResuming,
         redirect: absoluteRedirectUrl.toString(),
       }, 'LTI Student Launch Success')
     }
