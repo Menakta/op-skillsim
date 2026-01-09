@@ -14,6 +14,9 @@ import type {
   SessionsStats,
   Course,
   QuestionFromDB,
+  RegisteredUser,
+  UsersStats,
+  ApprovalStatus,
 } from '../types'
 
 // =============================================================================
@@ -24,6 +27,7 @@ export const adminQueryKeys = {
   results: ['admin', 'results'] as const,
   sessions: ['admin', 'sessions'] as const,
   questions: ['admin', 'questions'] as const,
+  users: ['admin', 'users'] as const,
 }
 
 // =============================================================================
@@ -93,6 +97,44 @@ async function fetchQuestions(): Promise<QuestionFromDB[]> {
   }
 
   return data.questions || []
+}
+
+async function fetchUsers(): Promise<{
+  users: RegisteredUser[]
+  stats: UsersStats
+}> {
+  const response = await fetch('/api/admin/users')
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`)
+  }
+
+  const data = await response.json()
+
+  if (!data.success) {
+    throw new Error(data.error || 'Failed to fetch users')
+  }
+
+  return {
+    users: data.users || [],
+    stats: data.stats || { total: 0, pending: 0, approved: 0, rejected: 0, outsiders: 0 },
+  }
+}
+
+async function updateUserApproval(params: { userId: string; approval_status: ApprovalStatus }): Promise<RegisteredUser> {
+  const response = await fetch('/api/admin/users', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  })
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to update user')
+  }
+
+  return data.user
 }
 
 async function updateQuestion(question: QuestionFromDB): Promise<QuestionFromDB> {
@@ -172,6 +214,49 @@ export function useUpdateQuestion() {
         (old) => old?.map(q =>
           q.question_id === updatedQuestion.question_id ? updatedQuestion : q
         )
+      )
+    },
+  })
+}
+
+/**
+ * Hook to fetch registered users
+ */
+export function useUsers() {
+  return useQuery({
+    queryKey: adminQueryKeys.users,
+    queryFn: fetchUsers,
+    retry: 1,
+  })
+}
+
+/**
+ * Hook to update user approval status
+ */
+export function useUpdateUserApproval() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: updateUserApproval,
+    onSuccess: (updatedUser) => {
+      // Update the users cache
+      queryClient.setQueryData<{ users: RegisteredUser[]; stats: UsersStats }>(
+        adminQueryKeys.users,
+        (old) => {
+          if (!old) return old
+          const newUsers = old.users.map(u =>
+            u.id === updatedUser.id ? updatedUser : u
+          )
+          // Recalculate stats
+          const stats: UsersStats = {
+            total: newUsers.length,
+            pending: newUsers.filter(u => u.approval_status === 'pending').length,
+            approved: newUsers.filter(u => u.approval_status === 'approved').length,
+            rejected: newUsers.filter(u => u.approval_status === 'rejected').length,
+            outsiders: newUsers.filter(u => u.registration_type === 'outsider').length,
+          }
+          return { users: newUsers, stats }
+        }
       )
     },
   })

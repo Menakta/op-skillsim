@@ -303,3 +303,32 @@ export interface FittingsStats {
   inactive: number
   categories: number
 }
+
+// =============================================================================
+// Registered User Types (for Users page)
+// =============================================================================
+
+export type RegistrationType = 'lti' | 'outsider' | 'demo'
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
+
+export interface RegisteredUser {
+  id: string
+  email: string
+  full_name: string | null
+  registration_type: RegistrationType
+  approval_status: ApprovalStatus
+  role: 'student' | 'teacher' | 'admin'
+  institution: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface UsersStats {
+  total: number
+  pending: number
+  approved: number
+  rejected: number
+  outsiders: number
+}
+
+export type ApprovalFilter = 'all' | 'pending' | 'approved' | 'rejected'
