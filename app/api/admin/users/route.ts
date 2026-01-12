@@ -3,13 +3,14 @@
  *
  * Endpoints for managing registered users (outsiders).
  * GET: Fetch all registered users from user_profiles
- * PATCH: Update user approval status
+ * PATCH: Update user approval status (sends email notification)
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { jwtVerify } from 'jose'
 import { getSupabaseAdmin } from '@/app/lib/supabase/admin'
 import { logger } from '@/app/lib/logger'
+import { sendApprovalEmail, sendRejectionEmail } from '@/app/lib/email'
 
 const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'your-super-secret-jwt-key-min-32-chars'
@@ -106,51 +107,123 @@ export async function GET(req: NextRequest) {
 }
 
 // =============================================================================
-// PATCH - Update user approval status
+// PATCH - Update user approval status and/or role
 // =============================================================================
 
 export async function PATCH(req: NextRequest) {
   try {
-    // Verify admin session (only admins can approve/reject)
+    // Verify admin session (only admins can approve/reject/change roles)
     const session = await validateSession(req)
     if (!session || session.role !== 'admin') {
       return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 401 })
     }
 
     const body = await req.json()
-    const { userId, approval_status } = body
+    const { userId, approval_status, role } = body
 
-    if (!userId || !approval_status) {
-      return NextResponse.json({ error: 'Missing userId or approval_status' }, { status: 400 })
+    if (!userId) {
+      return NextResponse.json({ error: 'Missing userId' }, { status: 400 })
     }
 
-    if (!['pending', 'approved', 'rejected'].includes(approval_status)) {
+    // Validate at least one field to update
+    if (!approval_status && !role) {
+      return NextResponse.json({ error: 'Missing approval_status or role to update' }, { status: 400 })
+    }
+
+    // Validate approval_status if provided
+    if (approval_status && !['pending', 'approved', 'rejected'].includes(approval_status)) {
       return NextResponse.json({ error: 'Invalid approval_status' }, { status: 400 })
+    }
+
+    // Validate role if provided
+    if (role && !['student', 'teacher', 'admin'].includes(role)) {
+      return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
     }
 
     const supabase = getSupabaseAdmin()
 
+    // First, get the current user to check if status is actually changing
+    const { data: currentUser, error: fetchError } = await supabase
+      .from('user_profiles')
+      .select('email, full_name, approval_status, role')
+      .eq('id', userId)
+      .single<{ email: string; full_name: string | null; approval_status: string; role: string }>()
+
+    if (fetchError || !currentUser) {
+      logger.error({ error: fetchError, userId }, 'Failed to fetch user for update')
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    const previousStatus = currentUser.approval_status
+    const previousRole = currentUser.role
+
+    // Build update object
+    const updateData: Record<string, string> = {
+      updated_at: new Date().toISOString(),
+    }
+
+    if (approval_status) {
+      updateData.approval_status = approval_status
+    }
+
+    if (role) {
+      updateData.role = role
+    }
+
     // Update the user profile
     const { data: updatedUser, error } = await supabase
       .from('user_profiles')
-      .update({
-        approval_status,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', userId)
       .select()
       .single()
 
     if (error) {
-      logger.error({ error, userId }, 'Failed to update user approval status')
+      logger.error({ error, userId }, 'Failed to update user')
       return NextResponse.json({ error: 'Failed to update user' }, { status: 500 })
     }
 
-    logger.info({ userId, approval_status, adminId: session.userId }, 'User approval status updated')
+    logger.info({
+      userId,
+      approval_status: approval_status || previousStatus,
+      previousStatus,
+      role: role || previousRole,
+      previousRole,
+      adminId: session.userId
+    }, 'User updated')
+
+    // Send email notification if approval status changed to approved or rejected
+    let emailSent = false
+    let emailError: string | undefined
+
+    if (approval_status && previousStatus !== approval_status) {
+      const userInfo = {
+        email: currentUser.email,
+        fullName: currentUser.full_name,
+      }
+
+      if (approval_status === 'approved') {
+        const result = await sendApprovalEmail(userInfo)
+        emailSent = result.success
+        emailError = result.error
+        if (result.success) {
+          logger.info({ userId, email: currentUser.email }, 'Approval email sent to user')
+        }
+      } else if (approval_status === 'rejected') {
+        const result = await sendRejectionEmail(userInfo)
+        emailSent = result.success
+        emailError = result.error
+        if (result.success) {
+          logger.info({ userId, email: currentUser.email }, 'Rejection email sent to user')
+        }
+      }
+    }
 
     return NextResponse.json({
       success: true,
       user: updatedUser,
+      emailSent,
+      emailError,
     })
   } catch (error) {
     logger.error({ error }, 'Error in PATCH /api/admin/users')

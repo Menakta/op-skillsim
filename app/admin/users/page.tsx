@@ -10,21 +10,38 @@
 import { useState, useMemo } from 'react'
 import { UserPlus, Users, Clock, CheckCircle, XCircle, UserCheck } from 'lucide-react'
 import { DashboardLayout } from '../components/layout/DashboardLayout'
-import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card'
+import { Card, CardContent } from '../components/ui/Card'
 import { DataTable, MobileCardList } from '../components/ui/DataTable'
 import { Badge } from '../components/ui/Badge'
 import { SearchInput } from '../components/ui/SearchInput'
 import { FilterButton } from '../components/ui/FilterButton'
 import { StatCard } from '../components/ui/StatCard'
 import { LoadingState } from '../components/ui/LoadingState'
-import { useUsers, useUpdateUserApproval } from '../hooks/useAdminQueries'
+import { ExportDropdown } from '../components/ui/ExportDropdown'
+import { useUsers, useUpdateUserApproval, useUpdateUserRole } from '../hooks/useAdminQueries'
+import { useExport } from '../hooks/useExport'
+import { useAdmin } from '../context/AdminContext'
+import { formatDate, type ExportColumn } from '../utils'
 import type { RegisteredUser, Column, ApprovalFilter, BadgeVariant, ApprovalStatus } from '../types'
+
+type UserRole = 'student' | 'teacher' | 'admin'
 
 // =============================================================================
 // Constants
 // =============================================================================
 
 const ITEMS_PER_PAGE = 10
+
+// PDF Export columns configuration
+const EXPORT_COLUMNS: ExportColumn<RegisteredUser>[] = [
+  { key: 'full_name', header: 'Name', getValue: (u) => u.full_name || 'N/A' },
+  { key: 'email', header: 'Email' },
+  { key: 'role', header: 'Role', getValue: (u) => u.role.charAt(0).toUpperCase() + u.role.slice(1) },
+  { key: 'registration_type', header: 'Type', getValue: (u) => u.registration_type.charAt(0).toUpperCase() + u.registration_type.slice(1) },
+  { key: 'approval_status', header: 'Status', getValue: (u) => u.approval_status.charAt(0).toUpperCase() + u.approval_status.slice(1) },
+  { key: 'institution', header: 'Institution', getValue: (u) => u.institution || 'N/A' },
+  { key: 'created_at', header: 'Registered', getValue: (u) => formatDate(u.created_at) },
+]
 
 // =============================================================================
 // Helper Functions
@@ -38,14 +55,6 @@ function getInitials(name: string | null): string {
     .join('')
     .toUpperCase()
     .slice(0, 2)
-}
-
-function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('en-NZ', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
 }
 
 function getApprovalBadgeVariant(status: ApprovalStatus): BadgeVariant {
@@ -81,11 +90,17 @@ function getRegistrationTypeBadgeVariant(type: string): BadgeVariant {
 export default function UsersPage() {
   const { data, isLoading, error } = useUsers()
   const updateApproval = useUpdateUserApproval()
+  const updateRole = useUpdateUserRole()
+  const { userRole: currentUserRole } = useAdmin()
+
+  // Only admins can change roles
+  const isAdmin = currentUserRole === 'admin'
 
   // State
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<ApprovalFilter>('all')
   const [currentPage, setCurrentPage] = useState(1)
+  const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set())
 
   // Extract data
   const users = data?.users || []
@@ -125,6 +140,54 @@ export default function UsersPage() {
       await updateApproval.mutateAsync({ userId, approval_status: newStatus })
     } catch (error) {
       console.error('Failed to update approval status:', error)
+    }
+  }
+
+  // Handle role change (admin only)
+  const handleRoleChange = async (userId: string, newRole: UserRole) => {
+    try {
+      await updateRole.mutateAsync({ userId, role: newRole })
+    } catch (error) {
+      console.error('Failed to update user role:', error)
+    }
+  }
+
+  // Export hook
+  const {
+    showExportMenu,
+    setShowExportMenu,
+    exportMenuRef,
+    handleExportAll,
+    handleExportFiltered,
+    handleExportSelected,
+  } = useExport({
+    data: users,
+    filteredData: filteredUsers,
+    selectedKeys: selectedUsers,
+    getItemKey: (user) => user.id,
+    columns: EXPORT_COLUMNS,
+    filenamePrefix: 'registered-users',
+    title: 'Registered Users',
+  })
+
+  // Selection handlers
+  const handleSelectUser = (userId: string) => {
+    setSelectedUsers(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(userId)) {
+        newSet.delete(userId)
+      } else {
+        newSet.add(userId)
+      }
+      return newSet
+    })
+  }
+
+  const handleSelectAll = () => {
+    if (selectedUsers.size === filteredUsers.length) {
+      setSelectedUsers(new Set())
+    } else {
+      setSelectedUsers(new Set(filteredUsers.map(u => u.id)))
     }
   }
 
@@ -173,7 +236,24 @@ export default function UsersPage() {
       className: 'hidden lg:table-cell',
       headerClassName: 'hidden lg:table-cell',
       render: (user) => (
-        <span className="theme-text-secondary capitalize">{user.role}</span>
+        isAdmin ? (
+          <select
+            value={user.role}
+            onChange={(e) => {
+              e.stopPropagation()
+              handleRoleChange(user.id, e.target.value as UserRole)
+            }}
+            disabled={updateRole.isPending}
+            className="px-2 py-1 rounded-md text-sm theme-bg-secondary theme-text-primary border theme-border focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 cursor-pointer"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <option value="student">Student</option>
+            <option value="teacher">Teacher</option>
+            <option value="admin">Admin</option>
+          </select>
+        ) : (
+          <span className="theme-text-secondary capitalize">{user.role}</span>
+        )
       ),
     },
     {
@@ -247,7 +327,7 @@ export default function UsersPage() {
         </div>
       ),
     },
-  ], [updateApproval.isPending])
+  ], [updateApproval.isPending, updateRole.isPending, isAdmin, handleApproval, handleRoleChange])
 
   // Loading state
   if (isLoading) {
@@ -312,9 +392,9 @@ export default function UsersPage() {
       </div>
 
       {/* Filters */}
-      <Card className="mb-6">
+      <Card className="mb-6 lg:w-[49%] w-full">
         <CardContent className="py-4">
-          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+          <div className="flex flex-col gap-4">
             <SearchInput
               value={searchQuery}
               onChange={setSearchQuery}
@@ -322,7 +402,7 @@ export default function UsersPage() {
               className="w-full lg:w-1/2"
             />
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 items-center">
               <FilterButton
                 active={statusFilter === 'all'}
                 onClick={() => setStatusFilter('all')}
@@ -347,6 +427,19 @@ export default function UsersPage() {
               >
                 Rejected
               </FilterButton>
+
+              {/* Export Dropdown */}
+              <ExportDropdown
+                isOpen={showExportMenu}
+                onToggle={() => setShowExportMenu(!showExportMenu)}
+                menuRef={exportMenuRef}
+                onExportAll={handleExportAll}
+                onExportFiltered={handleExportFiltered}
+                onExportSelected={handleExportSelected}
+                allCount={users.length}
+                filteredCount={filteredUsers.length}
+                selectedCount={selectedUsers.size}
+              />
             </div>
           </div>
         </CardContent>
@@ -367,6 +460,9 @@ export default function UsersPage() {
         emptyDescription={searchQuery || statusFilter !== 'all' ? 'Try adjusting your filters' : 'No registered users yet'}
         getRowKey={(user) => user.id}
         showActions={false}
+        selectable={true}
+        selectedKeys={selectedUsers}
+        onSelectionChange={setSelectedUsers}
       />
 
       {/* Mobile Card List */}
@@ -386,6 +482,13 @@ export default function UsersPage() {
           <Card className="p-4">
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-3">
+                {/* Selection checkbox */}
+                <input
+                  type="checkbox"
+                  checked={selectedUsers.has(user.id)}
+                  onChange={() => handleSelectUser(user.id)}
+                  className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-[#39BEAE] focus:ring-[#39BEAE] focus:ring-offset-0 cursor-pointer"
+                />
                 <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center flex-shrink-0">
                   <span className="text-white text-sm font-medium">
                     {getInitials(user.full_name)}
@@ -408,7 +511,20 @@ export default function UsersPage() {
                 <Badge variant={getRegistrationTypeBadgeVariant(user.registration_type)}>
                   {user.registration_type}
                 </Badge>
-                <span className="text-xs theme-text-muted capitalize">{user.role}</span>
+                {isAdmin ? (
+                  <select
+                    value={user.role}
+                    onChange={(e) => handleRoleChange(user.id, e.target.value as UserRole)}
+                    disabled={updateRole.isPending}
+                    className="px-2 py-1 rounded-md text-xs theme-bg-secondary theme-text-primary border theme-border focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 cursor-pointer"
+                  >
+                    <option value="student">Student</option>
+                    <option value="teacher">Teacher</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                ) : (
+                  <span className="text-xs theme-text-muted capitalize">{user.role}</span>
+                )}
               </div>
 
               <div className="flex items-center gap-1">

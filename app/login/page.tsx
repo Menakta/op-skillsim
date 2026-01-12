@@ -24,11 +24,17 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [redirectPath, setRedirectPath] = useState<string | null>(null)
 
-  // Get redirect path from URL params
+  // Get redirect path and error from URL params
   useEffect(() => {
     const redirect = searchParams.get('redirect')
     if (redirect) {
       setRedirectPath(redirect)
+    }
+
+    // Check for rejection error from middleware
+    const errorParam = searchParams.get('error')
+    if (errorParam === 'rejected') {
+      setError('Your registration request has been rejected. Please contact an administrator if you believe this is an error.')
     }
   }, [searchParams])
 
@@ -69,19 +75,29 @@ export default function LoginPage() {
       // Small delay to ensure cookie is set before redirect
       await new Promise(resolve => setTimeout(resolve, 100))
 
+      // Debug: Log the user role for troubleshooting
+      console.log('[Login] User data:', data.user)
+      console.log('[Login] Role:', data.user.role)
+      console.log('[Login] Redirect path:', redirectPath)
+
       // Redirect based on role or to the requested path
       if (redirectPath) {
         // If there's a redirect path, go there (unless it's /admin for students)
         if (data.user.role === 'student' && redirectPath.startsWith('/admin')) {
+          console.log('[Login] Student trying to access admin, redirecting to /')
           window.location.href = '/'
         } else {
+          console.log('[Login] Redirecting to:', redirectPath)
           window.location.href = redirectPath
         }
       } else if (data.user.role === 'student') {
+        console.log('[Login] Student role, redirecting to /')
         window.location.href = '/'
       } else if (data.user.role === 'teacher' || data.user.role === 'admin') {
+        console.log('[Login] Teacher/Admin role, redirecting to /admin')
         window.location.href = '/admin'
       } else {
+        console.log('[Login] Unknown role, redirecting to /')
         window.location.href = '/'
       }
     } catch (err) {

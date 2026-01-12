@@ -9,8 +9,8 @@
  * - Admins: Admin role sessions
  */
 
-import { useState, useEffect, useMemo, useRef } from 'react'
-import { Users, GraduationCap, Shield, Activity, Download, ChevronDown } from 'lucide-react'
+import { useState, useMemo, useCallback } from 'react'
+import { Users, GraduationCap, Shield, Activity } from 'lucide-react'
 import { DashboardLayout } from '../components'
 import {
   Card,
@@ -27,6 +27,7 @@ import {
   StudentDetailModal,
   TeacherDetailModal,
   AdminDetailModal,
+  ExportDropdown,
   type Column,
 } from '../components'
 import type {
@@ -36,8 +37,8 @@ import type {
   StatusFilter,
   SessionTabType,
 } from '../types'
-import { formatDate, getInitials, exportToPDF, type ExportColumn } from '../utils'
-import { useSessions } from '../hooks'
+import { formatDate, getInitials, type ExportColumn } from '../utils'
+import { useSessions, useExportDynamic, type ExportData } from '../hooks'
 
 // =============================================================================
 // Constants
@@ -98,10 +99,6 @@ export default function SessionsPage() {
   const [selectedTeacherKeys, setSelectedTeacherKeys] = useState<Set<string>>(new Set())
   const [selectedAdminKeys, setSelectedAdminKeys] = useState<Set<string>>(new Set())
 
-  // Export dropdown state
-  const [showExportMenu, setShowExportMenu] = useState(false)
-  const exportMenuRef = useRef<HTMLDivElement>(null)
-
   const students = data?.students || []
   const teachers = data?.teachers || []
   const admins = data?.admins || []
@@ -144,7 +141,7 @@ export default function SessionsPage() {
   }, [admins, searchQuery, statusFilter])
 
   // Reset to page 1 and clear selection when filters change
-  useEffect(() => {
+  useMemo(() => {
     setStudentPage(1)
     setTeacherPage(1)
     setAdminPage(1)
@@ -153,57 +150,27 @@ export default function SessionsPage() {
     setSelectedAdminKeys(new Set())
   }, [searchQuery, statusFilter])
 
-  // Close export menu when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
-        setShowExportMenu(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
   // Get current tab data for export
-  const getCurrentTabData = () => {
+  const getCurrentTabData = useCallback((): ExportData<SessionStudent | SessionTeacher | SessionAdmin> => {
     switch (activeTab) {
       case 'students':
-        return { all: students, filtered: filteredStudents, selectedKeys: selectedStudentKeys, columns: STUDENT_PDF_COLUMNS, name: 'Students' }
+        return { all: students, filtered: filteredStudents, selectedKeys: selectedStudentKeys, columns: STUDENT_PDF_COLUMNS as ExportColumn<SessionStudent | SessionTeacher | SessionAdmin>[], name: 'Students Sessions' }
       case 'teachers':
-        return { all: teachers, filtered: filteredTeachers, selectedKeys: selectedTeacherKeys, columns: TEACHER_PDF_COLUMNS, name: 'Teachers' }
+        return { all: teachers, filtered: filteredTeachers, selectedKeys: selectedTeacherKeys, columns: TEACHER_PDF_COLUMNS as ExportColumn<SessionStudent | SessionTeacher | SessionAdmin>[], name: 'Teachers Sessions' }
       case 'admins':
-        return { all: admins, filtered: filteredAdmins, selectedKeys: selectedAdminKeys, columns: ADMIN_PDF_COLUMNS, name: 'Admins' }
+        return { all: admins, filtered: filteredAdmins, selectedKeys: selectedAdminKeys, columns: ADMIN_PDF_COLUMNS as ExportColumn<SessionStudent | SessionTeacher | SessionAdmin>[], name: 'Admins Sessions' }
     }
-  }
+  }, [activeTab, students, filteredStudents, selectedStudentKeys, teachers, filteredTeachers, selectedTeacherKeys, admins, filteredAdmins, selectedAdminKeys])
 
-  // Export handlers
-  const handleExportAll = async () => {
-    const { all, columns, name } = getCurrentTabData()
-    const timestamp = new Date().toISOString().split('T')[0]
-    await exportToPDF(all, columns as ExportColumn<SessionStudent | SessionTeacher | SessionAdmin>[], `${name.toLowerCase()}-sessions-${timestamp}.pdf`, {
-      title: `${name} Sessions`,
-    })
-    setShowExportMenu(false)
-  }
-
-  const handleExportFiltered = async () => {
-    const { filtered, columns, name } = getCurrentTabData()
-    const timestamp = new Date().toISOString().split('T')[0]
-    await exportToPDF(filtered, columns as ExportColumn<SessionStudent | SessionTeacher | SessionAdmin>[], `${name.toLowerCase()}-sessions-${timestamp}.pdf`, {
-      title: `${name} Sessions`,
-    })
-    setShowExportMenu(false)
-  }
-
-  const handleExportSelected = async () => {
-    const { all, selectedKeys, columns, name } = getCurrentTabData()
-    const selectedData = all.filter(item => selectedKeys.has(item.id))
-    const timestamp = new Date().toISOString().split('T')[0]
-    await exportToPDF(selectedData, columns as ExportColumn<SessionStudent | SessionTeacher | SessionAdmin>[], `${name.toLowerCase()}-sessions-${timestamp}.pdf`, {
-      title: `${name} Sessions`,
-    })
-    setShowExportMenu(false)
-  }
+  // Export hook
+  const {
+    showExportMenu,
+    setShowExportMenu,
+    exportMenuRef,
+    handleExportAll,
+    handleExportFiltered,
+    handleExportSelected,
+  } = useExportDynamic(getCurrentTabData, (item) => item.id)
 
   // Paginated data
   const paginatedStudents = useMemo(() => {
@@ -473,44 +440,17 @@ export default function SessionsPage() {
               )}
 
               {/* Export Dropdown */}
-              <div className="relative ml-auto" ref={exportMenuRef}>
-                <button
-                  onClick={() => setShowExportMenu(!showExportMenu)}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#39BEAE] hover:bg-[#2ea89a] text-white rounded-lg transition-colors"
-                >
-                  <Download className="w-4 h-4" />
-                  Export
-                  <ChevronDown className={`w-4 h-4 transition-transform ${showExportMenu ? 'rotate-180' : ''}`} />
-                </button>
-
-                {showExportMenu && (
-                  <div className="absolute right-0 mt-2 w-56 bg-[#1a1a1a] border border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden">
-                    <button
-                      onClick={handleExportAll}
-                      className="w-full px-4 py-3 text-left text-sm text-white hover:bg-[#39BEAE]/20 flex items-center justify-between"
-                    >
-                      <span>Export All</span>
-                      <span className="text-gray-400 text-xs">{getCurrentTabData().all.length} rows</span>
-                    </button>
-                    <button
-                      onClick={handleExportFiltered}
-                      disabled={getCurrentTabData().filtered.length === 0}
-                      className="w-full px-4 py-3 text-left text-sm text-white hover:bg-[#39BEAE]/20 flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed border-t border-gray-700"
-                    >
-                      <span>Export Filtered</span>
-                      <span className="text-gray-400 text-xs">{getCurrentTabData().filtered.length} rows</span>
-                    </button>
-                    <button
-                      onClick={handleExportSelected}
-                      disabled={getCurrentTabData().selectedKeys.size === 0}
-                      className="w-full px-4 py-3 text-left text-sm text-white hover:bg-[#39BEAE]/20 flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed border-t border-gray-700"
-                    >
-                      <span>Export Selected</span>
-                      <span className="text-gray-400 text-xs">{getCurrentTabData().selectedKeys.size} rows</span>
-                    </button>
-                  </div>
-                )}
-              </div>
+              <ExportDropdown
+                isOpen={showExportMenu}
+                onToggle={() => setShowExportMenu(!showExportMenu)}
+                menuRef={exportMenuRef}
+                onExportAll={handleExportAll}
+                onExportFiltered={handleExportFiltered}
+                onExportSelected={handleExportSelected}
+                allCount={getCurrentTabData().all.length}
+                filteredCount={getCurrentTabData().filtered.length}
+                selectedCount={getCurrentTabData().selectedKeys.size}
+              />
             </div>
           </div>
         </CardContent>

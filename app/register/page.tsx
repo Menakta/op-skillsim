@@ -5,6 +5,7 @@
  *
  * Public registration for users outside the LTI system.
  * New accounts require admin approval before access is granted.
+ * Admin is notified via email when new users register.
  */
 
 import { useState } from 'react'
@@ -12,7 +13,6 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useTheme } from '../context/ThemeContext'
-import { createClient } from '../lib/supabase/client'
 
 export default function RegisterPage() {
   const { theme, toggleTheme } = useTheme()
@@ -48,28 +48,17 @@ export default function RegisterPage() {
     }
 
     try {
-      const supabase = createClient()
-
-      const { error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-            registration_type: 'outsider',
-            approval_status: 'pending',
-            role: 'student',
-          },
-        },
+      // Call the registration API endpoint
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, fullName }),
       })
 
-      if (signUpError) {
-        // Handle specific error cases
-        if (signUpError.message.includes('already registered')) {
-          setError('An account with this email already exists. Please sign in instead.')
-        } else {
-          setError(signUpError.message)
-        }
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        setError(data.error || 'Registration failed. Please try again.')
         setLoading(false)
         return
       }

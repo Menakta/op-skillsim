@@ -9,10 +9,17 @@
  * - / (training) : Requires valid session (any role)
  * - /login : Public
  * - /api/* : Most are public (auth handled in route)
+ *
+ * Outsider Registration Flow:
+ * - Checks user_profiles for outsiders after JWT validation
+ * - Pending approval: Redirect to /pending-approval
+ * - Rejected: Sign out and redirect to /login with error
+ * - LTI and demo users bypass this check
  */
 
 import { NextResponse, type NextRequest } from 'next/server'
 import { jwtVerify } from 'jose'
+import { createClient } from '@supabase/supabase-js'
 
 const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'your-super-secret-jwt-key-min-32-chars'
@@ -23,7 +30,7 @@ const ADMIN_ROUTES = ['/admin']
 const ADMIN_API_ROUTES = ['/api/admin']
 
 // Public routes that don't require authentication
-const PUBLIC_ROUTES = ['/login', '/api/auth', '/api/lti']
+const PUBLIC_ROUTES = ['/login', '/api/auth', '/api/lti', '/register', '/pending-approval']
 
 interface SessionPayload {
   sessionId: string
@@ -31,6 +38,7 @@ interface SessionPayload {
   email: string
   role: 'student' | 'teacher' | 'admin'
   sessionType: string
+  isLti?: boolean
 }
 
 async function getSessionFromToken(token: string): Promise<SessionPayload | null> {
@@ -38,6 +46,68 @@ async function getSessionFromToken(token: string): Promise<SessionPayload | null
     const { payload } = await jwtVerify(token, JWT_SECRET)
     return payload as unknown as SessionPayload
   } catch {
+    return null
+  }
+}
+
+// Supabase client for middleware (lazy initialized)
+let _supabaseAdmin: ReturnType<typeof createClient> | null = null
+
+function getSupabaseAdmin() {
+  if (!_supabaseAdmin) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (url && serviceRoleKey) {
+      _supabaseAdmin = createClient(url, serviceRoleKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      })
+    }
+  }
+  return _supabaseAdmin
+}
+
+interface UserProfile {
+  registration_type: 'lti' | 'outsider' | 'demo'
+  approval_status: 'pending' | 'approved' | 'rejected'
+}
+
+/**
+ * Check outsider approval status from user_profiles table.
+ * Returns null if user is not an outsider or profile not found.
+ * LTI and demo users bypass this check entirely.
+ */
+async function checkOutsiderApproval(email: string, isLti?: boolean): Promise<UserProfile | null> {
+  // LTI users bypass outsider check - they're authenticated via LTI provider
+  if (isLti === true) {
+    return null
+  }
+
+  const supabase = getSupabaseAdmin()
+  if (!supabase) {
+    console.warn('[Middleware] Supabase not configured - skipping outsider check')
+    return null
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .select('registration_type, approval_status')
+      .eq('email', email)
+      .single<UserProfile>()
+
+    if (error || !data) {
+      // No profile found - could be LTI user or demo user not in user_profiles
+      return null
+    }
+
+    // Only apply approval check to outsiders
+    if (data.registration_type !== 'outsider') {
+      return null
+    }
+
+    return data
+  } catch (err) {
+    console.error('[Middleware] Error checking outsider approval:', err)
     return null
   }
 }
@@ -56,6 +126,35 @@ function isAdminApiRoute(pathname: string): boolean {
 
 function hasAdminAccess(role: string): boolean {
   return role === 'teacher' || role === 'admin'
+}
+
+/**
+ * Handle outsider approval status - redirect if pending or rejected.
+ * Returns a response to redirect, or null to continue.
+ */
+function handleOutsiderStatus(
+  profile: UserProfile,
+  request: NextRequest
+): NextResponse | null {
+  if (profile.approval_status === 'pending') {
+    // Redirect pending outsiders to the pending approval page
+    console.log(`[Middleware] Outsider pending approval - redirecting to /pending-approval`)
+    return NextResponse.redirect(new URL('/pending-approval', request.url))
+  }
+
+  if (profile.approval_status === 'rejected') {
+    // Sign out rejected outsiders and redirect to login with error
+    console.log(`[Middleware] Outsider rejected - signing out and redirecting to /login`)
+    const loginUrl = new URL('/login', request.url)
+    loginUrl.searchParams.set('error', 'rejected')
+    const response = NextResponse.redirect(loginUrl)
+    // Clear the session token to sign them out
+    response.cookies.delete('session_token')
+    return response
+  }
+
+  // Approved - allow through
+  return null
 }
 
 export async function middleware(request: NextRequest) {
@@ -100,6 +199,15 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/', request.url))
     }
 
+    // Check outsider approval status (LTI and demo users bypass this)
+    const outsiderProfile = await checkOutsiderApproval(session.email, session.isLti)
+    if (outsiderProfile) {
+      const redirectResponse = handleOutsiderStatus(outsiderProfile, request)
+      if (redirectResponse) {
+        return redirectResponse
+      }
+    }
+
     // Valid admin/teacher - allow access
     return NextResponse.next()
   }
@@ -131,6 +239,23 @@ export async function middleware(request: NextRequest) {
       )
     }
 
+    // Check outsider approval status for API routes (LTI and demo users bypass this)
+    const outsiderProfile = await checkOutsiderApproval(session.email, session.isLti)
+    if (outsiderProfile) {
+      if (outsiderProfile.approval_status === 'pending') {
+        return NextResponse.json(
+          { error: 'Account pending approval' },
+          { status: 403 }
+        )
+      }
+      if (outsiderProfile.approval_status === 'rejected') {
+        return NextResponse.json(
+          { error: 'Account access denied' },
+          { status: 403 }
+        )
+      }
+    }
+
     // Valid admin/teacher - allow access
     return NextResponse.next()
   }
@@ -155,6 +280,15 @@ export async function middleware(request: NextRequest) {
       return response
     }
 
+    // Check outsider approval status (LTI and demo users bypass this)
+    const outsiderProfile = await checkOutsiderApproval(session.email, session.isLti)
+    if (outsiderProfile) {
+      const redirectResponse = handleOutsiderStatus(outsiderProfile, request)
+      if (redirectResponse) {
+        return redirectResponse
+      }
+    }
+
     // Valid session - allow access
     console.log(`[Middleware] Training Access: Allowed for ${session.email} (${session.role})`)
     return NextResponse.next()
@@ -166,7 +300,8 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Match admin pages
+    // Match admin pages (both /admin and /admin/*)
+    '/admin',
     '/admin/:path*',
     // Match admin API routes
     '/api/admin/:path*',

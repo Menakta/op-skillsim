@@ -7,8 +7,8 @@
  * Primary data source is quiz_responses, with student info from training_sessions.
  */
 
-import { useState, useEffect, useMemo, useRef } from 'react'
-import { Award, CheckCircle, XCircle, TrendingUp, Download, ChevronDown } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { Award, CheckCircle, XCircle, TrendingUp } from 'lucide-react'
 import { DashboardLayout } from '../components/layout'
 import {
   Card,
@@ -21,11 +21,12 @@ import {
   MobileCardList,
   FilterButton,
   ResultDetailModal,
+  ExportDropdown,
   type Column,
 } from '../components'
 import type { QuizResult, ResultFilter } from '../types'
-import { formatDate, getInitials, exportToPDF, type ExportColumn } from '../utils'
-import { useResults } from '../hooks'
+import { formatDate, getInitials, type ExportColumn } from '../utils'
+import { useResults, useExport } from '../hooks'
 
 // =============================================================================
 // Constants
@@ -61,24 +62,9 @@ export default function ResultsPage() {
   // Selection state
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set())
 
-  // Export dropdown state
-  const [showExportMenu, setShowExportMenu] = useState(false)
-  const exportMenuRef = useRef<HTMLDivElement>(null)
-
   const results = data?.results || []
   const stats = data?.stats
   const courses = data?.courses || []
-
-  // Close export menu when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
-        setShowExportMenu(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
 
   // Filter results
   const filteredResults = useMemo(() => {
@@ -100,36 +86,28 @@ export default function ResultsPage() {
   }, [results, searchQuery, resultFilter, courseFilter])
 
   // Reset to page 1 and clear selection when filters change
-  useEffect(() => {
+  useMemo(() => {
     setCurrentPage(1)
     setSelectedKeys(new Set())
   }, [searchQuery, resultFilter, courseFilter])
 
-  // Export handlers
-  const handleExportAll = async () => {
-    const timestamp = new Date().toISOString().split('T')[0]
-    await exportToPDF(results, PDF_COLUMNS, `quiz-results-${timestamp}.pdf`, {
-      title: 'Quiz Results',
-    })
-    setShowExportMenu(false)
-  }
-
-  const handleExportFiltered = async () => {
-    const timestamp = new Date().toISOString().split('T')[0]
-    await exportToPDF(filteredResults, PDF_COLUMNS, `quiz-results-${timestamp}.pdf`, {
-      title: 'Quiz Results',
-    })
-    setShowExportMenu(false)
-  }
-
-  const handleExportSelected = async () => {
-    const selectedResults = results.filter(r => selectedKeys.has(r.id))
-    const timestamp = new Date().toISOString().split('T')[0]
-    await exportToPDF(selectedResults, PDF_COLUMNS, `quiz-results-${timestamp}.pdf`, {
-      title: 'Quiz Results',
-    })
-    setShowExportMenu(false)
-  }
+  // Export hook
+  const {
+    showExportMenu,
+    setShowExportMenu,
+    exportMenuRef,
+    handleExportAll,
+    handleExportFiltered,
+    handleExportSelected,
+  } = useExport({
+    data: results,
+    filteredData: filteredResults,
+    selectedKeys,
+    getItemKey: (result) => result.id,
+    columns: PDF_COLUMNS,
+    filenamePrefix: 'quiz-results',
+    title: 'Quiz Results',
+  })
 
   // Paginated results
   const paginatedResults = useMemo(() => {
@@ -333,44 +311,17 @@ export default function ResultsPage() {
               )}
 
               {/* Export Dropdown */}
-              <div className="relative ml-auto" ref={exportMenuRef}>
-                <button
-                  onClick={() => setShowExportMenu(!showExportMenu)}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#39BEAE] hover:bg-[#2ea89a] text-white rounded-lg transition-colors"
-                >
-                  <Download className="w-4 h-4" />
-                  Export
-                  <ChevronDown className={`w-4 h-4 transition-transform ${showExportMenu ? 'rotate-180' : ''}`} />
-                </button>
-
-                {showExportMenu && (
-                  <div className="absolute right-0 mt-2 w-56 bg-[#1a1a1a] border border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden">
-                    <button
-                      onClick={handleExportAll}
-                      className="w-full px-4 py-3 text-left text-sm text-white hover:bg-[#39BEAE]/20 flex items-center justify-between"
-                    >
-                      <span>Export All</span>
-                      <span className="text-gray-400 text-xs">{results.length} rows</span>
-                    </button>
-                    <button
-                      onClick={handleExportFiltered}
-                      disabled={filteredResults.length === 0}
-                      className="w-full px-4 py-3 text-left text-sm text-white hover:bg-[#39BEAE]/20 flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed border-t border-gray-700"
-                    >
-                      <span>Export Filtered</span>
-                      <span className="text-gray-400 text-xs">{filteredResults.length} rows</span>
-                    </button>
-                    <button
-                      onClick={handleExportSelected}
-                      disabled={selectedKeys.size === 0}
-                      className="w-full px-4 py-3 text-left text-sm text-white hover:bg-[#39BEAE]/20 flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed border-t border-gray-700"
-                    >
-                      <span>Export Selected</span>
-                      <span className="text-gray-400 text-xs">{selectedKeys.size} rows</span>
-                    </button>
-                  </div>
-                )}
-              </div>
+              <ExportDropdown
+                isOpen={showExportMenu}
+                onToggle={() => setShowExportMenu(!showExportMenu)}
+                menuRef={exportMenuRef}
+                onExportAll={handleExportAll}
+                onExportFiltered={handleExportFiltered}
+                onExportSelected={handleExportSelected}
+                allCount={results.length}
+                filteredCount={filteredResults.length}
+                selectedCount={selectedKeys.size}
+              />
             </div>
           </div>
         </CardContent>

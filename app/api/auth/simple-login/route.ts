@@ -1,15 +1,20 @@
 /**
- * Simple Login Endpoint (Non-LTI / Demo Mode)
+ * Simple Login Endpoint (Non-LTI / Outsider + Demo Mode)
  *
- * Authenticates using a local JSON file for demo/testing purposes.
+ * Authentication flow:
+ * 1. First checks user_profiles table for registered outsiders (Supabase auth)
+ * 2. Falls back to demo users JSON for testing purposes
+ *
+ * Outsider registration flow:
+ * - Outsiders must be approved in user_profiles before they can log in
+ * - Pending/rejected outsiders get 403 with appropriate message
+ *
  * Creates a session with isLti=false flag.
- *
- * - Students: Can do training but data won't be saved
- * - Teachers/Admins: Can view admin panel in read-only mode
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { SignJWT } from 'jose'
+import { createClient } from '@supabase/supabase-js'
 import { logger } from '@/app/lib/logger'
 import { randomUUID } from 'crypto'
 import type { UserRole } from '@/app/types'
@@ -24,6 +29,35 @@ const JWT_SECRET = new TextEncoder().encode(
 )
 
 // =============================================================================
+// Supabase Client
+// =============================================================================
+
+let _supabase: ReturnType<typeof createClient> | null = null
+
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!
+    )
+  }
+  return _supabase
+}
+
+let _supabaseAdmin: ReturnType<typeof createClient> | null = null
+
+function getSupabaseAdmin() {
+  if (!_supabaseAdmin) {
+    _supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    )
+  }
+  return _supabaseAdmin
+}
+
+// =============================================================================
 // Types
 // =============================================================================
 
@@ -36,8 +70,17 @@ interface DemoUser {
   institution: string
 }
 
+interface UserProfile {
+  id: string
+  email: string
+  full_name: string | null
+  registration_type: 'lti' | 'outsider' | 'demo'
+  approval_status: 'pending' | 'approved' | 'rejected'
+  role: UserRole
+}
+
 // =============================================================================
-// POST - Simple Email/Password Login (Demo Mode)
+// POST - Login (Outsider Registration + Demo Mode)
 // =============================================================================
 
 export async function POST(request: NextRequest) {
@@ -51,34 +94,134 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    logger.info({ email }, 'Demo login attempt')
+    logger.info({ email }, 'Login attempt')
 
-    // Find user in demo database
-    const user = (demoUsers.users as DemoUser[]).find(
+    // =========================================================================
+    // Step 1: Try Supabase authentication for registered outsiders
+    // =========================================================================
+    const supabase = getSupabase()
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+
+    if (authData?.user) {
+      // User authenticated via Supabase - check their profile
+      const supabaseAdmin = getSupabaseAdmin()
+      const { data: profile, error: profileError } = await supabaseAdmin
+        .from('user_profiles')
+        .select('id, email, full_name, registration_type, approval_status, role')
+        .eq('id', authData.user.id)
+        .single<UserProfile>()
+
+      if (profileError || !profile) {
+        logger.warn({ email, userId: authData.user.id }, 'Supabase user has no profile')
+        return NextResponse.json(
+          { success: false, error: 'Account not found. Please register first.' },
+          { status: 403 }
+        )
+      }
+
+      // Check approval status for outsiders
+      if (profile.registration_type === 'outsider') {
+        if (profile.approval_status === 'pending') {
+          logger.info({ email, userId: profile.id }, 'Outsider login blocked - pending approval')
+          return NextResponse.json(
+            { success: false, error: 'Your account is pending admin approval. Please wait for approval before signing in.' },
+            { status: 403 }
+          )
+        }
+
+        if (profile.approval_status === 'rejected') {
+          logger.info({ email, userId: profile.id }, 'Outsider login blocked - rejected')
+          return NextResponse.json(
+            { success: false, error: 'Your registration request has been rejected. Please contact an administrator if you believe this is an error.' },
+            { status: 403 }
+          )
+        }
+      }
+
+      // Approved outsider or other registration type - create session
+      const sessionId = randomUUID()
+      const now = new Date()
+      const expiresAt = new Date(now.getTime() + 60 * 60 * 1000) // 1 hour
+
+      const token = await new SignJWT({
+        sessionId,
+        userId: profile.id,
+        email: profile.email,
+        role: profile.role,
+        sessionType: profile.role === 'student' ? 'lti' : profile.role,
+        isLti: false,
+        iat: Math.floor(now.getTime() / 1000),
+      })
+        .setProtectedHeader({ alg: 'HS256' })
+        .setExpirationTime(expiresAt)
+        .sign(JWT_SECRET)
+
+      logger.info({
+        userId: profile.id,
+        email: profile.email,
+        role: profile.role,
+        registrationType: profile.registration_type,
+        isLti: false,
+        sessionId,
+      }, 'Outsider login successful')
+
+      const response = NextResponse.json({
+        success: true,
+        user: {
+          id: profile.id,
+          email: profile.email,
+          name: profile.full_name || email.split('@')[0],
+          role: profile.role,
+          isLti: false,
+        },
+      })
+
+      response.cookies.set('session_token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 60 * 60 * 24, // 24 hours
+      })
+
+      return response
+    }
+
+    // =========================================================================
+    // Step 2: Fall back to demo users for testing
+    // =========================================================================
+    const demoUser = (demoUsers.users as DemoUser[]).find(
       (u) => u.email.toLowerCase() === email.toLowerCase() && u.password === password
     )
 
-    if (!user) {
-      logger.warn({ email }, 'Demo login failed - invalid credentials')
+    if (!demoUser) {
+      // Log the appropriate error based on what happened
+      if (authError) {
+        logger.warn({ email, error: authError.message }, 'Login failed - invalid credentials')
+      } else {
+        logger.warn({ email }, 'Login failed - user not found')
+      }
       return NextResponse.json(
         { success: false, error: 'Invalid email or password' },
         { status: 401 }
       )
     }
 
-    // Generate session
+    // Demo user found - create session
     const sessionId = randomUUID()
     const now = new Date()
-    const expiresAt = new Date(now.getTime() + 60 * 60  * 1000) // 1 hour
+    const expiresAt = new Date(now.getTime() + 60 * 60 * 1000) // 1 hour
 
-    // Create JWT token with isLti=false flag
     const token = await new SignJWT({
       sessionId,
-      userId: user.id,
-      email: user.email,
-      role: user.role,
-      sessionType: user.role === 'student' ? 'lti' : user.role,
-      isLti: false, // Important: marks this as non-LTI (demo) session
+      userId: demoUser.id,
+      email: demoUser.email,
+      role: demoUser.role,
+      sessionType: demoUser.role === 'student' ? 'lti' : demoUser.role,
+      isLti: false,
       iat: Math.floor(now.getTime() / 1000),
     })
       .setProtectedHeader({ alg: 'HS256' })
@@ -86,26 +229,24 @@ export async function POST(request: NextRequest) {
       .sign(JWT_SECRET)
 
     logger.info({
-      userId: user.id,
-      email: user.email,
-      role: user.role,
+      userId: demoUser.id,
+      email: demoUser.email,
+      role: demoUser.role,
       isLti: false,
       sessionId,
     }, 'Demo login successful')
 
-    // Create response
     const response = NextResponse.json({
       success: true,
       user: {
-        id: user.id,
-        email: user.email,
-        name: user.full_name,
-        role: user.role,
+        id: demoUser.id,
+        email: demoUser.email,
+        name: demoUser.full_name,
+        role: demoUser.role,
         isLti: false,
       },
     })
 
-    // Set session token cookie
     response.cookies.set('session_token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -117,7 +258,7 @@ export async function POST(request: NextRequest) {
     return response
 
   } catch (error) {
-    logger.error({ error }, 'Demo login error')
+    logger.error({ error }, 'Login error')
     return NextResponse.json(
       { success: false, error: 'Login failed. Please try again.' },
       { status: 500 }

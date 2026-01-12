@@ -137,6 +137,22 @@ async function updateUserApproval(params: { userId: string; approval_status: App
   return data.user
 }
 
+async function updateUserRole(params: { userId: string; role: 'student' | 'teacher' | 'admin' }): Promise<RegisteredUser> {
+  const response = await fetch('/api/admin/users', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  })
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to update user role')
+  }
+
+  return data.user
+}
+
 async function updateQuestion(question: QuestionFromDB): Promise<QuestionFromDB> {
   const response = await fetch('/api/questions', {
     method: 'PUT',
@@ -248,6 +264,38 @@ export function useUpdateUserApproval() {
             u.id === updatedUser.id ? updatedUser : u
           )
           // Recalculate stats
+          const stats: UsersStats = {
+            total: newUsers.length,
+            pending: newUsers.filter(u => u.approval_status === 'pending').length,
+            approved: newUsers.filter(u => u.approval_status === 'approved').length,
+            rejected: newUsers.filter(u => u.approval_status === 'rejected').length,
+            outsiders: newUsers.filter(u => u.registration_type === 'outsider').length,
+          }
+          return { users: newUsers, stats }
+        }
+      )
+    },
+  })
+}
+
+/**
+ * Hook to update user role (admin only)
+ */
+export function useUpdateUserRole() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: updateUserRole,
+    onSuccess: (updatedUser) => {
+      // Update the users cache
+      queryClient.setQueryData<{ users: RegisteredUser[]; stats: UsersStats }>(
+        adminQueryKeys.users,
+        (old) => {
+          if (!old) return old
+          const newUsers = old.users.map(u =>
+            u.id === updatedUser.id ? updatedUser : u
+          )
+          // Stats don't change with role updates, but recalculate anyway
           const stats: UsersStats = {
             total: newUsers.length,
             pending: newUsers.filter(u => u.approval_status === 'pending').length,
