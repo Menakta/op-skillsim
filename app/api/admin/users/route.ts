@@ -44,7 +44,14 @@ interface UsersStats {
 // Helper: Validate Session
 // =============================================================================
 
-async function validateSession(req: NextRequest): Promise<{ role: string; userId?: string } | null> {
+interface SessionInfo {
+  role: string
+  isLti: boolean
+  userId: string
+  email: string
+}
+
+async function validateSession(req: NextRequest): Promise<SessionInfo | null> {
   const token = req.cookies.get('session_token')?.value
   if (!token) return null
 
@@ -52,11 +59,21 @@ async function validateSession(req: NextRequest): Promise<{ role: string; userId
     const { payload } = await jwtVerify(token, JWT_SECRET)
     return {
       role: payload.role as string,
-      userId: payload.userId as string | undefined,
+      isLti: payload.isLti as boolean || false,
+      userId: payload.userId as string || '',
+      email: payload.email as string || '',
     }
   } catch {
     return null
   }
+}
+
+// =============================================================================
+// Helper: Check if user is LTI Admin (only LTI admins can delete)
+// =============================================================================
+
+function isLtiAdmin(session: SessionInfo | null): boolean {
+  return session !== null && session.role === 'admin' && session.isLti === true
 }
 
 // =============================================================================
@@ -227,6 +244,98 @@ export async function PATCH(req: NextRequest) {
     })
   } catch (error) {
     logger.error({ error }, 'Error in PATCH /api/admin/users')
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+// =============================================================================
+// DELETE - Delete users (single or bulk) - LTI Admin only
+// =============================================================================
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const session = await validateSession(req)
+
+    if (!session) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
+
+    // Only LTI admins can delete
+    if (!isLtiAdmin(session)) {
+      return NextResponse.json(
+        { success: false, error: 'Access denied. Only LTI administrators can delete users.' },
+        { status: 403 }
+      )
+    }
+
+    const body = await req.json()
+    const { ids } = body as { ids: string[] }
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'No user IDs provided' },
+        { status: 400 }
+      )
+    }
+
+    const supabase = getSupabaseAdmin()
+    const deletedIds: string[] = []
+    const errors: string[] = []
+
+    for (const id of ids) {
+      try {
+        // Get user profile first to check if it's safe to delete
+        const { data: userProfile, error: fetchError } = await supabase
+          .from('user_profiles')
+          .select('email, registration_type')
+          .eq('id', id)
+          .single()
+
+        if (fetchError || !userProfile) {
+          errors.push(`User ${id} not found`)
+          continue
+        }
+
+        // Delete user_sessions for this user (by email)
+        await supabase
+          .from('user_sessions')
+          .delete()
+          .eq('email', userProfile.email)
+
+        // Delete the user_profile
+        const { error: deleteError } = await supabase
+          .from('user_profiles')
+          .delete()
+          .eq('id', id)
+
+        if (deleteError) {
+          errors.push(`Failed to delete user ${id}: ${deleteError.message}`)
+        } else {
+          deletedIds.push(id)
+        }
+      } catch (err) {
+        errors.push(`Error deleting user ${id}: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      }
+    }
+
+    logger.info({
+      deletedCount: deletedIds.length,
+      adminEmail: session.email,
+      deletedIds,
+    }, 'Users deleted by LTI admin')
+
+    return NextResponse.json({
+      success: true,
+      deletedCount: deletedIds.length,
+      deletedIds,
+      errors: errors.length > 0 ? errors : undefined,
+    })
+
+  } catch (error) {
+    logger.error({ error }, 'Error in DELETE /api/admin/users')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

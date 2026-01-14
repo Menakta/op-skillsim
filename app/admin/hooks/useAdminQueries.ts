@@ -309,3 +309,219 @@ export function useUpdateUserRole() {
     },
   })
 }
+
+// =============================================================================
+// Delete API Fetchers
+// =============================================================================
+
+interface DeleteResponse {
+  success: boolean
+  deletedCount: number
+  deletedIds: string[]
+  errors?: string[]
+}
+
+async function deleteSessions(params: { ids: string[]; type: 'student' | 'teacher' | 'admin' }): Promise<DeleteResponse> {
+  const response = await fetch('/api/admin/sessions', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  })
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to delete sessions')
+  }
+
+  return data
+}
+
+async function deleteResults(params: { ids: string[] }): Promise<DeleteResponse> {
+  const response = await fetch('/api/admin/results', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  })
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to delete results')
+  }
+
+  return data
+}
+
+async function deleteUsers(params: { ids: string[] }): Promise<DeleteResponse> {
+  const response = await fetch('/api/admin/users', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  })
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to delete users')
+  }
+
+  return data
+}
+
+// =============================================================================
+// Delete Mutation Hooks
+// =============================================================================
+
+/**
+ * Hook to delete sessions (LTI Admin only)
+ */
+export function useDeleteSessions() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: deleteSessions,
+    onSuccess: (data, variables) => {
+      // Update the sessions cache by removing deleted items
+      queryClient.setQueryData<{
+        students: SessionStudent[]
+        teachers: SessionTeacher[]
+        admins: SessionAdmin[]
+        stats: SessionsStats
+      }>(
+        adminQueryKeys.sessions,
+        (old) => {
+          if (!old) return old
+
+          const deletedSet = new Set(data.deletedIds)
+
+          if (variables.type === 'student') {
+            const newStudents = old.students.filter(s => !deletedSet.has(s.id))
+            return {
+              ...old,
+              students: newStudents,
+              stats: {
+                ...old.stats,
+                students: {
+                  ...old.stats.students,
+                  total: newStudents.length,
+                  active: newStudents.filter(s => s.status === 'active').length,
+                  completed: newStudents.filter(s => s.status === 'completed').length,
+                },
+              },
+            }
+          } else if (variables.type === 'teacher') {
+            const newTeachers = old.teachers.filter(t => !deletedSet.has(t.id))
+            return {
+              ...old,
+              teachers: newTeachers,
+              stats: {
+                ...old.stats,
+                teachers: {
+                  total: newTeachers.length,
+                  active: newTeachers.filter(t => t.status === 'active').length,
+                },
+              },
+            }
+          } else if (variables.type === 'admin') {
+            const newAdmins = old.admins.filter(a => !deletedSet.has(a.id))
+            return {
+              ...old,
+              admins: newAdmins,
+              stats: {
+                ...old.stats,
+                admins: {
+                  total: newAdmins.length,
+                  active: newAdmins.filter(a => a.status === 'active').length,
+                },
+              },
+            }
+          }
+
+          return old
+        }
+      )
+    },
+  })
+}
+
+/**
+ * Hook to delete results (LTI Admin only)
+ */
+export function useDeleteResults() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: deleteResults,
+    onSuccess: (data) => {
+      // Update the results cache by removing deleted items
+      queryClient.setQueryData<{
+        results: QuizResult[]
+        stats: ResultsStats
+        courses: Course[]
+      }>(
+        adminQueryKeys.results,
+        (old) => {
+          if (!old) return old
+
+          const deletedSet = new Set(data.deletedIds)
+          const newResults = old.results.filter(r => !deletedSet.has(r.id))
+
+          // Recalculate stats
+          const passedCount = newResults.filter(r => r.passed).length
+          const failedCount = newResults.filter(r => !r.passed).length
+
+          return {
+            ...old,
+            results: newResults,
+            stats: {
+              totalResults: newResults.length,
+              passedCount,
+              failedCount,
+              avgScore: newResults.length > 0
+                ? Math.round(newResults.reduce((acc, r) => acc + r.scorePercentage, 0) / newResults.length)
+                : 0,
+              passRate: newResults.length > 0
+                ? Math.round((passedCount / newResults.length) * 100)
+                : 0,
+            },
+          }
+        }
+      )
+    },
+  })
+}
+
+/**
+ * Hook to delete users (LTI Admin only)
+ */
+export function useDeleteUsers() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: deleteUsers,
+    onSuccess: (data) => {
+      // Update the users cache by removing deleted items
+      queryClient.setQueryData<{ users: RegisteredUser[]; stats: UsersStats }>(
+        adminQueryKeys.users,
+        (old) => {
+          if (!old) return old
+
+          const deletedSet = new Set(data.deletedIds)
+          const newUsers = old.users.filter(u => !deletedSet.has(u.id))
+
+          // Recalculate stats
+          const stats: UsersStats = {
+            total: newUsers.length,
+            pending: newUsers.filter(u => u.approval_status === 'pending').length,
+            approved: newUsers.filter(u => u.approval_status === 'approved').length,
+            rejected: newUsers.filter(u => u.approval_status === 'rejected').length,
+            outsiders: newUsers.filter(u => u.registration_type === 'outsider').length,
+          }
+
+          return { users: newUsers, stats }
+        }
+      )
+    },
+  })
+}

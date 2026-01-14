@@ -29,7 +29,14 @@ interface QuestionDetail {
 // Helper: Get session from token
 // =============================================================================
 
-async function getSessionFromRequest(request: NextRequest): Promise<{ role: string } | null> {
+interface SessionInfo {
+  role: string
+  isLti: boolean
+  userId: string
+  email: string
+}
+
+async function getSessionFromRequest(request: NextRequest): Promise<SessionInfo | null> {
   const token = request.cookies.get('session_token')?.value
 
   if (!token) {
@@ -40,10 +47,21 @@ async function getSessionFromRequest(request: NextRequest): Promise<{ role: stri
     const { payload } = await jwtVerify(token, JWT_SECRET)
     return {
       role: payload.role as string,
+      isLti: payload.isLti as boolean || false,
+      userId: payload.userId as string || '',
+      email: payload.email as string || '',
     }
   } catch {
     return null
   }
+}
+
+// =============================================================================
+// Helper: Check if user is LTI Admin (only LTI admins can delete)
+// =============================================================================
+
+function isLtiAdmin(session: SessionInfo | null): boolean {
+  return session !== null && session.role === 'admin' && session.isLti === true
 }
 
 // =============================================================================
@@ -263,6 +281,82 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     logger.error({ error }, 'Results GET error')
+    return NextResponse.json(
+      { success: false, error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+// =============================================================================
+// DELETE - Delete quiz results (single or bulk) - LTI Admin only
+// =============================================================================
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = await getSessionFromRequest(request)
+
+    if (!session) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
+
+    // Only LTI admins can delete
+    if (!isLtiAdmin(session)) {
+      return NextResponse.json(
+        { success: false, error: 'Access denied. Only LTI administrators can delete results.' },
+        { status: 403 }
+      )
+    }
+
+    const body = await request.json()
+    const { ids } = body as { ids: string[] }
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'No result IDs provided' },
+        { status: 400 }
+      )
+    }
+
+    const supabase = getSupabaseAdmin()
+    const deletedIds: string[] = []
+    const errors: string[] = []
+
+    for (const id of ids) {
+      try {
+        const { error: deleteError } = await supabase
+          .from('quiz_responses')
+          .delete()
+          .eq('id', id)
+
+        if (deleteError) {
+          errors.push(`Failed to delete result ${id}: ${deleteError.message}`)
+        } else {
+          deletedIds.push(id)
+        }
+      } catch (err) {
+        errors.push(`Error deleting result ${id}: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      }
+    }
+
+    logger.info({
+      deletedCount: deletedIds.length,
+      adminEmail: session.email,
+      deletedIds,
+    }, 'Quiz results deleted by LTI admin')
+
+    return NextResponse.json({
+      success: true,
+      deletedCount: deletedIds.length,
+      deletedIds,
+      errors: errors.length > 0 ? errors : undefined,
+    })
+
+  } catch (error) {
+    logger.error({ error }, 'Results DELETE error')
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }

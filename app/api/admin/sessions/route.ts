@@ -74,7 +74,14 @@ interface TrainingSession {
 // Helper: Get session from token
 // =============================================================================
 
-async function getSessionFromRequest(request: NextRequest): Promise<{ role: string } | null> {
+interface SessionInfo {
+  role: string
+  isLti: boolean
+  userId: string
+  email: string
+}
+
+async function getSessionFromRequest(request: NextRequest): Promise<SessionInfo | null> {
   const token = request.cookies.get('session_token')?.value
 
   if (!token) {
@@ -85,10 +92,21 @@ async function getSessionFromRequest(request: NextRequest): Promise<{ role: stri
     const { payload } = await jwtVerify(token, JWT_SECRET)
     return {
       role: payload.role as string,
+      isLti: payload.isLti as boolean || false,
+      userId: payload.userId as string || '',
+      email: payload.email as string || '',
     }
   } catch {
     return null
   }
+}
+
+// =============================================================================
+// Helper: Check if user is LTI Admin (only LTI admins can delete)
+// =============================================================================
+
+function isLtiAdmin(session: SessionInfo | null): boolean {
+  return session !== null && session.role === 'admin' && session.isLti === true
 }
 
 // =============================================================================
@@ -346,6 +364,124 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     logger.error({ error }, 'Sessions GET error')
+    return NextResponse.json(
+      { success: false, error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+// =============================================================================
+// DELETE - Delete sessions (single or bulk) - LTI Admin only
+// =============================================================================
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = await getSessionFromRequest(request)
+
+    if (!session) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
+
+    // Only LTI admins can delete
+    if (!isLtiAdmin(session)) {
+      return NextResponse.json(
+        { success: false, error: 'Access denied. Only LTI administrators can delete sessions.' },
+        { status: 403 }
+      )
+    }
+
+    const body = await request.json()
+    const { ids, type } = body as { ids: string[]; type: 'student' | 'teacher' | 'admin' }
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'No session IDs provided' },
+        { status: 400 }
+      )
+    }
+
+    if (!type || !['student', 'teacher', 'admin'].includes(type)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid session type' },
+        { status: 400 }
+      )
+    }
+
+    const supabase = getSupabaseAdmin()
+    const deletedIds: string[] = []
+    const errors: string[] = []
+
+    for (const id of ids) {
+      try {
+        // For students, also delete related training_sessions and quiz_responses
+        if (type === 'student') {
+          // Get the user_session to find the session_id
+          const { data: userSession } = await supabase
+            .from('user_sessions')
+            .select('session_id')
+            .eq('id', id)
+            .single()
+
+          if (userSession) {
+            // Find training_session by session_id
+            const { data: trainingSession } = await supabase
+              .from('training_sessions')
+              .select('id')
+              .eq('session_id', userSession.session_id)
+              .single()
+
+            if (trainingSession) {
+              // Delete quiz_responses for this training session
+              await supabase
+                .from('quiz_responses')
+                .delete()
+                .eq('session_id', trainingSession.id)
+
+              // Delete the training_session
+              await supabase
+                .from('training_sessions')
+                .delete()
+                .eq('id', trainingSession.id)
+            }
+          }
+        }
+
+        // Delete the user_session
+        const { error: deleteError } = await supabase
+          .from('user_sessions')
+          .delete()
+          .eq('id', id)
+
+        if (deleteError) {
+          errors.push(`Failed to delete session ${id}: ${deleteError.message}`)
+        } else {
+          deletedIds.push(id)
+        }
+      } catch (err) {
+        errors.push(`Error deleting session ${id}: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      }
+    }
+
+    logger.info({
+      deletedCount: deletedIds.length,
+      type,
+      adminEmail: session.email,
+      deletedIds,
+    }, 'Sessions deleted by LTI admin')
+
+    return NextResponse.json({
+      success: true,
+      deletedCount: deletedIds.length,
+      deletedIds,
+      errors: errors.length > 0 ? errors : undefined,
+    })
+
+  } catch (error) {
+    logger.error({ error }, 'Sessions DELETE error')
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }

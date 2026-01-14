@@ -173,6 +173,8 @@ export async function middleware(request: NextRequest) {
 
   // Check admin routes (pages)
   if (isAdminRoute(pathname)) {
+    console.log(`[Middleware] Admin route detected: ${pathname}`)
+
     if (!token) {
       console.log(`[Middleware] Admin Access Denied: No Token for ${pathname}`)
       // No token - redirect to login
@@ -182,8 +184,10 @@ export async function middleware(request: NextRequest) {
     }
 
     const session = await getSessionFromToken(token)
+    console.log(`[Middleware] Admin route - Session:`, session ? { userId: session.userId, role: session.role, email: session.email, isLti: session.isLti } : 'null')
 
     if (!session) {
+      console.log(`[Middleware] Admin Access Denied: Invalid session token for ${pathname}`)
       // Invalid token - redirect to login
       const loginUrl = new URL('/login', request.url)
       loginUrl.searchParams.set('redirect', pathname)
@@ -201,6 +205,8 @@ export async function middleware(request: NextRequest) {
 
     // Check outsider approval status (LTI and demo users bypass this)
     const outsiderProfile = await checkOutsiderApproval(session.email, session.isLti)
+    console.log(`[Middleware] Outsider profile check for ${session.email}:`, outsiderProfile)
+
     if (outsiderProfile) {
       const redirectResponse = handleOutsiderStatus(outsiderProfile, request)
       if (redirectResponse) {
@@ -209,6 +215,7 @@ export async function middleware(request: NextRequest) {
     }
 
     // Valid admin/teacher - allow access
+    console.log(`[Middleware] Admin Access GRANTED for ${session.email} (${session.role}) to ${pathname}`)
     return NextResponse.next()
   }
 

@@ -10,7 +10,7 @@
  */
 
 import { useState, useMemo, useCallback } from 'react'
-import { Users, GraduationCap, Shield, Activity } from 'lucide-react'
+import { Users, GraduationCap, Shield, Activity, Trash2 } from 'lucide-react'
 import { DashboardLayout } from '../components'
 import {
   Card,
@@ -28,6 +28,7 @@ import {
   TeacherDetailModal,
   AdminDetailModal,
   ExportDropdown,
+  ConfirmDialog,
   type Column,
 } from '../components'
 import type {
@@ -38,7 +39,7 @@ import type {
   SessionTabType,
 } from '../types'
 import { formatDate, getInitials, type ExportColumn } from '../utils'
-import { useSessions, useExportDynamic, type ExportData } from '../hooks'
+import { useSessions, useExportDynamic, useDeleteSessions, useIsLtiAdmin, type ExportData } from '../hooks'
 
 // =============================================================================
 // Constants
@@ -80,7 +81,9 @@ const ADMIN_PDF_COLUMNS: ExportColumn<SessionAdmin>[] = [
 // =============================================================================
 
 export default function SessionsPage() {
-  const { data, isLoading, error } = useSessions()
+  const { data, isLoading, error, refetch } = useSessions()
+  const { isLtiAdmin } = useIsLtiAdmin()
+  const deleteSessions = useDeleteSessions()
 
   const [activeTab, setActiveTab] = useState<SessionTabType>('students')
   const [searchQuery, setSearchQuery] = useState('')
@@ -98,6 +101,11 @@ export default function SessionsPage() {
   const [selectedStudentKeys, setSelectedStudentKeys] = useState<Set<string>>(new Set())
   const [selectedTeacherKeys, setSelectedTeacherKeys] = useState<Set<string>>(new Set())
   const [selectedAdminKeys, setSelectedAdminKeys] = useState<Set<string>>(new Set())
+
+  // Delete confirmation state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteType, setDeleteType] = useState<'selected' | 'single'>('selected')
+  const [singleDeleteId, setSingleDeleteId] = useState<string | null>(null)
 
   const students = data?.students || []
   const teachers = data?.teachers || []
@@ -171,6 +179,63 @@ export default function SessionsPage() {
     handleExportFiltered,
     handleExportSelected,
   } = useExportDynamic(getCurrentTabData, (item) => item.id)
+
+  // Get current selection based on active tab
+  const getCurrentSelectedKeys = useCallback(() => {
+    switch (activeTab) {
+      case 'students':
+        return selectedStudentKeys
+      case 'teachers':
+        return selectedTeacherKeys
+      case 'admins':
+        return selectedAdminKeys
+    }
+  }, [activeTab, selectedStudentKeys, selectedTeacherKeys, selectedAdminKeys])
+
+  // Clear selection for current tab
+  const clearCurrentSelection = useCallback(() => {
+    switch (activeTab) {
+      case 'students':
+        setSelectedStudentKeys(new Set())
+        break
+      case 'teachers':
+        setSelectedTeacherKeys(new Set())
+        break
+      case 'admins':
+        setSelectedAdminKeys(new Set())
+        break
+    }
+  }, [activeTab])
+
+  // Handle delete button click
+  const handleDeleteClick = useCallback(() => {
+    setDeleteType('selected')
+    setSingleDeleteId(null)
+    setShowDeleteConfirm(true)
+  }, [])
+
+  // Handle delete confirmation
+  const handleDeleteConfirm = useCallback(async () => {
+    const ids = deleteType === 'single' && singleDeleteId
+      ? [singleDeleteId]
+      : Array.from(getCurrentSelectedKeys())
+
+    if (ids.length === 0) return
+
+    // Convert plural tab name to singular for API
+    const typeMap = { students: 'student', teachers: 'teacher', admins: 'admin' } as const
+    const type = typeMap[activeTab]
+
+    try {
+      await deleteSessions.mutateAsync({ ids, type })
+      clearCurrentSelection()
+      setSingleDeleteId(null)
+      setShowDeleteConfirm(false)
+      refetch()
+    } catch (error) {
+      console.error('Delete failed:', error)
+    }
+  }, [deleteType, singleDeleteId, getCurrentSelectedKeys, deleteSessions, activeTab, clearCurrentSelection, refetch])
 
   // Paginated data
   const paginatedStudents = useMemo(() => {
@@ -451,6 +516,17 @@ export default function SessionsPage() {
                 filteredCount={getCurrentTabData().filtered.length}
                 selectedCount={getCurrentTabData().selectedKeys.size}
               />
+
+              {/* Delete Button - Only visible to LTI Admins */}
+              {isLtiAdmin && getCurrentSelectedKeys().size > 0 && (
+                <button
+                  onClick={handleDeleteClick}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete ({getCurrentSelectedKeys().size})
+                </button>
+              )}
             </div>
           </div>
         </CardContent>
@@ -491,7 +567,7 @@ export default function SessionsPage() {
             emptyDescription={students.length === 0 ? "No student sessions yet" : "Try adjusting your search or filter"}
             getRowKey={(student) => student.id}
             renderCard={(student) => (
-              <Card className="p-4">
+              <Card className="p-1">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0 flex-1">
                     <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center flex-shrink-0">
@@ -652,6 +728,18 @@ export default function SessionsPage() {
       {selectedAdmin && (
         <AdminDetailModal admin={selectedAdmin} onClose={() => setSelectedAdmin(null)} />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={handleDeleteConfirm}
+        title={`Delete ${activeTab === 'students' ? 'Student' : activeTab === 'teachers' ? 'Teacher' : 'Admin'} Sessions`}
+        message={`Are you sure you want to delete ${deleteType === 'single' ? 'this session' : `${getCurrentSelectedKeys().size} selected sessions`}? ${activeTab === 'students' ? 'This will also delete all associated training data and quiz responses.' : ''} This action cannot be undone.`}
+        confirmText="Delete"
+        isLoading={deleteSessions.isPending}
+        variant="danger"
+      />
     </DashboardLayout>
   )
 }

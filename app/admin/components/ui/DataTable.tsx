@@ -89,7 +89,7 @@ export function DataTable<T>({
   }
 
   return (
-    <Card className="hidden md:block">
+    <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -113,7 +113,8 @@ export function DataTable<T>({
           />
         ) : (
           <>
-            <Table>
+            <div className="overflow-x-auto">
+              <Table>
               <TableHeader>
                 <TableRow>
                   {selectable && (
@@ -175,6 +176,7 @@ export function DataTable<T>({
                 })}
               </TableBody>
             </Table>
+            </div>
             {totalPages > 1 && (
               <div className="px-6 py-4 border-t theme-border">
                 <Pagination
@@ -228,8 +230,9 @@ export function MobileCardList<T>({
   getRowKey,
   renderCard,
 }: MobileCardListProps<T>) {
+  // Hidden - DataTable now handles all screen sizes with horizontal scroll
   return (
-    <div className="md:hidden space-y-3">
+    <div className="hidden space-y-2">
       <div className="flex items-center justify-between px-1">
         <span className="text-sm font-medium theme-text-primary">{title}</span>
         <span className="text-gray-400 text-sm">{totalItems} items</span>
@@ -255,7 +258,7 @@ export function MobileCardList<T>({
             </div>
           ))}
           {totalPages > 1 && (
-            <div className="py-4">
+            <div className="py-2">
               <Pagination
                 currentPage={currentPage}
                 totalPages={totalPages}

@@ -126,9 +126,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Update phases completed and score
+    // Update phases completed (score is tracked separately via quiz_responses)
     const newPhasesCompleted = currentSession.phases_completed + 1
-    const newTotalScore = currentSession.total_score + (score || 0)
+    // Don't accumulate phase scores - total_score will be calculated from quiz responses
     const newTimeSpent = currentSession.total_time_spent + Math.floor((timeSpentMs || 0) / 1000)
 
     // Determine next phase
@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
       .from('training_sessions')
       .update({
         phases_completed: newPhasesCompleted,
-        total_score: newTotalScore,
+        // total_score is NOT updated here - it comes from quiz_responses at completion
         total_time_spent: newTimeSpent,
         current_training_phase: nextPhase,
         overall_progress: overallProgress,
@@ -164,15 +164,12 @@ export async function POST(request: NextRequest) {
     logger.info({
       sessionId: currentSession.id,
       phase,
-      score,
       phasesCompleted: newPhasesCompleted,
-      totalScore: newTotalScore,
     }, 'Training phase completed')
 
     return NextResponse.json({
       success: true,
       phasesCompleted: newPhasesCompleted,
-      totalScore: newTotalScore,
       nextPhase,
       overallProgress,
     })

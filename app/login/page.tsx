@@ -80,26 +80,30 @@ export default function LoginPage() {
       console.log('[Login] Role:', data.user.role)
       console.log('[Login] Redirect path:', redirectPath)
 
-      // Redirect based on role or to the requested path
-      if (redirectPath) {
-        // If there's a redirect path, go there (unless it's /admin for students)
-        if (data.user.role === 'student' && redirectPath.startsWith('/admin')) {
-          console.log('[Login] Student trying to access admin, redirecting to /')
-          window.location.href = '/'
-        } else {
-          console.log('[Login] Redirecting to:', redirectPath)
-          window.location.href = redirectPath
-        }
+      // Determine redirect destination based on role
+      // Teachers and admins should always go to /admin, students to /
+      const isAdminUser = data.user.role === 'teacher' || data.user.role === 'admin'
+
+      let destination: string
+      if (isAdminUser) {
+        // Admin/Teacher always goes to /admin
+        destination = '/admin'
+        console.log('[Login] Admin/Teacher role detected, destination: /admin')
       } else if (data.user.role === 'student') {
-        console.log('[Login] Student role, redirecting to /')
-        window.location.href = '/'
-      } else if (data.user.role === 'teacher' || data.user.role === 'admin') {
-        console.log('[Login] Teacher/Admin role, redirecting to /admin')
-        window.location.href = '/admin'
+        // Students go to requested path (if not admin) or home
+        if (redirectPath && !redirectPath.startsWith('/admin')) {
+          destination = redirectPath
+        } else {
+          destination = '/'
+        }
+        console.log('[Login] Student role, destination:', destination)
       } else {
-        console.log('[Login] Unknown role, redirecting to /')
-        window.location.href = '/'
+        destination = '/'
+        console.log('[Login] Unknown role, destination: /')
       }
+
+      console.log('[Login] Final redirect destination:', destination)
+      window.location.href = destination
     } catch (err) {
       setError('Network error. Please try again.')
       setLoading(false)

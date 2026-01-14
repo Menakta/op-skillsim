@@ -73,11 +73,11 @@ export function Pagination({
   }
 
   return (
-    <div className={`flex items-center justify-between gap-4 ${className}`}>
+    <div className={`flex items-center justify-between gap-2 ${className}`}>
       {/* Item count */}
       {showItemCount && totalItems !== undefined && (
-        <p className="text-sm theme-text-muted">
-          Showing {startItem}-{endItem} of {totalItems}
+        <p className="text-xs theme-text-muted">
+          {startItem}-{endItem} of {totalItems}
         </p>
       )}
 
@@ -87,23 +87,23 @@ export function Pagination({
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className="p-2 rounded-lg transition-colors theme-bg-secondary theme-border border disabled:opacity-50 disabled:cursor-not-allowed hover:theme-bg-tertiary"
+          className="p-1 rounded-lg transition-colors theme-bg-secondary theme-border border disabled:opacity-50 disabled:cursor-not-allowed hover:theme-bg-tertiary"
           aria-label="Previous page"
         >
-          <ChevronLeft className="w-4 h-4 theme-text-muted" />
+          <ChevronLeft className="w-3 h-3 md:w-4 md:h-4 theme-text-muted" />
         </button>
 
         {/* Page numbers */}
         {getPageNumbers().map((page, index) => (
           page === 'ellipsis' ? (
-            <span key={`ellipsis-${index}`} className="px-2 theme-text-muted">
+            <span key={`ellipsis-${index}`} className="px-1 theme-text-muted">
               ...
             </span>
           ) : (
             <button
               key={page}
               onClick={() => onPageChange(page)}
-              className={`min-w-[36px] h-9 px-3 rounded-lg text-sm font-medium transition-colors ${
+              className={`min-w-[30px] h-6 md:h-8 md:min-w-[36px] px-2 rounded-lg text-sm font-medium transition-colors ${
                 currentPage === page
                   ? 'bg-[#39BEAE] text-white'
                   : 'theme-bg-secondary theme-border border hover:theme-bg-tertiary theme-text-primary'
@@ -118,10 +118,10 @@ export function Pagination({
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className="p-2 rounded-lg transition-colors theme-bg-secondary theme-border border disabled:opacity-50 disabled:cursor-not-allowed hover:theme-bg-tertiary"
+          className="p-1 rounded-lg transition-colors theme-bg-secondary theme-border border disabled:opacity-50 disabled:cursor-not-allowed hover:theme-bg-tertiary"
           aria-label="Next page"
         >
-          <ChevronRight className="w-4 h-4 theme-text-muted" />
+          <ChevronRight className=" w-3 h-3 md:w-4 md:h-4 theme-text-muted" />
         </button>
       </div>
     </div>

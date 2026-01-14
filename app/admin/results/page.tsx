@@ -7,8 +7,8 @@
  * Primary data source is quiz_responses, with student info from training_sessions.
  */
 
-import { useState, useMemo } from 'react'
-import { Award, CheckCircle, XCircle, TrendingUp } from 'lucide-react'
+import { useState, useMemo, useCallback } from 'react'
+import { Award, CheckCircle, XCircle, TrendingUp, Trash2 } from 'lucide-react'
 import { DashboardLayout } from '../components/layout'
 import {
   Card,
@@ -22,11 +22,12 @@ import {
   FilterButton,
   ResultDetailModal,
   ExportDropdown,
+  ConfirmDialog,
   type Column,
 } from '../components'
 import type { QuizResult, ResultFilter } from '../types'
 import { formatDate, getInitials, type ExportColumn } from '../utils'
-import { useResults, useExport } from '../hooks'
+import { useResults, useExport, useDeleteResults, useIsLtiAdmin } from '../hooks'
 
 // =============================================================================
 // Constants
@@ -51,7 +52,9 @@ const PDF_COLUMNS: ExportColumn<QuizResult>[] = [
 ]
 
 export default function ResultsPage() {
-  const { data, isLoading, error } = useResults()
+  const { data, isLoading, error, refetch } = useResults()
+  const { isLtiAdmin } = useIsLtiAdmin()
+  const deleteResults = useDeleteResults()
 
   const [searchQuery, setSearchQuery] = useState('')
   const [resultFilter, setResultFilter] = useState<ResultFilter>('all')
@@ -61,6 +64,9 @@ export default function ResultsPage() {
 
   // Selection state
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set())
+
+  // Delete confirmation state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   const results = data?.results || []
   const stats = data?.stats
@@ -108,6 +114,26 @@ export default function ResultsPage() {
     filenamePrefix: 'quiz-results',
     title: 'Quiz Results',
   })
+
+  // Handle delete button click
+  const handleDeleteClick = useCallback(() => {
+    setShowDeleteConfirm(true)
+  }, [])
+
+  // Handle delete confirmation
+  const handleDeleteConfirm = useCallback(async () => {
+    const ids = Array.from(selectedKeys)
+    if (ids.length === 0) return
+
+    try {
+      await deleteResults.mutateAsync({ ids })
+      setSelectedKeys(new Set())
+      setShowDeleteConfirm(false)
+      refetch()
+    } catch (error) {
+      console.error('Delete failed:', error)
+    }
+  }, [selectedKeys, deleteResults, refetch])
 
   // Paginated results
   const paginatedResults = useMemo(() => {
@@ -322,6 +348,17 @@ export default function ResultsPage() {
                 filteredCount={filteredResults.length}
                 selectedCount={selectedKeys.size}
               />
+
+              {/* Delete Button - Only visible to LTI Admins */}
+              {isLtiAdmin && selectedKeys.size > 0 && (
+                <button
+                  onClick={handleDeleteClick}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete ({selectedKeys.size})
+                </button>
+              )}
             </div>
           </div>
         </CardContent>
@@ -404,6 +441,18 @@ export default function ResultsPage() {
           onClose={() => setSelectedResult(null)}
         />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Quiz Results"
+        message={`Are you sure you want to delete ${selectedKeys.size} selected quiz result${selectedKeys.size > 1 ? 's' : ''}? This action cannot be undone.`}
+        confirmText="Delete"
+        isLoading={deleteResults.isPending}
+        variant="danger"
+      />
     </DashboardLayout>
   )
 }

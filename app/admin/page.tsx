@@ -17,6 +17,7 @@ import { ProgressBar } from './components/ui/ProgressBar'
 import { EmptyState } from './components/ui/EmptyState'
 import { LoadingState } from './components/ui/LoadingState'
 import { Pagination } from './components/ui/Pagination'
+import { SessionsChart } from './components/ui/SessionsChart'
 import { formatTimeAgo } from './utils'
 
 // =============================================================================
@@ -184,6 +185,9 @@ export default function TeacherDashboardPage() {
         />
       </div>
 
+      {/* Sessions Chart - Lazy loaded */}
+      <SessionsChart className="mb-6" />
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent Activity */}
         <Card className="lg:col-span-2">
@@ -258,7 +262,7 @@ export default function TeacherDashboardPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate theme-text-primary">{student.name}</p>
-                        <p className="text-xs theme-text-muted">Score: {student.averageScore}%</p>
+                        <p className="text-xs theme-text-muted">Quiz Score: {student.averageScore}</p>
                       </div>
                       <Badge variant={student.status === 'completed' ? 'success' : 'info'}>
                         {student.status}
@@ -285,7 +289,7 @@ export default function TeacherDashboardPage() {
       </div>
 
       {/* Student Progress Overview */}
-      <Card className="mt-6">
+      <Card className="mt-6 p-0 lg:p-4">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Student Progress Overview</CardTitle>
@@ -301,16 +305,16 @@ export default function TeacherDashboardPage() {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                 {paginatedStudents.map((student) => (
                   <div
                     key={student.id}
-                    className="p-4 rounded-lg border theme-bg-secondary theme-border"
+                    className="p-3 rounded-lg border theme-bg-secondary theme-border"
                   >
-                    <div className="flex items-center justify-between mb-3">
+                    <div className="flex flex-col sm:flex-row gap-3 items-center justify-between mb-3 p-1">
                       <div>
                         <p className="font-medium theme-text-primary">{student.name}</p>
-                        <p className="text-xs theme-text-muted">{student.email}</p>
+                        <p className="text-[10px] theme-text-muted">{student.email}</p>
                       </div>
                       <Badge
                         variant={

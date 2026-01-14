@@ -29,9 +29,6 @@ export interface QuestionFlowCallbacks {
   onAnswerSaved?: (answer: QuizAnswerState, success: boolean) => void
 }
 
-// Total questions in the quiz (used for incremental saves)
-const TOTAL_QUESTIONS = 6
-
 // =============================================================================
 // Initial State
 // =============================================================================
@@ -78,7 +75,8 @@ export function useQuestionFlow(
   const questionStartTimeRef = useRef<number | null>(null)
 
   // Get questions from context (loaded from Supabase)
-  const { isLoading: questionsLoading, getQuestion } = useQuestions()
+  // questionCount is the actual number of quiz questions from database
+  const { isLoading: questionsLoading, getQuestion, questionCount } = useQuestions()
 
   // ==========================================================================
   // Message Handler
@@ -190,8 +188,9 @@ export function useQuestionFlow(
       messageBus.sendMessage(WEB_TO_UE_MESSAGES.QUESTION_ANSWER, answerMessage)
 
       // Save answer to database immediately
-      console.log('📝 [useQuestionFlow] Saving correct answer to database...')
-      quizService.saveAnswer(answerState, TOTAL_QUESTIONS).then(result => {
+      // Use dynamic questionCount from database instead of hardcoded value
+      console.log('📝 [useQuestionFlow] Saving correct answer to database... (totalQuestions:', questionCount, ')')
+      quizService.saveAnswer(answerState, questionCount).then(result => {
         if (result.success) {
           console.log('✅ [useQuestionFlow] Answer saved to database:', question.id)
         } else {
@@ -213,7 +212,7 @@ export function useQuestionFlow(
       setState(prev => ({ ...prev, questionTryCount: prev.questionTryCount + 1 }))
       return { correct: false, message: 'Incorrect. Try again!' }
     }
-  }, [state.currentQuestion, state.questionTryCount, messageBus])
+  }, [state.currentQuestion, state.questionTryCount, messageBus, questionCount])
 
   // ==========================================================================
   // Submit All Quiz Results to Supabase

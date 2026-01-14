@@ -112,31 +112,53 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Calculate quiz performance from quiz data
+    // Get quiz performance from quiz_responses table (source of truth)
+    const { data: quizResponse } = await supabase
+      .from('quiz_responses')
+      .select('correct_count, total_questions, question_data')
+      .eq('session_id', currentSession.id)
+      .order('answered_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    // Calculate quiz performance from quiz_responses (not from request data)
     let quizPerformance = {
       totalQuestions: 0,
       correctFirstTry: 0,
       totalAttempts: 0,
       averageTimeMs: 0,
     }
-    let totalScore = 0
 
-    if (quizData && Object.keys(quizData).length > 0) {
+    // total_score = number of correct quiz answers (from quiz_responses)
+    let totalScore = 0
+    let actualTotalQuestions = 0
+
+    if (quizResponse) {
+      totalScore = quizResponse.correct_count || 0
+      actualTotalQuestions = quizResponse.total_questions || 0
+
+      // Calculate detailed quiz performance from question_data
+      const questionData = quizResponse.question_data as QuestionDataMap | null
+      if (questionData && Object.keys(questionData).length > 0) {
+        const entries = Object.entries(questionData)
+        quizPerformance.totalQuestions = actualTotalQuestions
+        quizPerformance.correctFirstTry = entries.filter(([, v]) => v.correct && v.attempts === 1).length
+        quizPerformance.totalAttempts = entries.reduce((sum, [, v]) => sum + v.attempts, 0)
+        quizPerformance.averageTimeMs = entries.length > 0
+          ? Math.round(entries.reduce((sum, [, v]) => sum + v.time, 0) / entries.length)
+          : 0
+      }
+    } else if (quizData && Object.keys(quizData).length > 0) {
+      // Fallback to request data if no quiz_responses record exists
       const entries = Object.entries(quizData)
-      quizPerformance.totalQuestions = totalQuestions || entries.length
+      actualTotalQuestions = totalQuestions || entries.length
+      quizPerformance.totalQuestions = actualTotalQuestions
       quizPerformance.correctFirstTry = entries.filter(([, v]) => v.correct && v.attempts === 1).length
       quizPerformance.totalAttempts = entries.reduce((sum, [, v]) => sum + v.attempts, 0)
-      quizPerformance.averageTimeMs = Math.round(
-        entries.reduce((sum, [, v]) => sum + v.time, 0) / entries.length
-      )
-
-      // Calculate score: 100 points per correct answer, minus 10 per extra attempt
-      totalScore = entries.reduce((sum, [, v]) => {
-        if (v.correct) {
-          return sum + Math.max(100 - (v.attempts - 1) * 10, 50) // Min 50 points if correct
-        }
-        return sum
-      }, 0)
+      quizPerformance.averageTimeMs = entries.length > 0
+        ? Math.round(entries.reduce((sum, [, v]) => sum + v.time, 0) / entries.length)
+        : 0
+      totalScore = entries.filter(([, v]) => v.correct).length
     }
 
     // Calculate total time spent in seconds
@@ -148,7 +170,7 @@ export async function POST(request: NextRequest) {
       totalTimeMs: totalTimeMs || 0,
       phaseScores: [],
       quizPerformance,
-      overallGrade: calculateGrade(totalScore, phasesCompleted || 6),
+      overallGrade: calculateGrade(totalScore, actualTotalQuestions),
     }
 
     // Update training session with all data
@@ -199,14 +221,14 @@ export async function POST(request: NextRequest) {
 }
 
 // =============================================================================
-// Helper: Calculate grade based on score and phases
+// Helper: Calculate grade based on score and quiz questions
 // =============================================================================
 
-function calculateGrade(totalScore: number, phasesCompleted: number): string {
-  const maxPossibleScore = phasesCompleted * 100 // Assuming 100 points per phase
-  if (maxPossibleScore === 0) return 'N/A'
+function calculateGrade(totalScore: number, totalQuestions: number): string {
+  // Max score equals total questions (1 point per correct answer)
+  if (totalQuestions === 0) return 'N/A'
 
-  const percentage = (totalScore / maxPossibleScore) * 100
+  const percentage = (totalScore / totalQuestions) * 100
 
   if (percentage >= 90) return 'A'
   if (percentage >= 80) return 'B'

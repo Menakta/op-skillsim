@@ -7,8 +7,8 @@
  * Displays user list with approval status and actions.
  */
 
-import { useState, useMemo } from 'react'
-import { UserPlus, Users, Clock, CheckCircle, XCircle, UserCheck } from 'lucide-react'
+import { useState, useMemo, useCallback } from 'react'
+import { UserPlus, Users, Clock, CheckCircle, XCircle, UserCheck, Trash2 } from 'lucide-react'
 import { DashboardLayout } from '../components/layout/DashboardLayout'
 import { Card, CardContent } from '../components/ui/Card'
 import { DataTable, MobileCardList } from '../components/ui/DataTable'
@@ -18,8 +18,10 @@ import { FilterButton } from '../components/ui/FilterButton'
 import { StatCard } from '../components/ui/StatCard'
 import { LoadingState } from '../components/ui/LoadingState'
 import { ExportDropdown } from '../components/ui/ExportDropdown'
-import { useUsers, useUpdateUserApproval, useUpdateUserRole } from '../hooks/useAdminQueries'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog'
+import { useUsers, useUpdateUserApproval, useUpdateUserRole, useDeleteUsers } from '../hooks/useAdminQueries'
 import { useExport } from '../hooks/useExport'
+import { useIsLtiAdmin } from '../hooks/useCurrentUser'
 import { useAdmin } from '../context/AdminContext'
 import { formatDate, type ExportColumn } from '../utils'
 import type { RegisteredUser, Column, ApprovalFilter, BadgeVariant, ApprovalStatus } from '../types'
@@ -88,10 +90,12 @@ function getRegistrationTypeBadgeVariant(type: string): BadgeVariant {
 // =============================================================================
 
 export default function UsersPage() {
-  const { data, isLoading, error } = useUsers()
+  const { data, isLoading, error, refetch } = useUsers()
   const updateApproval = useUpdateUserApproval()
   const updateRole = useUpdateUserRole()
+  const deleteUsers = useDeleteUsers()
   const { userRole: currentUserRole } = useAdmin()
+  const { isLtiAdmin } = useIsLtiAdmin()
 
   // Only admins can change roles
   const isAdmin = currentUserRole === 'admin'
@@ -101,6 +105,9 @@ export default function UsersPage() {
   const [statusFilter, setStatusFilter] = useState<ApprovalFilter>('all')
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set())
+
+  // Delete confirmation state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   // Extract data
   const users = data?.users || []
@@ -169,6 +176,26 @@ export default function UsersPage() {
     filenamePrefix: 'registered-users',
     title: 'Registered Users',
   })
+
+  // Handle delete button click
+  const handleDeleteClick = useCallback(() => {
+    setShowDeleteConfirm(true)
+  }, [])
+
+  // Handle delete confirmation
+  const handleDeleteConfirm = useCallback(async () => {
+    const ids = Array.from(selectedUsers)
+    if (ids.length === 0) return
+
+    try {
+      await deleteUsers.mutateAsync({ ids })
+      setSelectedUsers(new Set())
+      setShowDeleteConfirm(false)
+      refetch()
+    } catch (error) {
+      console.error('Delete failed:', error)
+    }
+  }, [selectedUsers, deleteUsers, refetch])
 
   // Selection handlers
   const handleSelectUser = (userId: string) => {
@@ -440,6 +467,17 @@ export default function UsersPage() {
                 filteredCount={filteredUsers.length}
                 selectedCount={selectedUsers.size}
               />
+
+              {/* Delete Button - Only visible to LTI Admins */}
+              {isLtiAdmin && selectedUsers.size > 0 && (
+                <button
+                  onClick={handleDeleteClick}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete ({selectedUsers.size})
+                </button>
+              )}
             </div>
           </div>
         </CardContent>
@@ -572,6 +610,18 @@ export default function UsersPage() {
             </p>
           </Card>
         )}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Users"
+        message={`Are you sure you want to delete ${selectedUsers.size} selected user${selectedUsers.size > 1 ? 's' : ''}? This will also delete their associated sessions and data. This action cannot be undone.`}
+        confirmText="Delete"
+        isLoading={deleteUsers.isPending}
+        variant="danger"
       />
     </DashboardLayout>
   )
