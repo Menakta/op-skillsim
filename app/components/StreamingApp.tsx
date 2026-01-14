@@ -648,8 +648,9 @@ export default function StreamingApp() {
         const modeToRestore = trainingState?.mode || 'training'
 
         // Check if we should resume training (not in cinematic mode and has progress)
+        // Phase is now stored as index string ("0", "1", "2"...)
         const shouldResumeTraining = modeToRestore === 'training' ||
-          (phaseToRestore && phaseToRestore !== 'Phase A') ||
+          (phaseToRestore && phaseToRestore !== '0') ||
           (overallProgress && overallProgress > 0)
 
         if (shouldResumeTraining) {

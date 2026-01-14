@@ -461,7 +461,7 @@ export class SessionManager {
         session_id: userSessionId,
         course_id: courseId,
         course_name: courseName,
-        current_training_phase: 'Phase A',
+        current_training_phase: '0', // Phase index as string
         overall_progress: 0,
         status: 'active',
         student: student,

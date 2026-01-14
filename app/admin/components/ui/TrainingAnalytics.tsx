@@ -33,8 +33,9 @@ interface StatusCount {
 }
 
 interface PhaseCount {
-  current_training_phase: string
-  phaseName: string
+  phaseKey: string     // Index as string ("0", "1", "2"...)
+  phaseName: string    // Human-readable name from training_phases table
+  phaseOrder: number   // Display order
   count: number
 }
 
@@ -161,9 +162,9 @@ export function TrainingAnalytics({ className = '' }: TrainingAnalyticsProps) {
     status: item.status,
   })) || []
 
-  // Prepare bar chart data (filter phases with 0 count for cleaner display)
+  // Prepare bar chart data (phases from training_phases table)
   const barData = data?.phaseCounts.map((item, index) => ({
-    phase: item.current_training_phase,
+    phaseKey: item.phaseKey,
     phaseName: item.phaseName,
     count: item.count,
     fill: PHASE_COLORS[index % PHASE_COLORS.length],
@@ -321,13 +322,13 @@ export function TrainingAnalytics({ className = '' }: TrainingAnalyticsProps) {
           {hasActiveData && !isLoading && (
             <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t theme-border">
               {barData.filter(p => p.count > 0).map((phase, index) => (
-                <div key={phase.phase} className="flex items-center gap-1.5">
+                <div key={phase.phaseKey} className="flex items-center gap-1.5">
                   <div
                     className="w-2.5 h-2.5 rounded-sm"
                     style={{ backgroundColor: PHASE_COLORS[index % PHASE_COLORS.length] }}
                   />
                   <span className="text-xs theme-text-muted">
-                    {phase.phase}: {phase.count}
+                    {phase.phaseName}: {phase.count}
                   </span>
                 </div>
               ))}
