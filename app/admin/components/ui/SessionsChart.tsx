@@ -92,7 +92,7 @@ function ChartBar({ label, students, teachers, admins, maxValue }: ChartBarProps
           {/* Students - Purple */}
           {students > 0 && (
             <div
-              className="w-full bg-[#df5e5e] transition-all duration-500"
+              className="w-full bg-[#14B8A6] transition-all duration-500"
               style={{ height: `${(studentPercent / heightPercent) * 100}%` }}
               title={`Students: ${students}`}
             />
@@ -100,7 +100,7 @@ function ChartBar({ label, students, teachers, admins, maxValue }: ChartBarProps
           {/* Teachers - Green */}
           {teachers > 0 && (
             <div
-              className="w-full bg-green-500 transition-all duration-500"
+              className="w-full bg-[#EC4899] transition-all duration-500"
               style={{ height: `${(teacherPercent / heightPercent) * 100}%` }}
               title={`Teachers: ${teachers}`}
             />
@@ -108,7 +108,7 @@ function ChartBar({ label, students, teachers, admins, maxValue }: ChartBarProps
           {/* Admins - Yellow */}
           {admins > 0 && (
             <div
-              className="w-full bg-yellow-500 transition-all duration-500"
+              className="w-full bg-[#6366F1] transition-all duration-500"
               style={{ height: `${(adminPercent / heightPercent) * 100}%` }}
               title={`Admins: ${admins}`}
             />
@@ -209,7 +209,7 @@ export function SessionsChart({ className = '' }: SessionsChartProps) {
         {/* Legend */}
         <div className="flex flex-wrap gap-4 mb-4">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-sm bg-[#df5e5e]" />
+            <div className="w-3 h-3 rounded-sm bg-[#14B8A6]" />
             <span className="text-xs theme-text-muted">Students</span>
           </div>
           <div className="flex items-center gap-2">
@@ -217,7 +217,7 @@ export function SessionsChart({ className = '' }: SessionsChartProps) {
             <span className="text-xs theme-text-muted">Teachers</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-sm bg-yellow-500" />
+            <div className="w-3 h-3 rounded-sm bg-[#6366F1]" />
             <span className="text-xs theme-text-muted">Admins</span>
           </div>
         </div>
@@ -262,7 +262,7 @@ export function SessionsChart({ className = '' }: SessionsChartProps) {
         {data.length > 0 && !isLoading && (
           <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t theme-border">
             <div className="text-center">
-              <p className="text-lg font-bold text-purple-400">
+              <p className="text-lg font-bold text-[#df5e5e]">
                 {data.reduce((sum, d) => sum + d.students, 0)}
               </p>
               <p className="text-xs theme-text-muted">Total Students</p>
@@ -274,7 +274,7 @@ export function SessionsChart({ className = '' }: SessionsChartProps) {
               <p className="text-xs theme-text-muted">Total Teachers</p>
             </div>
             <div className="text-center">
-              <p className="text-lg font-bold text-yellow-400">
+              <p className="text-lg font-bold text-[#6366F1]">
                 {data.reduce((sum, d) => sum + d.admins, 0)}
               </p>
               <p className="text-xs theme-text-muted">Total Admins</p>

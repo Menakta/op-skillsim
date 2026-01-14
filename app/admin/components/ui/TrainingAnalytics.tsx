@@ -64,7 +64,7 @@ const COLORS = {
 }
 
 const PHASE_COLORS = [
-  '#8B5CF6', // Purple
+  '#f65c64', // Purple
   '#EC4899', // Pink
   '#F59E0B', // Amber
   '#10B981', // Emerald
@@ -99,9 +99,9 @@ function DoughnutTooltip({ active, payload }: CustomTooltipProps) {
   const count = data.value
 
   return (
-    <div className="bg-gray-800 text-white text-sm px-3 py-2 rounded-lg shadow-lg border border-gray-700">
+    <div className="theme-bg-elevated theme-text-primary text-sm px-3 py-2 rounded-lg shadow-lg theme-border border">
       <p className="font-medium capitalize">{status}</p>
-      <p className="text-gray-300">{count} sessions</p>
+      <p className="theme-text-secondary">{count} sessions</p>
     </div>
   )
 }
@@ -114,9 +114,9 @@ function BarTooltip({ active, payload }: CustomTooltipProps) {
   const count = data.value
 
   return (
-    <div className="bg-gray-800 text-white text-sm px-3 py-2 rounded-lg shadow-lg border border-gray-700">
+    <div className="theme-bg-elevated theme-text-primary text-sm px-3 py-2 rounded-lg shadow-lg theme-border border">
       <p className="font-medium">{phaseName}</p>
-      <p className="text-gray-300">{count} active sessions</p>
+      <p className="theme-text-secondary">{count} active sessions</p>
     </div>
   )
 }
@@ -179,23 +179,23 @@ export function TrainingAnalytics({ className = '' }: TrainingAnalyticsProps) {
       {/* Doughnut Chart - Session Status */}
       <Card>
         <CardHeader>
-          <CardTitle>Session Status Distribution</CardTitle>
+          <CardTitle>Training Session Status Distribution</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <div className="h-64 flex items-center justify-center">
               <div className="flex items-center gap-2">
-                <div className="w-5 h-5 border-2 border-[#39BEAE] border-t-transparent rounded-full animate-spin" />
+                <div className="w-5 h-5 border-2 border-[var(--color-accent)] border-t-transparent rounded-full animate-spin" />
                 <span className="text-sm theme-text-muted">Loading...</span>
               </div>
             </div>
           ) : error ? (
             <div className="h-64 flex items-center justify-center">
-              <p className="text-sm text-red-400">{error}</p>
+              <p className="text-sm theme-text-error">{error}</p>
             </div>
           ) : !hasData ? (
             <div className="h-64 flex items-center justify-center">
-              <p className="text-sm theme-text-muted">No session data available</p>
+              <p className="text-sm theme-text-muted">No training session data available</p>
             </div>
           ) : (
             <div className="h-64">
@@ -240,17 +240,18 @@ export function TrainingAnalytics({ className = '' }: TrainingAnalyticsProps) {
           {hasData && !isLoading && (
             <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t theme-border">
               <div className="text-center">
-                <p className="text-2xl font-bold text-green-500">{data.totals.completed}</p>
-                <p className="text-xs theme-text-muted">Completed</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-blue-500">{data.totals.active}</p>
-                <p className="text-xs theme-text-muted">Active</p>
-              </div>
-              <div className="text-center">
                 <p className="text-2xl font-bold theme-text-primary">{data.totals.total}</p>
                 <p className="text-xs theme-text-muted">Total</p>
               </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold theme-text-success">{data.totals.completed}</p>
+                <p className="text-xs theme-text-muted">Completed</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold theme-text-info">{data.totals.active}</p>
+                <p className="text-xs theme-text-muted">Active</p>
+              </div>
+              
             </div>
           )}
         </CardContent>
@@ -259,25 +260,25 @@ export function TrainingAnalytics({ className = '' }: TrainingAnalyticsProps) {
       {/* Horizontal Bar Chart - Active Sessions by Phase */}
       <Card>
         <CardHeader>
-          <CardTitle>Active Sessions by Phase</CardTitle>
+          <CardTitle>Active Training Sessions by Phase</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <div className="h-64 flex items-center justify-center">
               <div className="flex items-center gap-2">
-                <div className="w-5 h-5 border-2 border-[#39BEAE] border-t-transparent rounded-full animate-spin" />
+                <div className="w-5 h-5 border-2 border-[var(--color-accent)] border-t-transparent rounded-full animate-spin" />
                 <span className="text-sm theme-text-muted">Loading...</span>
               </div>
             </div>
           ) : error ? (
             <div className="h-64 flex items-center justify-center">
-              <p className="text-sm text-red-400">{error}</p>
+              <p className="text-sm theme-text-error">{error}</p>
             </div>
           ) : !hasActiveData ? (
             <div className="h-64 flex items-center justify-center flex-col gap-2">
-              <p className="text-sm theme-text-muted">No active sessions</p>
+              <p className="text-sm theme-text-muted">No active training sessions</p>
               <p className="text-xs theme-text-tertiary">
-                Active session distribution will appear here
+                Active training sessions distribution will appear here
               </p>
             </div>
           ) : (
@@ -290,15 +291,15 @@ export function TrainingAnalytics({ className = '' }: TrainingAnalyticsProps) {
                 >
                   <XAxis
                     type="number"
-                    tick={{ fill: 'currentColor', fontSize: 12, color: 'blue' }}
-                    tickLine={{ stroke: 'currentColor' }}
-                    axisLine={{ stroke: 'currentColor' }}
+                    tick={{ fill: 'var(--color-text-primary)', fontSize: 12 }}
+                    tickLine={{ stroke: 'var(--color-border)' }}
+                    axisLine={{ stroke: 'var(--color-border)' }}
                     allowDecimals={false}
                   />
                   <YAxis
                     type="category"
                     dataKey="phaseName"
-                    tick={{ fill: 'currentColor', fontSize: 11 }}
+                    tick={{ fill: 'var(--color-text-primary)', fontSize: 11 }}
                     tickLine={{ stroke: 'transparent' }}
                     axisLine={{ stroke: 'transparent' }}
                     width={95}
@@ -321,11 +322,11 @@ export function TrainingAnalytics({ className = '' }: TrainingAnalyticsProps) {
           {/* Phase Legend */}
           {hasActiveData && !isLoading && (
             <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t theme-border">
-              {barData.filter(p => p.count > 0).map((phase, index) => (
+              {barData.filter(p => p.count > 0).map((phase) => (
                 <div key={phase.phaseKey} className="flex items-center gap-1.5">
                   <div
                     className="w-2.5 h-2.5 rounded-sm"
-                    style={{ backgroundColor: PHASE_COLORS[index % PHASE_COLORS.length] }}
+                    style={{ backgroundColor: phase.fill }}
                   />
                   <span className="text-xs theme-text-muted">
                     {phase.phaseName}: {phase.count}

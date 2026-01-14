@@ -116,83 +116,39 @@ async function getSessionCountsForPeriod(
   const startISO = startDate.toISOString()
   const endISO = endDate.toISOString()
 
-  // Get student sessions from training_sessions
-  const { count: studentCount } = await supabaseAdmin
-    .from('training_sessions')
-    .select('*', { count: 'exact', head: true })
-    .gte('created_at', startISO)
-    .lte('created_at', endISO)
-
-  // Get teacher/admin sessions from user_sessions with role info
-  const { data: userSessions } = await supabaseAdmin
+  // Fetch all sessions from user_sessions table with role column
+  const { data: sessions, error } = await supabaseAdmin
     .from('user_sessions')
-    .select('session_id, created_at')
+    .select('role')
     .gte('created_at', startISO)
     .lte('created_at', endISO)
 
-  // Count by role from user_profiles
+  if (error) {
+    console.error('Failed to fetch user sessions:', error)
+    return { students: 0, teachers: 0, admins: 0 }
+  }
+
+  // Count by role
+  let studentCount = 0
   let teacherCount = 0
   let adminCount = 0
 
-  if (userSessions && userSessions.length > 0) {
-    // Get unique emails from the session context or related profiles
-    const { data: profiles } = await supabaseAdmin
-      .from('user_profiles')
-      .select('email, role')
-      .in('role', ['teacher', 'admin'])
-
-    const roleMap = new Map<string, string>()
-    profiles?.forEach((p) => roleMap.set(p.email, p.role))
-
-    // For user_sessions, we need to check lti_context for email
-    for (const session of userSessions) {
-      // Count based on session type in the JWT or context
-      // Since we don't have direct role info, estimate from profiles created in period
-      teacherCount = 0
-      adminCount = 0
-    }
-
-    // Alternative: count profiles created in the period
-    const { count: teachersCreated } = await supabaseAdmin
-      .from('user_profiles')
-      .select('*', { count: 'exact', head: true })
-      .eq('role', 'teacher')
-      .gte('created_at', startISO)
-      .lte('created_at', endISO)
-
-    const { count: adminsCreated } = await supabaseAdmin
-      .from('user_profiles')
-      .select('*', { count: 'exact', head: true })
-      .eq('role', 'admin')
-      .gte('created_at', startISO)
-      .lte('created_at', endISO)
-
-    teacherCount = teachersCreated || 0
-    adminCount = adminsCreated || 0
-  }
-
-  // Also count user_sessions by checking lti_context
-  const { data: sessionsWithContext } = await supabaseAdmin
-    .from('user_sessions')
-    .select('lti_context')
-    .gte('created_at', startISO)
-    .lte('created_at', endISO)
-
-  if (sessionsWithContext) {
-    for (const session of sessionsWithContext) {
-      if (session.lti_context) {
-        const context = typeof session.lti_context === 'string'
-          ? JSON.parse(session.lti_context)
-          : session.lti_context
-
-        if (context.role === 'teacher') teacherCount++
-        else if (context.role === 'admin') adminCount++
-      }
+  for (const session of sessions || []) {
+    switch (session.role) {
+      case 'student':
+        studentCount++
+        break
+      case 'teacher':
+        teacherCount++
+        break
+      case 'admin':
+        adminCount++
+        break
     }
   }
 
   return {
-    students: studentCount || 0,
+    students: studentCount,
     teachers: teacherCount,
     admins: adminCount,
   }
