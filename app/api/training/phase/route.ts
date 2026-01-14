@@ -69,40 +69,37 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Skip save for non-LTI sessions (demo mode) - use hardcoded mock data
+    // Skip save for non-LTI sessions (demo mode) - use mock phase indices
     if (!session.isLti) {
-      const mockPhaseOrder = ['Phase A', 'Phase B', 'Phase C', 'Phase D']
-      const currentPhaseIndex = mockPhaseOrder.indexOf(phase)
-      const nextPhase = currentPhaseIndex < mockPhaseOrder.length - 1
-        ? mockPhaseOrder[currentPhaseIndex + 1]
-        : phase
+      const totalPhasesMock = 7
+      // phase can be index string ("0", "1") or name, try to parse as int
+      const currentPhaseIndex = parseInt(phase) || 0
+      const nextPhaseIndex = Math.min(currentPhaseIndex + 1, totalPhasesMock)
 
-      logger.info({ sessionId: session.sessionId, phase }, 'Demo mode: Skipping phase completion save')
+      logger.info({ sessionId: session.sessionId, phase, currentPhaseIndex }, 'Demo mode: Skipping phase completion save')
       return NextResponse.json({
         success: true,
         phasesCompleted: currentPhaseIndex + 1,
         totalScore: score || 0,
-        nextPhase,
-        overallProgress: Math.min(((currentPhaseIndex + 1) / mockPhaseOrder.length) * 100, 100),
+        nextPhase: String(nextPhaseIndex), // Return next phase as index string
+        overallProgress: Math.min(((currentPhaseIndex + 1) / totalPhasesMock) * 100, 100),
         demo: true,
       })
     }
 
-    // Skip save for admin/teacher roles (they are just testing) - use hardcoded mock data
+    // Skip save for admin/teacher roles (they are just testing) - use mock phase indices
     if (session.role === 'admin' || session.role === 'teacher') {
-      const mockPhaseOrder = ['Phase A', 'Phase B', 'Phase C', 'Phase D']
-      const currentPhaseIndex = mockPhaseOrder.indexOf(phase)
-      const nextPhase = currentPhaseIndex < mockPhaseOrder.length - 1
-        ? mockPhaseOrder[currentPhaseIndex + 1]
-        : phase
+      const totalPhasesMock = 7
+      const currentPhaseIndex = parseInt(phase) || 0
+      const nextPhaseIndex = Math.min(currentPhaseIndex + 1, totalPhasesMock)
 
-      logger.info({ sessionId: session.sessionId, role: session.role, phase }, 'Test mode: Skipping phase completion save for admin/teacher')
+      logger.info({ sessionId: session.sessionId, role: session.role, phase, currentPhaseIndex }, 'Test mode: Skipping phase completion save for admin/teacher')
       return NextResponse.json({
         success: true,
         phasesCompleted: currentPhaseIndex + 1,
         totalScore: score || 0,
-        nextPhase,
-        overallProgress: Math.min(((currentPhaseIndex + 1) / mockPhaseOrder.length) * 100, 100),
+        nextPhase: String(nextPhaseIndex), // Return next phase as index string
+        overallProgress: Math.min(((currentPhaseIndex + 1) / totalPhasesMock) * 100, 100),
         testMode: true,
       })
     }

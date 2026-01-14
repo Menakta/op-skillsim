@@ -94,7 +94,7 @@ export function useTrainingState(
   const sessionStartTimeRef = useRef<number | null>(null)
   const lastSaveTimeRef = useRef<number>(0)
   const lastProgressRef = useRef<number>(0)
-  const lastPhaseRef = useRef<string>('NotStarted')
+  const lastPhaseRef = useRef<string>('0') // Track by index
 
   // ==========================================================================
   // Initialize/Resume Training Session from Database
@@ -157,15 +157,16 @@ export function useTrainingState(
           })
 
           // Save progress to database
-          // Phase changes are ALWAYS saved immediately (no throttle)
+          // Phase index changes are ALWAYS saved immediately (no throttle)
           // Progress changes are throttled (only if changed >= 5% and 5 seconds passed)
           const now = Date.now()
           const progressChanged = Math.abs(progress - lastProgressRef.current) >= 5
-          const phaseChanged = phase !== lastPhaseRef.current
+          // Track by currentTask index instead of phase name (more reliable from stream)
+          const phaseIndexChanged = currentTask !== state.currentTaskIndex
           const timeSinceLastSave = now - lastSaveTimeRef.current
 
-          // Always save on phase change, or throttled progress change
-          const shouldSavePhase = phaseChanged
+          // Always save on phase index change, or throttled progress change
+          const shouldSavePhase = phaseIndexChanged
           const shouldSaveProgress = progressChanged && timeSinceLastSave > 5000
 
           if (shouldSavePhase || shouldSaveProgress) {
@@ -178,17 +179,21 @@ export function useTrainingState(
               ? now - sessionStartTimeRef.current
               : 0
 
-            console.log(`📊 Saving training progress: phase=${phase}, progress=${progress}%, phaseChanged=${phaseChanged}`)
+            // Store phase index as string (e.g., "0", "1", "2"...) instead of phase name
+            // This is more reliable as UE5 sometimes sends "NotStarted" for intermediate phases
+            const phaseIndex = String(currentTask)
+
+            console.log(`📊 Saving training progress: phaseIndex=${phaseIndex}, phaseName=${phase}, progress=${progress}%`)
 
             trainingSessionService.updateProgress({
-              phase,
+              phase: phaseIndex, // Store index as string
               progress,
               timeSpentMs,
             }).then(result => {
               if (!result.success) {
                 console.warn('Failed to save training progress:', result.error)
               } else {
-                console.log(`✅ Training progress saved: phase=${phase}`)
+                console.log(`✅ Training progress saved: phaseIndex=${phaseIndex}`)
               }
             })
           }

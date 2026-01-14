@@ -67,7 +67,7 @@ export async function PATCH(request: NextRequest) {
       logger.info({ sessionId: session.sessionId, phase, progress }, 'Demo mode: Skipping progress update')
       return NextResponse.json({
         success: true,
-        phase: phase || 'Phase A',
+        phase: phase || '0', // Phase index as string
         progress: progress || 0,
         demo: true,
       })
@@ -78,7 +78,7 @@ export async function PATCH(request: NextRequest) {
       logger.info({ sessionId: session.sessionId, role: session.role, phase, progress }, 'Test mode: Skipping progress update for admin/teacher')
       return NextResponse.json({
         success: true,
-        phase: phase || 'Phase A',
+        phase: phase || '0', // Phase index as string
         progress: progress || 0,
         testMode: true,
       })
