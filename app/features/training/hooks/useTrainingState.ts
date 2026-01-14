@@ -156,13 +156,19 @@ export function useTrainingState(
             isActive
           })
 
-          // Save progress to database (throttled - only if changed significantly)
+          // Save progress to database
+          // Phase changes are ALWAYS saved immediately (no throttle)
+          // Progress changes are throttled (only if changed >= 5% and 5 seconds passed)
           const now = Date.now()
           const progressChanged = Math.abs(progress - lastProgressRef.current) >= 5
           const phaseChanged = phase !== lastPhaseRef.current
           const timeSinceLastSave = now - lastSaveTimeRef.current
 
-          if ((progressChanged || phaseChanged) && timeSinceLastSave > 5000) {
+          // Always save on phase change, or throttled progress change
+          const shouldSavePhase = phaseChanged
+          const shouldSaveProgress = progressChanged && timeSinceLastSave > 5000
+
+          if (shouldSavePhase || shouldSaveProgress) {
             lastProgressRef.current = progress
             lastPhaseRef.current = phase
             lastSaveTimeRef.current = now
@@ -172,6 +178,8 @@ export function useTrainingState(
               ? now - sessionStartTimeRef.current
               : 0
 
+            console.log(`📊 Saving training progress: phase=${phase}, progress=${progress}%, phaseChanged=${phaseChanged}`)
+
             trainingSessionService.updateProgress({
               phase,
               progress,
@@ -179,6 +187,8 @@ export function useTrainingState(
             }).then(result => {
               if (!result.success) {
                 console.warn('Failed to save training progress:', result.error)
+              } else {
+                console.log(`✅ Training progress saved: phase=${phase}`)
               }
             })
           }

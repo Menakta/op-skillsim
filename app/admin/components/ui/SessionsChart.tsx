@@ -92,7 +92,7 @@ function ChartBar({ label, students, teachers, admins, maxValue }: ChartBarProps
           {/* Students - Purple */}
           {students > 0 && (
             <div
-              className="w-full bg-purple-500 transition-all duration-500"
+              className="w-full bg-[#df5e5e] transition-all duration-500"
               style={{ height: `${(studentPercent / heightPercent) * 100}%` }}
               title={`Students: ${students}`}
             />
@@ -209,7 +209,7 @@ export function SessionsChart({ className = '' }: SessionsChartProps) {
         {/* Legend */}
         <div className="flex flex-wrap gap-4 mb-4">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-sm bg-purple-500" />
+            <div className="w-3 h-3 rounded-sm bg-[#df5e5e]" />
             <span className="text-xs theme-text-muted">Students</span>
           </div>
           <div className="flex items-center gap-2">

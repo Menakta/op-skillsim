@@ -18,6 +18,7 @@ import { EmptyState } from './components/ui/EmptyState'
 import { LoadingState } from './components/ui/LoadingState'
 import { Pagination } from './components/ui/Pagination'
 import { SessionsChart } from './components/ui/SessionsChart'
+import { TrainingAnalytics } from './components/ui/TrainingAnalytics'
 import { formatTimeAgo } from './utils'
 
 // =============================================================================
@@ -185,60 +186,25 @@ export default function TeacherDashboardPage() {
         />
       </div>
 
+      {/* Training Analytics Charts */}
+      <TrainingAnalytics className="mb-6" />
+
       {/* Sessions Chart - Lazy loaded */}
-      <SessionsChart className="mb-6" />
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Activity */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {stats.recentActivity.length === 0 ? (
-              <div className="px-6 py-8 text-center theme-text-muted">
-                No recent activity yet
-              </div>
-            ) : (
-              <>
-                <div className="divide-y theme-divide">
-                  {paginatedActivity.map((activity) => (
-                    <div key={activity.id} className="px-6 py-4 transition-colors theme-bg-hover">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="font-medium theme-text-primary">{activity.studentName}</p>
-                          <p className="text-sm theme-text-muted">{activity.action}</p>
-                          {activity.details && (
-                            <p className="text-xs mt-1 theme-text-tertiary">{activity.details}</p>
-                          )}
-                        </div>
-                        <span className="text-xs theme-text-muted">
-                          {formatTimeAgo(activity.timestamp)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {stats.recentActivity.length > ITEMS_PER_PAGE && (
-                  <div className="px-6 py-4 border-t theme-border">
-                    <Pagination
-                      currentPage={activityPage}
-                      totalPages={Math.ceil(stats.recentActivity.length / ITEMS_PER_PAGE)}
-                      totalItems={stats.recentActivity.length}
-                      itemsPerPage={ITEMS_PER_PAGE}
-                      onPageChange={setActivityPage}
-                    />
-                  </div>
-                )}
-              </>
-            )}
-          </CardContent>
-        </Card>
+        <div className='lg:col-span-2'>
+          <SessionsChart className="mb-6" />
 
+        </div>
         {/* Top Performers */}
-        <Card>
+        <Card className="mb-6">
           <CardHeader>
-            <CardTitle>Top Performers</CardTitle>
+            <div className='flex items-center justify-between'>
+               <CardTitle>Top Performers</CardTitle>
+             <a href="/admin/results" className="text-sm theme-text-brand hover:opacity-80">
+              View all →
+            </a>
+            </div>
+           
           </CardHeader>
           <CardContent className="space-y-4">
             {paginatedPerformers.total === 0 ? (
@@ -279,6 +245,60 @@ export default function TeacherDashboardPage() {
                       itemsPerPage={ITEMS_PER_PAGE}
                       onPageChange={setPerformersPage}
                       showItemCount={false}
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Recent Activity */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+            <CardTitle>Recent Activity</CardTitle>
+            <a href="/admin/sessions" className="text-sm theme-text-brand hover:opacity-80">
+              View all →
+            </a>
+          </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            {stats.recentActivity.length === 0 ? (
+              <div className="px-6 py-8 text-center theme-text-muted">
+                No recent activity yet
+              </div>
+            ) : (
+              <>
+                <div className="divide-y theme-divide">
+                  {paginatedActivity.map((activity) => (
+                    <div key={activity.id} className="px-6 py-4 transition-colors theme-bg-hover">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="font-medium theme-text-primary">{activity.studentName}</p>
+                          <p className="text-sm theme-text-muted">{activity.action}</p>
+                          {activity.details && (
+                            <p className="text-xs mt-1 theme-text-tertiary">{activity.details}</p>
+                          )}
+                        </div>
+                        <span className="text-xs theme-text-muted">
+                          {formatTimeAgo(activity.timestamp)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {stats.recentActivity.length > ITEMS_PER_PAGE && (
+                  <div className="px-6 py-4 border-t theme-border">
+                    <Pagination
+                      currentPage={activityPage}
+                      totalPages={Math.ceil(stats.recentActivity.length / ITEMS_PER_PAGE)}
+                      totalItems={stats.recentActivity.length}
+                      itemsPerPage={ITEMS_PER_PAGE}
+                      onPageChange={setActivityPage}
                     />
                   </div>
                 )}

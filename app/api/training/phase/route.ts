@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { phase, score, timeSpentMs, tasksCompleted, totalTasks } = body
+    const { phase, score, timeSpentMs, tasksCompleted, totalTasks, nextPhase, totalPhases, progress } = body
 
     if (!phase) {
       return NextResponse.json(
@@ -69,12 +69,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Skip save for non-LTI sessions (demo mode)
+    // Skip save for non-LTI sessions (demo mode) - use hardcoded mock data
     if (!session.isLti) {
-      const phaseOrder = ['Phase A', 'Phase B', 'Phase C', 'Phase D']
-      const currentPhaseIndex = phaseOrder.indexOf(phase)
-      const nextPhase = currentPhaseIndex < phaseOrder.length - 1
-        ? phaseOrder[currentPhaseIndex + 1]
+      const mockPhaseOrder = ['Phase A', 'Phase B', 'Phase C', 'Phase D']
+      const currentPhaseIndex = mockPhaseOrder.indexOf(phase)
+      const nextPhase = currentPhaseIndex < mockPhaseOrder.length - 1
+        ? mockPhaseOrder[currentPhaseIndex + 1]
         : phase
 
       logger.info({ sessionId: session.sessionId, phase }, 'Demo mode: Skipping phase completion save')
@@ -83,17 +83,17 @@ export async function POST(request: NextRequest) {
         phasesCompleted: currentPhaseIndex + 1,
         totalScore: score || 0,
         nextPhase,
-        overallProgress: Math.min(((currentPhaseIndex + 1) / phaseOrder.length) * 100, 100),
+        overallProgress: Math.min(((currentPhaseIndex + 1) / mockPhaseOrder.length) * 100, 100),
         demo: true,
       })
     }
 
-    // Skip save for admin/teacher roles (they are just testing)
+    // Skip save for admin/teacher roles (they are just testing) - use hardcoded mock data
     if (session.role === 'admin' || session.role === 'teacher') {
-      const phaseOrder = ['Phase A', 'Phase B', 'Phase C', 'Phase D']
-      const currentPhaseIndex = phaseOrder.indexOf(phase)
-      const nextPhase = currentPhaseIndex < phaseOrder.length - 1
-        ? phaseOrder[currentPhaseIndex + 1]
+      const mockPhaseOrder = ['Phase A', 'Phase B', 'Phase C', 'Phase D']
+      const currentPhaseIndex = mockPhaseOrder.indexOf(phase)
+      const nextPhase = currentPhaseIndex < mockPhaseOrder.length - 1
+        ? mockPhaseOrder[currentPhaseIndex + 1]
         : phase
 
       logger.info({ sessionId: session.sessionId, role: session.role, phase }, 'Test mode: Skipping phase completion save for admin/teacher')
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
         phasesCompleted: currentPhaseIndex + 1,
         totalScore: score || 0,
         nextPhase,
-        overallProgress: Math.min(((currentPhaseIndex + 1) / phaseOrder.length) * 100, 100),
+        overallProgress: Math.min(((currentPhaseIndex + 1) / mockPhaseOrder.length) * 100, 100),
         testMode: true,
       })
     }
@@ -131,15 +131,10 @@ export async function POST(request: NextRequest) {
     // Don't accumulate phase scores - total_score will be calculated from quiz responses
     const newTimeSpent = currentSession.total_time_spent + Math.floor((timeSpentMs || 0) / 1000)
 
-    // Determine next phase
-    const phaseOrder = ['Phase A', 'Phase B', 'Phase C', 'Phase D']
-    const currentPhaseIndex = phaseOrder.indexOf(phase)
-    const nextPhase = currentPhaseIndex < phaseOrder.length - 1
-      ? phaseOrder[currentPhaseIndex + 1]
-      : phase
-
-    // Calculate overall progress based on phases completed
-    const overallProgress = Math.min((newPhasesCompleted / phaseOrder.length) * 100, 100)
+    // For LTI students: Use data from stream (nextPhase, progress) - no hardcoded values
+    // nextPhase and progress should be provided by the client from stream data
+    const updatedNextPhase = nextPhase || phase // Fallback to current phase if not provided
+    const overallProgress = progress !== undefined ? Math.min(progress, 100) : currentSession.overall_progress
 
     const { error: updateError } = await supabase
       .from('training_sessions')
@@ -147,7 +142,7 @@ export async function POST(request: NextRequest) {
         phases_completed: newPhasesCompleted,
         // total_score is NOT updated here - it comes from quiz_responses at completion
         total_time_spent: newTimeSpent,
-        current_training_phase: nextPhase,
+        current_training_phase: updatedNextPhase,
         overall_progress: overallProgress,
         updated_at: new Date().toISOString(),
       })
@@ -165,12 +160,13 @@ export async function POST(request: NextRequest) {
       sessionId: currentSession.id,
       phase,
       phasesCompleted: newPhasesCompleted,
+      nextPhase: updatedNextPhase,
     }, 'Training phase completed')
 
     return NextResponse.json({
       success: true,
       phasesCompleted: newPhasesCompleted,
-      nextPhase,
+      nextPhase: updatedNextPhase,
       overallProgress,
     })
 

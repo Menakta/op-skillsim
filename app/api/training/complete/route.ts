@@ -174,6 +174,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Update training session with all data
+    // For LTI students: phasesCompleted should come from client - no hardcoded fallback
     const { data: updatedSession, error: updateError } = await supabase
       .from('training_sessions')
       .update({
@@ -181,7 +182,7 @@ export async function POST(request: NextRequest) {
         overall_progress: 100,
         end_time: new Date().toISOString(),
         total_time_spent: totalTimeSpent,
-        phases_completed: phasesCompleted || 6,
+        phases_completed: phasesCompleted ?? currentSession.phases_completed, // Use current value if not provided
         total_score: totalScore,
         final_results: results,
         updated_at: new Date().toISOString(),
@@ -201,7 +202,7 @@ export async function POST(request: NextRequest) {
     logger.info({
       sessionId: currentSession.id,
       totalScore,
-      phasesCompleted: phasesCompleted || 6,
+      phasesCompleted: phasesCompleted ?? currentSession.phases_completed,
       totalTimeSpent,
       quizQuestionsAnswered: quizData ? Object.keys(quizData).length : 0,
     }, 'Training session completed')

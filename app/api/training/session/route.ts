@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json().catch(() => ({}))
-    const { courseId, courseName } = body
+    const { courseId, courseName, initialPhase } = body
 
     const supabase = getSupabaseAdmin()
 
@@ -168,13 +168,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Create new training session (only if none exists for this session_id)
+    // For LTI students: initialPhase should come from the client/stream, not hardcoded
     const { data: newSession, error: createError } = await supabase
       .from('training_sessions')
       .insert({
         session_id: session.sessionId,
         course_id: courseId || 'default',
         course_name: courseName || 'VR Pipe Training',
-        current_training_phase: 'Phase A',
+        current_training_phase: initialPhase || null, // No hardcoded default - use stream data
         overall_progress: 0,
         status: 'active',
         phases_completed: 0,
