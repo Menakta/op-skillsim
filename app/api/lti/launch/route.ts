@@ -433,46 +433,40 @@ export async function POST(req: NextRequest) {
 
       // ==========================================================================
       // Resume Training Logic:
-      // 1. Find active training session by email using JOIN between user_sessions and training_sessions
+      // 1. Find active training session by email (stored in student JSONB)
       // 2. If status = 'active' → Resume from current_training_phase
       // 3. If status = 'completed' OR no record → Create new session starting at phase 0
       // ==========================================================================
       const supabase = getSupabaseAdmin()
 
-      // Query: JOIN user_sessions and training_sessions to find active training by email
-      // This is more performant than querying JSONB student->>email
-      const { data: activeTrainingData, error: queryError } = await supabase
-        .from('user_sessions')
-        .select(`
-          session_id,
-          email,
-          training_sessions!inner (
-            id,
-            session_id,
-            current_training_phase,
-            overall_progress,
-            training_state,
-            student,
-            status
-          )
-        `)
-        .eq('email', email)
-        .eq('training_sessions.status', 'active')
+      // Query training_sessions directly by student email (JSONB field)
+      // This finds any active training for this student regardless of which user_session created it
+      const { data: existingTrainingSession, error: queryError } = await supabase
+        .from('training_sessions')
+        .select('id, session_id, current_training_phase, overall_progress, training_state, student, status')
+        .eq('student->>email', email)
+        .eq('status', 'active')
         .order('created_at', { ascending: false })
         .limit(1)
         .single()
-
-      // Extract the training session from the join result
-      const existingTrainingSession = activeTrainingData?.training_sessions
-        ? (Array.isArray(activeTrainingData.training_sessions)
-            ? activeTrainingData.training_sessions[0]
-            : activeTrainingData.training_sessions)
-        : null
 
       if (queryError && queryError.code !== 'PGRST116') {
         // Log non-"no rows" errors
         logger.warn({ error: queryError.message, email }, 'Error querying for active training session')
       }
+
+      // Debug: Log query result
+      console.log('=== Training Session Query Result ===')
+      console.log({ email, found: !!existingTrainingSession, error: queryError?.message || null })
+      if (existingTrainingSession) {
+        console.log({
+          id: existingTrainingSession.id,
+          session_id: existingTrainingSession.session_id,
+          current_training_phase: existingTrainingSession.current_training_phase,
+          status: existingTrainingSession.status,
+        })
+      }
+      console.log('=====================================');
 
       let sessionId: string
       let token: string

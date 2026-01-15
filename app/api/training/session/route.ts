@@ -111,50 +111,52 @@ export async function POST(request: NextRequest) {
 
     const supabase = getSupabaseAdmin()
 
-    // Check for any existing session (regardless of status)
+    // ==========================================================================
+    // IMPORTANT: Query by student EMAIL, not session_id
+    // Each LTI login creates a new session_id, but we want to find existing
+    // training sessions for this student (identified by email)
+    // ==========================================================================
     const { data: existingSession } = await supabase
       .from('training_sessions')
       .select('*')
-      .eq('session_id', session.sessionId)
+      .eq('student->>email', session.email)
+      .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(1)
       .single()
 
     if (existingSession) {
-      // If session exists but is not active, reactivate it
-      if (existingSession.status !== 'active') {
-        const { data: reactivatedSession, error: updateError } = await supabase
-          .from('training_sessions')
-          .update({
-            status: 'active',
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', existingSession.id)
-          .select()
-          .single()
-
-        if (updateError) {
-          logger.error({ error: updateError.message }, 'Failed to reactivate training session')
-          return NextResponse.json(
-            { success: false, error: 'Failed to reactivate training session' },
-            { status: 500 }
-          )
-        }
-
-        logger.info({ sessionId: existingSession.id, previousStatus: existingSession.status }, 'Reactivated existing training session')
-        return NextResponse.json({
-          success: true,
-          session: reactivatedSession,
-          isNew: false,
-          reactivated: true,
+      // Found an active training session for this email
+      // Update the session_id to link to the current login session
+      const { data: updatedSession, error: updateError } = await supabase
+        .from('training_sessions')
+        .update({
+          session_id: session.sessionId, // Link to current login session
+          updated_at: new Date().toISOString(),
         })
+        .eq('id', existingSession.id)
+        .select()
+        .single()
+
+      if (updateError) {
+        logger.error({ error: updateError.message }, 'Failed to update training session')
+        return NextResponse.json(
+          { success: false, error: 'Failed to update training session' },
+          { status: 500 }
+        )
       }
 
-      logger.info({ sessionId: existingSession.id }, 'Returning existing active training session')
+      logger.info({
+        sessionId: existingSession.id,
+        email: session.email,
+        currentPhase: existingSession.current_training_phase,
+      }, 'Returning existing active training session for email')
+
       return NextResponse.json({
         success: true,
-        session: existingSession,
+        session: updatedSession,
         isNew: false,
+        resumed: true,
       })
     }
 
@@ -256,10 +258,12 @@ export async function GET(request: NextRequest) {
 
     const supabase = getSupabaseAdmin()
 
+    // Query by student EMAIL to find active training session
+    // This ensures we find the session even after a new LTI login (new session_id)
     const { data: trainingSession, error } = await supabase
       .from('training_sessions')
       .select('*')
-      .eq('session_id', session.sessionId)
+      .eq('student->>email', session.email)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(1)
@@ -325,11 +329,11 @@ export async function PATCH(request: NextRequest) {
 
     const supabase = getSupabaseAdmin()
 
-    // Get current active session
+    // Get current active session by EMAIL
     const { data: currentSession } = await supabase
       .from('training_sessions')
       .select('id')
-      .eq('session_id', session.sessionId)
+      .eq('student->>email', session.email)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(1)

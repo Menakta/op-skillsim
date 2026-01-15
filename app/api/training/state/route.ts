@@ -22,6 +22,7 @@ const JWT_SECRET = new TextEncoder().encode(
 interface SessionPayload {
   sessionId: string
   userId: string
+  email: string
   role: string
   isLti: boolean
 }
@@ -38,6 +39,7 @@ async function getSessionFromRequest(request: NextRequest): Promise<SessionPaylo
     return {
       sessionId: payload.sessionId as string,
       userId: payload.userId as string,
+      email: payload.email as string || 'unknown@unknown.local',
       role: payload.role as string,
       isLti: (payload.isLti as boolean) ?? true,
     }
@@ -81,11 +83,12 @@ export async function GET(request: NextRequest) {
 
     const supabase = getSupabaseAdmin()
 
-    // Get the most recent active session with training_state
+    // Get the most recent active session with training_state by EMAIL
+    // This ensures we find the session even after a new LTI login
     const { data: trainingSession, error } = await supabase
       .from('training_sessions')
       .select('id, training_state, status, current_training_phase, overall_progress')
-      .eq('session_id', session.sessionId)
+      .eq('student->>email', session.email)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(1)
@@ -177,11 +180,11 @@ export async function PATCH(request: NextRequest) {
 
     const supabase = getSupabaseAdmin()
 
-    // Get current active session
+    // Get current active session by EMAIL
     const { data: currentSession } = await supabase
       .from('training_sessions')
       .select('id')
-      .eq('session_id', session.sessionId)
+      .eq('student->>email', session.email)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(1)

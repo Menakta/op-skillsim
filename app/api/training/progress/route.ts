@@ -20,6 +20,7 @@ const JWT_SECRET = new TextEncoder().encode(
 interface SessionPayload {
   sessionId: string
   userId: string
+  email: string
   role: string
   isLti: boolean // true = LTI session (data saved), false = demo (no save)
 }
@@ -36,6 +37,7 @@ async function getSessionFromRequest(request: NextRequest): Promise<SessionPaylo
     return {
       sessionId: payload.sessionId as string,
       userId: payload.userId as string,
+      email: payload.email as string || 'unknown@unknown.local',
       role: payload.role as string,
       isLti: (payload.isLti as boolean) ?? true, // Default to true for backward compatibility
     }
@@ -86,11 +88,11 @@ export async function PATCH(request: NextRequest) {
 
     const supabase = getSupabaseAdmin()
 
-    // Get current active session
+    // Get current active session by EMAIL
     const { data: currentSession } = await supabase
       .from('training_sessions')
       .select('*')
-      .eq('session_id', session.sessionId)
+      .eq('student->>email', session.email)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(1)
