@@ -260,3 +260,120 @@ export async function exportToPDF<T>(
   // Save the PDF
   doc.save(filename)
 }
+
+// =============================================================================
+// Chart Export Utilities
+// =============================================================================
+
+export interface ChartExportOptions {
+  title: string
+  subtitle?: string
+  orientation?: 'portrait' | 'landscape'
+}
+
+/**
+ * Export a chart element to PDF by capturing it as an image
+ */
+export async function exportChartToPDF(
+  chartElement: HTMLElement,
+  filename: string,
+  options: ChartExportOptions
+): Promise<void> {
+  const { title, subtitle, orientation = 'landscape' } = options
+
+  // Dynamically import html2canvas
+  const html2canvas = (await import('html2canvas')).default
+
+  // Capture the chart as an image
+  const canvas = await html2canvas(chartElement, {
+    backgroundColor: '#1a1a2e',
+    scale: 2,
+    logging: false,
+  })
+
+  const imgData = canvas.toDataURL('image/png')
+
+  // Create PDF document
+  const doc = new jsPDF({
+    orientation,
+    unit: 'mm',
+    format: 'a4'
+  })
+
+  const pageWidth = doc.internal.pageSize.getWidth()
+  const pageHeight = doc.internal.pageSize.getHeight()
+
+  // Try to load the logo
+  let logoBase64: string | null = null
+  try {
+    logoBase64 = await loadImageAsBase64('/logos/Dark_Logo.png')
+  } catch (error) {
+    console.warn('Could not load logo for PDF:', error)
+  }
+
+  // Add title
+  doc.setFontSize(18)
+  doc.setTextColor(57, 190, 174)
+  doc.text(title, 14, 20)
+
+  // Add subtitle if provided
+  let startY = 28
+  if (subtitle) {
+    doc.setFontSize(11)
+    doc.setTextColor(100)
+    doc.text(subtitle, 14, startY)
+    startY += 8
+  }
+
+  // Add timestamp
+  doc.setFontSize(9)
+  doc.setTextColor(128)
+  const timestamp = new Date().toLocaleString('en-NZ', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+  doc.text(`Generated: ${timestamp}`, 14, startY)
+  startY += 10
+
+  // Calculate image dimensions to fit the page
+  const maxWidth = pageWidth - 28
+  const maxHeight = pageHeight - startY - 30
+
+  const imgWidth = canvas.width
+  const imgHeight = canvas.height
+  const ratio = Math.min(maxWidth / imgWidth, maxHeight / imgHeight)
+
+  const finalWidth = imgWidth * ratio
+  const finalHeight = imgHeight * ratio
+
+  // Center the image horizontally
+  const xOffset = (pageWidth - finalWidth) / 2
+
+  // Add the chart image
+  doc.addImage(imgData, 'PNG', xOffset, startY, finalWidth, finalHeight)
+
+  // Add footer
+  doc.setFontSize(8)
+  doc.setTextColor(128)
+  doc.text('Page 1 of 1', pageWidth / 2, pageHeight - 10, { align: 'center' })
+
+  // Add logo to footer
+  if (logoBase64) {
+    const logoWidth = 35
+    const logoHeight = 8
+    doc.addImage(
+      logoBase64,
+      'PNG',
+      pageWidth - 14 - logoWidth,
+      pageHeight - 14,
+      logoWidth,
+      logoHeight
+    )
+  }
+
+  // Save the PDF
+  doc.save(filename)
+}

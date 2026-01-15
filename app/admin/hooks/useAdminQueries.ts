@@ -23,11 +23,20 @@ import type {
 // Query Keys
 // =============================================================================
 
+// =============================================================================
+// Constants
+// =============================================================================
+
+const TEN_MINUTES = 10 * 60 * 1000
+
 export const adminQueryKeys = {
   results: ['admin', 'results'] as const,
   sessions: ['admin', 'sessions'] as const,
   questions: ['admin', 'questions'] as const,
   users: ['admin', 'users'] as const,
+  fittings: ['admin', 'fittings'] as const,
+  trainingAnalytics: ['admin', 'training-analytics'] as const,
+  sessionsChart: (range: string) => ['admin', 'sessions-chart', range] as const,
 }
 
 // =============================================================================
@@ -119,6 +128,31 @@ async function fetchUsers(): Promise<{
     users: data.users || [],
     stats: data.stats || { total: 0, pending: 0, approved: 0, rejected: 0, outsiders: 0 },
   }
+}
+
+interface FittingOption {
+  id: number
+  fitting_id: string
+  name: string
+  description: string | null
+  is_correct: boolean
+  created_at: string
+}
+
+async function fetchFittings(): Promise<FittingOption[]> {
+  const response = await fetch('/api/admin/fittings')
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`)
+  }
+
+  const data = await response.json()
+
+  if (!data.success) {
+    throw new Error(data.error || 'Failed to fetch fittings')
+  }
+
+  return data.fittings || []
 }
 
 async function updateUserApproval(params: { userId: string; approval_status: ApprovalStatus }): Promise<RegisteredUser> {
@@ -242,6 +276,17 @@ export function useUsers() {
   return useQuery({
     queryKey: adminQueryKeys.users,
     queryFn: fetchUsers,
+    retry: 1,
+  })
+}
+
+/**
+ * Hook to fetch fittings
+ */
+export function useFittings() {
+  return useQuery({
+    queryKey: adminQueryKeys.fittings,
+    queryFn: fetchFittings,
     retry: 1,
   })
 }
@@ -523,5 +568,106 @@ export function useDeleteUsers() {
         }
       )
     },
+  })
+}
+
+// =============================================================================
+// Chart Types
+// =============================================================================
+
+interface StatusCount {
+  status: string
+  count: number
+}
+
+interface PhaseCount {
+  phaseKey: string
+  phaseName: string
+  phaseOrder: number
+  count: number
+}
+
+export interface TrainingAnalyticsData {
+  statusCounts: StatusCount[]
+  phaseCounts: PhaseCount[]
+  totals: {
+    completed: number
+    active: number
+    total: number
+  }
+}
+
+export interface SessionsChartDataPoint {
+  label: string
+  students: number
+  teachers: number
+  admins: number
+}
+
+// =============================================================================
+// Chart API Fetchers
+// =============================================================================
+
+async function fetchTrainingAnalytics(): Promise<TrainingAnalyticsData> {
+  const response = await fetch('/api/admin/training-analytics')
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`)
+  }
+
+  const data = await response.json()
+
+  if (!data.success) {
+    throw new Error(data.error || 'Failed to fetch training analytics')
+  }
+
+  return data.data
+}
+
+async function fetchSessionsChart(range: string): Promise<SessionsChartDataPoint[]> {
+  const response = await fetch(`/api/admin/sessions-chart?range=${range}`)
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`)
+  }
+
+  const data = await response.json()
+
+  if (!data.success) {
+    throw new Error(data.error || 'Failed to fetch sessions chart data')
+  }
+
+  return data.data
+}
+
+// =============================================================================
+// Chart Query Hooks
+// =============================================================================
+
+/**
+ * Hook to fetch training analytics data (for SessionStatusChart and PhaseDistributionChart)
+ * Cached for 10 minutes, refetches after 10 minutes
+ */
+export function useTrainingAnalytics() {
+  return useQuery({
+    queryKey: adminQueryKeys.trainingAnalytics,
+    queryFn: fetchTrainingAnalytics,
+    staleTime: TEN_MINUTES,
+    refetchInterval: TEN_MINUTES,
+    retry: 1,
+  })
+}
+
+/**
+ * Hook to fetch sessions chart data
+ * Cached for 10 minutes, refetches after 10 minutes
+ */
+export function useSessionsChart(range: 'weekly' | 'monthly' | 'yearly') {
+  return useQuery({
+    queryKey: adminQueryKeys.sessionsChart(range),
+    queryFn: () => fetchSessionsChart(range),
+    staleTime: TEN_MINUTES,
+    refetchInterval: TEN_MINUTES,
+    retry: 1,
   })
 }

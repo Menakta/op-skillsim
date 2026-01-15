@@ -8,7 +8,8 @@
  */
 
 import { useState, useEffect, useMemo } from 'react'
-import { Users, BookOpen, Award, TrendingUp } from 'lucide-react'
+import Link from 'next/link'
+import { Users, FileQuestion, Wrench, Award, TrendingUp } from 'lucide-react'
 import { DashboardLayout } from './components/layout'
 import { StatCard } from './components/ui/StatCard'
 import { Card, CardHeader, CardTitle, CardContent } from './components/ui/Card'
@@ -17,8 +18,8 @@ import { ProgressBar } from './components/ui/ProgressBar'
 import { EmptyState } from './components/ui/EmptyState'
 import { LoadingState } from './components/ui/LoadingState'
 import { Pagination } from './components/ui/Pagination'
-import { SessionsChart } from './components/ui/SessionsChart'
-import { TrainingAnalytics } from './components/ui/TrainingAnalytics'
+import { SessionsChart, SessionStatusChart, PhaseDistributionChart } from './components/charts'
+import { useSessions, useQuestions, useFittings, useResults } from './hooks'
 import { formatTimeAgo } from './utils'
 
 // =============================================================================
@@ -71,6 +72,20 @@ export default function TeacherDashboardPage() {
   const [topPerformers, setTopPerformers] = useState<Student[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // React Query hooks for stat cards
+  const { data: sessionsData } = useSessions()
+  const { data: questionsData } = useQuestions()
+  const { data: fittingsData } = useFittings()
+  const { data: resultsData } = useResults()
+
+  // Calculate totals for stat cards
+  const totalSessions = sessionsData
+    ? sessionsData.students.length + sessionsData.teachers.length + sessionsData.admins.length
+    : 0
+  const totalQuestions = questionsData?.length || 0
+  const totalFittings = fittingsData?.length || 0
+  const totalResults = resultsData?.results.length || 0
 
   // Pagination state
   const [activityPage, setActivityPage] = useState(1)
@@ -160,34 +175,41 @@ export default function TeacherDashboardPage() {
     <DashboardLayout title="Dashboard" subtitle="Welcome back! Here's your overview.">
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-8">
-        <StatCard
-          label="Total Students"
-          value={stats.totalStudents}
-          color="blue"
-          icon={<Users className="w-6 h-6" />}
-        />
-        <StatCard
-          label="Active Sessions"
-          value={stats.activeSessions}
-          color="green"
-          icon={<BookOpen className="w-6 h-6" />}
-        />
-        <StatCard
-          label="Completed Trainings"
-          value={stats.completedTrainings}
-          color="purple"
-          icon={<Award className="w-6 h-6" />}
-        />
-        <StatCard
-          label="Avg. Completion Rate"
-          value={`${stats.averageCompletionRate}%`}
-          color="yellow"
-          icon={<TrendingUp className="w-6 h-6" />}
-        />
+        <Link href="/admin/sessions" className="block transition-all hover:scale-[1.02] hover:shadow-lg">
+          <StatCard
+            label="Total Sessions"
+            value={totalSessions}
+            icon={<Users className="w-6 h-6" />}
+          />
+        </Link>
+        <Link href="/admin/questionnaires" className="block transition-all hover:scale-[1.02] hover:shadow-lg">
+          <StatCard
+            label="Questionnaires"
+            value={totalQuestions}
+            icon={<FileQuestion className="w-6 h-6" />}
+          />
+        </Link>
+        <Link href="/admin/fittings" className="block transition-all hover:scale-[1.02] hover:shadow-lg">
+          <StatCard
+            label="Fittings"
+            value={totalFittings}
+            icon={<Wrench className="w-6 h-6" />}
+          />
+        </Link>
+        <Link href="/admin/results" className="block transition-all hover:scale-[1.02] hover:shadow-lg">
+          <StatCard
+            label="Results"
+            value={totalResults}
+            icon={<Award className="w-6 h-6" />}
+          />
+        </Link>
       </div>
 
       {/* Training Analytics Charts */}
-      <TrainingAnalytics className="mb-6" />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <SessionStatusChart />
+        <PhaseDistributionChart />
+      </div>
 
       {/* Sessions Chart - Lazy loaded */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

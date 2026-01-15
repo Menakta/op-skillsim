@@ -265,7 +265,7 @@ export default function ResultsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="theme-text-muted text-sm">Average Quiz Score</p>
-              <p className="text-4xl font-bold theme-text-primary mt-1">{avgScore}%</p>
+              <p className="text-4xl font-bold theme-text-primary mt-1">{stats?.passRate || 0}%</p>
             </div>
             <div className="w-32 h-32 relative">
               <svg className="w-32 h-32 -rotate-90" viewBox="0 0 100 100">
@@ -284,12 +284,12 @@ export default function ResultsPage() {
                   stroke="#39BEAE"
                   strokeWidth="8"
                   fill="none"
-                  strokeDasharray={`${avgScore * 2.51} 251`}
+                  strokeDasharray={`${(stats?.passRate ||0) * 2.51} 251`}
                   strokeLinecap="round"
                 />
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-2xl font-bold theme-text-primary">{avgScore}%</span>
+                <span className="text-2xl font-bold theme-text-primary">{stats?.passRate || 0}%</span>
               </div>
             </div>
           </div>

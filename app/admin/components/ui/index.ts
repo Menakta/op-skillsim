@@ -19,8 +19,6 @@ export * from './FilterButton'
 export * from './QuestionCard'
 export * from './ExportDropdown'
 export * from './ConfirmDialog'
-export * from './SessionsChart'
-export * from './TrainingAnalytics'
 
 // Re-export types from centralized types
 export type { Column, QuestionFromDB, BadgeVariant } from '../../types'
