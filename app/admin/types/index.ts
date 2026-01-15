@@ -319,6 +319,7 @@ export interface RegisteredUser {
   approval_status: ApprovalStatus
   role: 'student' | 'teacher' | 'admin'
   institution: string | null
+  is_confirmed: boolean
   created_at: string
   updated_at: string
 }

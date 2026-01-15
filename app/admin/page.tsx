@@ -46,6 +46,7 @@ interface DashboardStats {
     action: string
     timestamp: string
     details: string
+    role: 'student' | 'teacher' | 'admin'
   }[]
 }
 
@@ -249,7 +250,17 @@ export default function TeacherDashboardPage() {
                     <div key={activity.id} className="px-6 py-4 transition-colors theme-bg-hover">
                       <div className="flex items-start justify-between">
                         <div>
-                          <p className="font-medium theme-text-primary">{activity.studentName}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium theme-text-primary">{activity.studentName}</p>
+                            <Badge
+                              variant={
+                                activity.role === 'admin' ? 'purple' :
+                                activity.role === 'teacher' ? 'info' : 'success'
+                              }
+                            >
+                              {activity.role}
+                            </Badge>
+                          </div>
                           <p className="text-sm theme-text-muted">{activity.action}</p>
                           {activity.details && (
                             <p className="text-xs mt-1 theme-text-tertiary">{activity.details}</p>

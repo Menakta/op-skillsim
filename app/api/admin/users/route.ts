@@ -28,6 +28,7 @@ interface UserProfile {
   approval_status: 'pending' | 'approved' | 'rejected'
   role: 'student' | 'teacher' | 'admin'
   institution: string | null
+  is_confirmed: boolean
   created_at: string
   updated_at: string
 }

@@ -7,7 +7,7 @@
  */
 
 import { useMemo } from 'react'
-import { UserCheck, CheckCircle, XCircle } from 'lucide-react'
+import { UserCheck, CheckCircle, XCircle, Mail, MailX } from 'lucide-react'
 import { Card, DataTable, MobileCardList, Badge } from '../../components'
 import type { RegisteredUser, ApprovalStatus } from '../../types'
 import { formatDate } from '../../utils'
@@ -212,9 +212,21 @@ export function UsersTable({
               </div>
             </div>
 
-            <p className="text-xs theme-text-muted mt-2">
-              Registered {formatDate(user.created_at)}
-            </p>
+            <div className="flex items-center justify-between mt-2">
+              <p className="text-xs theme-text-muted">
+                Registered {formatDate(user.created_at)}
+              </p>
+              <div className="flex items-center gap-1" title={user.is_confirmed ? 'Email confirmed' : 'Email not confirmed'}>
+                {user.is_confirmed ? (
+                  <Mail className="w-4 h-4 text-green-500" />
+                ) : (
+                  <MailX className="w-4 h-4 text-red-400" />
+                )}
+                <span className={`text-xs ${user.is_confirmed ? 'text-green-500' : 'text-red-400'}`}>
+                  {user.is_confirmed ? 'Verified' : 'Not Verified'}
+                </span>
+              </div>
+            </div>
           </Card>
         )}
       />

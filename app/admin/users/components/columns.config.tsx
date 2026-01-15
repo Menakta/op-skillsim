@@ -4,7 +4,7 @@
  * Column definitions, helpers, and export config for users page.
  */
 
-import { CheckCircle, XCircle } from 'lucide-react'
+import { CheckCircle, XCircle, Mail, MailX } from 'lucide-react'
 import { Badge } from '../../components/ui/Badge'
 import type { RegisteredUser, Column, BadgeVariant, ApprovalStatus } from '../../types'
 import { formatDate, type ExportColumn } from '../../utils'
@@ -65,6 +65,7 @@ export const EXPORT_COLUMNS: ExportColumn<RegisteredUser>[] = [
   { key: 'role', header: 'Role', getValue: (u) => u.role.charAt(0).toUpperCase() + u.role.slice(1) },
   { key: 'registration_type', header: 'Type', getValue: (u) => u.registration_type.charAt(0).toUpperCase() + u.registration_type.slice(1) },
   { key: 'approval_status', header: 'Status', getValue: (u) => u.approval_status.charAt(0).toUpperCase() + u.approval_status.slice(1) },
+  { key: 'is_confirmed', header: 'Email Confirmed', getValue: (u) => u.is_confirmed ? 'Yes' : 'No' },
   { key: 'institution', header: 'Institution', getValue: (u) => u.institution || 'N/A' },
   { key: 'created_at', header: 'Registered', getValue: (u) => formatDate(u.created_at) },
 ]
@@ -124,6 +125,22 @@ export function createUserColumns({
         <Badge variant={getApprovalBadgeVariant(user.approval_status)}>
           {user.approval_status}
         </Badge>
+      ),
+    },
+    {
+      key: 'email_confirmed',
+      header: 'Email',
+      render: (user) => (
+        <div className="flex items-center gap-1" title={user.is_confirmed ? 'Email confirmed' : 'Email not confirmed'}>
+          {user.is_confirmed ? (
+            <Mail className="w-4 h-4 text-green-500" />
+          ) : (
+            <MailX className="w-4 h-4 text-red-400" />
+          )}
+          <span className={`text-xs ${user.is_confirmed ? 'text-green-500' : 'text-red-400'}`}>
+            {user.is_confirmed ? 'Verified' : 'Pending'}
+          </span>
+        </div>
       ),
     },
     {

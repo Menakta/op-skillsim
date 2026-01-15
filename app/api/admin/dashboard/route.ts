@@ -85,8 +85,8 @@ export async function GET(request: NextRequest) {
     // Fetch user sessions to get lti_context with full_name as fallback
     const { data: userSessions, error: userSessionsError } = await supabase
       .from('user_sessions')
-      .select('session_id, email, lti_context')
-      .eq('role', 'student')
+      .select('*')
+      .order('last_activity', { ascending: false })
 
     if (userSessionsError) {
       logger.error({ error: userSessionsError.message }, 'Failed to fetch user sessions')
@@ -202,41 +202,43 @@ export async function GET(request: NextRequest) {
       totalModules: 4,
     }))
 
-    // Recent activity from training sessions
-    const recentActivity = allSessions
-      .slice(0, 10)
-      .map(session => {
-        let action = 'Started training'
-        let details = session.course_name || 'VR Pipe Training'
+    // Recent activity from user_sessions (student logins/sessions)
+    const recentActivity = (userSessions || [])
+      .slice(0, 20)
+      .map(userSession => {
+        // Parse lti_context for full_name
+        const ltiContext = typeof userSession.lti_context === 'string'
+          ? JSON.parse(userSession.lti_context || '{}')
+          : userSession.lti_context || {}
 
-        const effectiveStatus = getEffectiveStatus(session)
-        if (effectiveStatus === 'completed') {
-          action = 'Completed training'
-          details = `${session.course_name || 'Training'} - ${session.overall_progress}%`
-        } else if (effectiveStatus === 'paused') {
-          action = 'Paused training'
-        } else if (session.overall_progress > 0) {
-          action = 'In progress'
-          details = `${session.current_training_phase} - ${session.overall_progress}%`
-        }
-
-        // Get name from: training session -> lti_context -> email prefix (if real email)
-        // Don't use email prefix if it's a fake LTI email (lti-* or ends with @lti.local)
-        const userSessionInfo = userSessionMap.get(session.session_id)
-        const studentEmail = session.student?.email || ''
+        // Get student name from lti_context or email
+        const studentEmail = userSession.email || ''
         const isFakeLtiEmail = studentEmail.startsWith('lti-') || studentEmail.endsWith('@lti.local')
         const emailPrefix = !isFakeLtiEmail && studentEmail ? studentEmail.split('@')[0] : undefined
-        const studentName = session.student?.full_name
-          || userSessionInfo?.full_name
-          || emailPrefix
-          || 'Student'
+        const studentName = ltiContext?.full_name || emailPrefix || 'Student'
+
+        // Determine action based on session status
+        let action = 'Logged in'
+        let details = userSession.session_type === 'lti' ? 'LTI Session' : 'Direct Login'
+
+        if (userSession.status === 'expired') {
+          action = 'Session expired'
+        } else if (userSession.login_count > 1) {
+          action = `Logged in (${userSession.login_count} times)`
+        }
+
+        // Add course info if available from lti_context
+        if (ltiContext?.course_name) {
+          details = ltiContext.course_name
+        }
 
         return {
-          id: session.id,
+          id: userSession.id,
           studentName,
           action,
-          timestamp: session.updated_at,
+          timestamp: userSession.last_activity || userSession.created_at,
           details,
+          role: userSession.role || 'student',
         }
       })
 

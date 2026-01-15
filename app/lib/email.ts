@@ -177,7 +177,7 @@ function getEmailConfirmationHtml(user: UserInfo, confirmationUrl: string): stri
     <h1 style="color: white; margin: 0; font-size: 24px;">${APP_NAME}</h1>
   </div>
 
-  <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e0e0e0; border-top: none;">
+  <div style="background: #f9f9f9; padding: 10px; border-radius: 0 0 10px 10px; border: 1px solid #e0e0e0; border-top: none;">
     <h2 style="color: #39BEAE; margin-top: 0;">Confirm Your Email Address</h2>
 
     <p>Hi ${user.fullName || 'there'},</p>
