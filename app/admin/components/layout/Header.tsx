@@ -54,10 +54,10 @@ export function Header({ title, subtitle, onMenuClick, showMenuButton = false }:
         {/* Profile Link */}
         <Link
           href="/admin/profile"
-          className="relative transition-colors theme-bg-secondary theme-text-primary p-3 rounded-full hover:bg-purple-700"
+          className="relative transition-colors bg-[#39BEAE] text-white p-2 rounded-full hover:bg-[#39BEAE]/80"
           aria-label="View profile"
         >
-          <User2 className="w-5 h-5" />
+          <User2 className="w-6 h-6 font-bold" />
         </Link>
       </div>
     </header>
