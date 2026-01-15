@@ -3,7 +3,8 @@
  *
  * Handles outsider registration:
  * 1. Creates user in Supabase Auth
- * 2. Sends notification email to admin
+ * 2. Sends email confirmation to user
+ * 3. Sends notification email to admin
  *
  * The user_profiles entry is created automatically by a database trigger.
  */
@@ -11,7 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { logger } from '@/app/lib/logger'
-import { sendAdminNotificationEmail } from '@/app/lib/email'
+import { sendAdminNotificationEmail, sendEmailConfirmation } from '@/app/lib/email'
 
 // =============================================================================
 // Supabase Client
@@ -107,23 +108,37 @@ export async function POST(request: NextRequest) {
 
     logger.info({ email, userId: authData.user.id }, 'User registered successfully')
 
+    // Send email confirmation to user
+    const confirmationResult = await sendEmailConfirmation({
+      email,
+      fullName,
+      userId: authData.user.id,
+    })
+
+    if (confirmationResult.success) {
+      logger.info({ email }, 'Email confirmation sent to new user')
+    } else {
+      // Log but don't fail the registration if email fails
+      logger.warn({ email, error: confirmationResult.error }, 'Failed to send email confirmation')
+    }
+
     // Send notification email to admin
-    const emailResult = await sendAdminNotificationEmail({
+    const adminEmailResult = await sendAdminNotificationEmail({
       email,
       fullName,
     })
 
-    if (emailResult.success) {
+    if (adminEmailResult.success) {
       logger.info({ email }, 'Admin notification email sent for new registration')
     } else {
       // Log but don't fail the registration if email fails
-      logger.warn({ email, error: emailResult.error }, 'Failed to send admin notification email')
+      logger.warn({ email, error: adminEmailResult.error }, 'Failed to send admin notification email')
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Registration successful. Your account is pending admin approval.',
-      emailConfirmationRequired: !authData.session, // Supabase may require email confirmation
+      message: 'Registration successful. Please check your email to confirm your account.',
+      emailConfirmationRequired: true,
     })
 
   } catch (error) {
