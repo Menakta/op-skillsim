@@ -142,7 +142,7 @@ export default function ResultsPage() {
   return (
     <DashboardLayout title="Results" subtitle="View and analyze quiz results">
       {/* Stats Overview */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 mb-3">
         <StatCard
           label="Total Submissions"
           value={stats?.totalResults || 0}
@@ -170,8 +170,8 @@ export default function ResultsPage() {
       </div>
 
       {/* Average Score Chart */}
-      <Card className="mb-6">
-        <CardContent className="py-6">
+      <Card className="mb-3">
+        <CardContent className="py-3">
           <div className="flex items-center justify-between">
             <div>
               <p className="theme-text-muted text-sm">Average Quiz Score</p>
@@ -207,9 +207,9 @@ export default function ResultsPage() {
       </Card>
 
       {/* Filters */}
-      <Card className="mb-6 w-full lg:w-[49%]">
-        <CardContent className="py-4">
-          <div className="flex flex-col gap-4 justify-between">
+      <Card className="mb-3 w-full lg:w-[49%]">
+        <CardContent className="py-2">
+          <div className="flex flex-col gap-2 justify-between">
             <SearchInput
               value={searchQuery}
               onChange={setSearchQuery}

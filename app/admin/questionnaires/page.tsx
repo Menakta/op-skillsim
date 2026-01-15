@@ -107,7 +107,7 @@ export default function QuestionnairesPage() {
   return (
     <DashboardLayout title="Questionnaires" subtitle="View and edit training questions">
       {/* Header Actions */}
-      <Card className="mb-6 lg:w-[49%] w-full">
+      <Card className="mb-3 lg:w-[49%] w-full">
         <CardHeader className='p-4'>
           <div className="flex flex-col sm:flex-row gap-2 justify-between">
             <SearchInput
@@ -122,7 +122,7 @@ export default function QuestionnairesPage() {
 
       {/* Save Message */}
       {saveMessage && (
-        <div className={`mb-4 p-3 rounded-lg flex items-center gap-2 border ${
+        <div className={`mb-2 p-2 rounded-lg flex items-center gap-2 border ${
           saveMessage.type === 'success'
             ? 'theme-bg-success theme-text-success theme-border-success'
             : 'theme-bg-error theme-text-error theme-border-error'
@@ -140,7 +140,7 @@ export default function QuestionnairesPage() {
       <DemoModeNotice />
 
       {/* Info Notice */}
-      <div className="mb-6 p-4 rounded-lg border theme-bg-info theme-border-info">
+      <div className="mb-3 p-3 rounded-lg border theme-bg-info theme-border-info">
         <p className="text-sm theme-text-info">
           <strong>Note:</strong> {isLti
             ? 'You can edit existing questions but cannot add new ones or delete existing ones. Changes will be reflected immediately in the training simulation.'
@@ -190,7 +190,7 @@ export default function QuestionnairesPage() {
 
       {/* Questions by Phase */}
       {!isLoading && !error && Object.keys(groupedQuestions).length > 0 && (
-        <div className="space-y-6">
+        <div className="space-y-3">
           {Object.entries(groupedQuestions).map(([phase, phaseQuestions]) => {
             const paginatedQuestions = getPaginatedQuestions(phase, phaseQuestions)
             const totalPages = Math.ceil(phaseQuestions.length / ITEMS_PER_PAGE)
@@ -206,7 +206,7 @@ export default function QuestionnairesPage() {
                     </CardTitle>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-2">
                   {paginatedQuestions.map((question) => (
                     <QuestionCard
                       key={question.question_id}
@@ -220,7 +220,7 @@ export default function QuestionnairesPage() {
                     />
                   ))}
                   {totalPages > 1 && (
-                    <div className="pt-4 border-t theme-border">
+                    <div className="pt-2 border-t theme-border">
                       <Pagination
                         currentPage={currentPage}
                         totalPages={totalPages}
