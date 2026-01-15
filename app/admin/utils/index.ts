@@ -273,6 +273,7 @@ export interface ChartExportOptions {
 
 /**
  * Export a chart element to PDF by capturing it as an image
+ * Uses html-to-image which supports modern CSS including oklch
  */
 export async function exportChartToPDF(
   chartElement: HTMLElement,
@@ -281,87 +282,21 @@ export async function exportChartToPDF(
 ): Promise<void> {
   const { title, subtitle, orientation = 'landscape' } = options
 
-  // Dynamically import html2canvas
-  const html2canvas = (await import('html2canvas')).default
+  // Dynamically import html-to-image (supports oklch colors)
+  const { toPng } = await import('html-to-image')
 
-  // Get computed styles before cloning to preserve percentage-based heights
-  const elementsWithComputedHeights = new Map<Element, { height: string; width: string }>()
-  chartElement.querySelectorAll('*').forEach((el) => {
-    const computed = window.getComputedStyle(el)
-    elementsWithComputedHeights.set(el, {
-      height: computed.height,
-      width: computed.width,
-    })
+  // Detect current theme by checking the html element's class or data attribute
+  const isDarkTheme = document.documentElement.classList.contains('dark') ||
+    document.documentElement.getAttribute('data-theme') === 'dark'
+
+  // Use appropriate background color based on theme
+  const backgroundColor = isDarkTheme ? '#1a1a2e' : '#ffffff'
+
+  // Capture the chart as PNG
+  const imgData = await toPng(chartElement, {
+    backgroundColor,
+    pixelRatio: 2,
   })
-
-  // Clone the element to apply export-specific styles without affecting the UI
-  const clone = chartElement.cloneNode(true) as HTMLElement
-  clone.style.position = 'absolute'
-  clone.style.left = '-9999px'
-  clone.style.top = '0'
-  clone.style.width = `${chartElement.offsetWidth}px`
-  clone.style.height = `${chartElement.offsetHeight}px`
-  clone.style.backgroundColor = '#1a1a2e'
-  clone.style.padding = '16px'
-  clone.style.borderRadius = '8px'
-  clone.style.overflow = 'visible'
-
-  // Apply computed dimensions and dark theme colors to cloned elements
-  const originalElements = Array.from(chartElement.querySelectorAll('*'))
-  const clonedElements = Array.from(clone.querySelectorAll('*'))
-
-  clonedElements.forEach((clonedEl, index) => {
-    const element = clonedEl as HTMLElement
-    const originalEl = originalElements[index]
-    const computedStyle = window.getComputedStyle(originalEl)
-
-    // Preserve computed height and width (converts percentage to px)
-    const savedDimensions = elementsWithComputedHeights.get(originalEl)
-    if (savedDimensions) {
-      if (savedDimensions.height !== 'auto' && savedDimensions.height !== '0px') {
-        element.style.height = savedDimensions.height
-      }
-      if (savedDimensions.width !== 'auto' && savedDimensions.width !== '0px') {
-        element.style.width = savedDimensions.width
-      }
-    }
-
-    // Make text visible on dark background
-    const currentColor = computedStyle.color
-    if (currentColor === 'rgb(0, 0, 0)' ||
-        currentColor === 'rgba(0, 0, 0, 0)' ||
-        currentColor.startsWith('rgba(0, 0, 0')) {
-      element.style.color = '#e5e5e5'
-    }
-
-    // Copy background color
-    const bgColor = computedStyle.backgroundColor
-    if (bgColor && bgColor !== 'rgba(0, 0, 0, 0)' && bgColor !== 'transparent') {
-      element.style.backgroundColor = bgColor
-    }
-  })
-
-  // Append clone to body temporarily
-  document.body.appendChild(clone)
-
-  // Wait for fonts and styles to apply
-  await new Promise(resolve => setTimeout(resolve, 150))
-
-  // Capture the chart as an image with proper settings
-  const canvas = await html2canvas(clone, {
-    backgroundColor: '#1a1a2e',
-    scale: 2,
-    logging: false,
-    useCORS: true,
-    allowTaint: true,
-    width: clone.offsetWidth,
-    height: clone.offsetHeight,
-  })
-
-  // Remove the clone
-  document.body.removeChild(clone)
-
-  const imgData = canvas.toDataURL('image/png')
 
   // Create PDF document
   const doc = new jsPDF({
@@ -373,31 +308,37 @@ export async function exportChartToPDF(
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()
 
-  // Try to load the logo
+  // Try to load the logo (use opposite theme logo for visibility)
   let logoBase64: string | null = null
   try {
-    logoBase64 = await loadImageAsBase64('/logos/Dark_Logo.png')
+    const logoPath = isDarkTheme ? '/logos/Dark_Logo.png' : '/logos/Light_Logo.png'
+    logoBase64 = await loadImageAsBase64(logoPath)
   } catch (error) {
     console.warn('Could not load logo for PDF:', error)
   }
 
+  // PDF text colors based on theme
+  const titleColor: [number, number, number] = [57, 190, 174] // Brand color works on both
+  const subtitleColor: [number, number, number] = isDarkTheme ? [160, 160, 160] : [80, 80, 80]
+  const mutedColor: [number, number, number] = isDarkTheme ? [128, 128, 128] : [100, 100, 100]
+
   // Add title
   doc.setFontSize(18)
-  doc.setTextColor(57, 190, 174)
+  doc.setTextColor(...titleColor)
   doc.text(title, 14, 20)
 
   // Add subtitle if provided
   let startY = 28
   if (subtitle) {
     doc.setFontSize(11)
-    doc.setTextColor(100)
+    doc.setTextColor(...subtitleColor)
     doc.text(subtitle, 14, startY)
     startY += 8
   }
 
   // Add timestamp
   doc.setFontSize(9)
-  doc.setTextColor(128)
+  doc.setTextColor(...mutedColor)
   const timestamp = new Date().toLocaleString('en-NZ', {
     year: 'numeric',
     month: 'short',
@@ -408,12 +349,13 @@ export async function exportChartToPDF(
   doc.text(`Generated: ${timestamp}`, 14, startY)
   startY += 10
 
-  // Calculate image dimensions to fit the page with more space
+  // Calculate image dimensions to fit the page
   const maxWidth = pageWidth - 28
   const maxHeight = pageHeight - startY - 20
 
-  const imgWidth = canvas.width
-  const imgHeight = canvas.height
+  // Get original element dimensions (pixelRatio of 2 was used)
+  const imgWidth = chartElement.offsetWidth * 2
+  const imgHeight = chartElement.offsetHeight * 2
   const ratio = Math.min(maxWidth / imgWidth, maxHeight / imgHeight)
 
   const finalWidth = imgWidth * ratio
@@ -427,7 +369,7 @@ export async function exportChartToPDF(
 
   // Add footer
   doc.setFontSize(8)
-  doc.setTextColor(128)
+  doc.setTextColor(...mutedColor)
   doc.text('Page 1 of 1', pageWidth / 2, pageHeight - 8, { align: 'center' })
 
   // Add logo to footer

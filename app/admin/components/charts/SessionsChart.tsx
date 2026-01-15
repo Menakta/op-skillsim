@@ -111,7 +111,10 @@ export function SessionsChart({ className = '' }: SessionsChartProps) {
   const totalAdmins = data.reduce((sum, d) => sum + d.admins, 0)
 
   const handleExport = async () => {
-    if (!chartRef.current) return
+    if (!chartRef.current) {
+      console.error('Chart ref not available')
+      return
+    }
 
     setIsExporting(true)
     try {
@@ -127,6 +130,7 @@ export function SessionsChart({ className = '' }: SessionsChartProps) {
       )
     } catch (err) {
       console.error('Failed to export chart:', err)
+      alert('Failed to export chart. Please try again.')
     } finally {
       setIsExporting(false)
     }

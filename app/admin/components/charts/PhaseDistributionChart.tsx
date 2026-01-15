@@ -163,7 +163,7 @@ export function PhaseDistributionChart({ className = '' }: PhaseDistributionChar
                 <BarChart
                   data={barData}
                   layout="vertical"
-                  margin={{ top: 5, right: 30, left: 1, bottom: 5 }}
+                  margin={{ top: 5, right: 20, left: 1, bottom: 5 }}
                 >
                   <XAxis
                     type="number"
@@ -175,10 +175,10 @@ export function PhaseDistributionChart({ className = '' }: PhaseDistributionChar
                   <YAxis
                     type="category"
                     dataKey="phaseName"
-                    tick={{ fill: 'var(--color-text-primary)', fontSize: 11 }}
+                    tick={{ fill: 'var(--color-text-primary)', fontSize: 10 }}
                     tickLine={{ stroke: 'transparent' }}
                     axisLine={{ stroke: 'transparent' }}
-                    width={95}
+                    width={57}
                   />
                   <Tooltip content={<BarTooltip />} cursor={{ fill: 'rgba(255,255,255,0.1)' }} />
                   <Bar
