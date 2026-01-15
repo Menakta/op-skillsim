@@ -18,7 +18,7 @@
      ------------------------------------------------------------------------- */
 
   /* Background colors (white shades) */
-  --color-bg-primary: #FFFFFF;
+  --color-bg-primary: #dee5e6;
   --color-bg-secondary: #eeeeee;
   --color-bg-tertiary: #ffffff;
   --color-bg-elevated: #FFFFFF;
@@ -71,7 +71,7 @@
   --color-card-border: #dddddd;
   --color-input-bg: #FFFFFF;
   --color-input-border: #D9D9D9;
-  --color-sidebar-bg: #39BEAE;
+  --color-sidebar-bg: #ffffff;
   --color-header-bg: #FFFFFF;
 
   /* Shadows */
@@ -86,7 +86,7 @@
 
 .dark {
   /* Background colors (black shades) */
-  --color-bg-primary: #222222;
+  --color-bg-primary: #1a2525;
   --color-bg-secondary: #212121;
   --color-bg-tertiary: #141414;
   --color-bg-elevated: #141414;

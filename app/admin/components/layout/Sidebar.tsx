@@ -116,8 +116,8 @@ export function Sidebar({
               className={`
                 flex items-center gap-3 px-4 py-3 rounded-lg transition-all
                 ${active
-                  ? 'bg-white/40 text-black border-l-2 border-gray-100'
-                  : 'theme-text-tertiary hover:bg-white/30'
+                  ? 'theme-bg-brand text-black border-l-2 border-gray-100'
+                  : 'theme-text-tertiary hover:bg-[#39BEAE]/30'
                 }
               `}
             >
@@ -131,7 +131,7 @@ export function Sidebar({
         <Link
           href="/"
           onClick={handleNavClick}
-          className="flex items-center gap-3 px-4 py-3 rounded-lg theme-text-accent hover:bg-white/30 transition-all mt-4"
+          className="flex items-center gap-3 px-4 py-3 rounded-lg theme-text-accent hover:bg-[#39BEAE]/30 transition-all mt-4"
         >
           <Play className="w-5 h-5 flex-shrink-0" />
           <span className="font-medium">Launch Demo</span>
@@ -167,7 +167,7 @@ export function Sidebar({
         {!isLti && (
           <button
             onClick={onLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all theme-text-tertiary hover:text-red-400 hover:bg-red-400/10"
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all theme-text-tertiary hover:text-red-400 hover:bg-[#39BEAE]/30"
           >
             <LogOut className="w-5 h-5 flex-shrink-0" />
             <span className="font-medium">Logout</span>
