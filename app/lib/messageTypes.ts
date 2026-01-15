@@ -18,6 +18,7 @@
 export const WEB_TO_UE_MESSAGES = {
   // Training Control
   TRAINING_CONTROL: 'training_control',  // start, pause, reset, test
+  START_FROM_TASK: 'start_from_task',    // <phaseIndex> - Resume training from specific phase (0-7)
 
   // Tool Selection
   TOOL_SELECT: 'tool_select',            // XRay, Shovel, Measuring, PipeConnection, Glue, PressureTester
@@ -458,6 +459,11 @@ export function createMessage(type: string, data?: string): string {
 // Training Control
 export function createTrainingControlMessage(action: TrainingControlAction): string {
   return createMessage(WEB_TO_UE_MESSAGES.TRAINING_CONTROL, action)
+}
+
+// Start from specific task/phase (for resume)
+export function createStartFromTaskMessage(phaseIndex: number): string {
+  return createMessage(WEB_TO_UE_MESSAGES.START_FROM_TASK, String(phaseIndex))
 }
 
 // Tool Selection

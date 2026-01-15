@@ -422,6 +422,10 @@ export class SessionManager {
 
   /**
    * Create a training session for a student
+   *
+   * IMPORTANT: Before creating a new session, this method first marks any
+   * existing 'active' sessions for the same email as 'abandoned' to prevent
+   * duplicate active sessions for the same user.
    */
   async createTrainingSession(
     userSessionId: string,
@@ -453,6 +457,29 @@ export class SessionManager {
       full_name: 'Student',
       institution: 'Unknown Institution',
       enrolled_at: new Date().toISOString(),
+    }
+
+    // ==========================================================================
+    // PREVENT DUPLICATE ACTIVE SESSIONS:
+    // Mark any existing 'active' sessions for this email as 'abandoned'
+    // This ensures only one active training session per student
+    // ==========================================================================
+    if (email && email !== 'unknown@unknown.local') {
+      const { error: updateError } = await supabaseAdmin
+        .from('training_sessions')
+        .update({
+          status: 'abandoned',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('student->>email', email)
+        .eq('status', 'active')
+
+      if (updateError) {
+        console.warn('Failed to mark existing sessions as abandoned:', updateError.message)
+        // Continue anyway - we still want to create the new session
+      } else {
+        console.log(`[SessionManager] Marked existing active sessions for ${email} as abandoned`)
+      }
     }
 
     const { data, error } = await supabaseAdmin

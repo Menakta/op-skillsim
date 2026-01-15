@@ -68,6 +68,7 @@ const initialState: TrainingStateData = {
 export interface UseTrainingStateReturn {
   state: TrainingStateData
   startTraining: () => void
+  startFromTask: (phaseIndex: number) => void
   pauseTraining: () => void
   resetTraining: () => void
   testConnection: () => void
@@ -345,6 +346,31 @@ export function useTrainingState(
     messageBus.sendMessage(WEB_TO_UE_MESSAGES.TRAINING_CONTROL, 'test')
   }, [messageBus])
 
+  /**
+   * Resume training from a specific phase/task index
+   * Used when student returns to continue a previous session
+   */
+  const startFromTask = useCallback(async (phaseIndex: number) => {
+    console.log(`🔄 Resuming training from phase ${phaseIndex}`)
+
+    // Start session timer
+    sessionStartTimeRef.current = Date.now()
+
+    setState(prev => ({
+      ...prev,
+      mode: 'training',
+      uiMode: 'task',
+      currentTaskIndex: phaseIndex,
+      trainingStarted: false,
+    }))
+
+    // Send start_from_task message to UE5 to jump to the correct phase
+    messageBus.sendMessage(WEB_TO_UE_MESSAGES.START_FROM_TASK, String(phaseIndex))
+
+    // Emit event
+    eventBus.emit('training:resumed', { taskIndex: phaseIndex })
+  }, [messageBus])
+
   // State setters
   const setMode = useCallback((mode: 'cinematic' | 'training') => {
     setState(prev => ({ ...prev, mode }))
@@ -369,6 +395,7 @@ export function useTrainingState(
   return {
     state,
     startTraining,
+    startFromTask,
     pauseTraining,
     resetTraining,
     testConnection,

@@ -222,6 +222,7 @@ export function useTrainingMessagesComposite(
 
     // Training Control
     startTraining: trainingState.startTraining,
+    startFromTask: trainingState.startFromTask,
     pauseTraining: trainingState.pauseTraining,
     resetTraining: trainingState.resetTraining,
     testConnection: trainingState.testConnection,

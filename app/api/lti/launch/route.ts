@@ -431,46 +431,82 @@ export async function POST(req: NextRequest) {
       // Get request info for session tracking
       const requestInfo = await sessionManager.getRequestInfo()
 
-      // Check for existing active training session for this user BY EMAIL
-      // Email is the stable identifier since LTI userId changes every launch
+      // ==========================================================================
+      // Resume Training Logic:
+      // 1. Find active training session by email using JOIN between user_sessions and training_sessions
+      // 2. If status = 'active' → Resume from current_training_phase
+      // 3. If status = 'completed' OR no record → Create new session starting at phase 0
+      // ==========================================================================
       const supabase = getSupabaseAdmin()
-      const { data: existingTrainingSession } = await supabase
-        .from('training_sessions')
-        .select('id, session_id, current_training_phase, overall_progress, training_state, student')
-        .eq('student->>email', email)
-        .eq('status', 'active')
+
+      // Query: JOIN user_sessions and training_sessions to find active training by email
+      // This is more performant than querying JSONB student->>email
+      const { data: activeTrainingData, error: queryError } = await supabase
+        .from('user_sessions')
+        .select(`
+          session_id,
+          email,
+          training_sessions!inner (
+            id,
+            session_id,
+            current_training_phase,
+            overall_progress,
+            training_state,
+            student,
+            status
+          )
+        `)
+        .eq('email', email)
+        .eq('training_sessions.status', 'active')
         .order('created_at', { ascending: false })
         .limit(1)
         .single()
 
+      // Extract the training session from the join result
+      const existingTrainingSession = activeTrainingData?.training_sessions
+        ? (Array.isArray(activeTrainingData.training_sessions)
+            ? activeTrainingData.training_sessions[0]
+            : activeTrainingData.training_sessions)
+        : null
+
+      if (queryError && queryError.code !== 'PGRST116') {
+        // Log non-"no rows" errors
+        logger.warn({ error: queryError.message, email }, 'Error querying for active training session')
+      }
+
       let sessionId: string
       let token: string
       let isResuming = false
+      let resumePhase: string | null = null
 
-      if (existingTrainingSession) {
-        // Found an active training session - resume it
+      if (existingTrainingSession && existingTrainingSession.status === 'active') {
+        // ==========================================================================
+        // RESUME: Found an active training session for this email
+        // ==========================================================================
         isResuming = true
-        console.log('=== Resuming Existing Training Session (by email) ===')
+        resumePhase = existingTrainingSession.current_training_phase || '0'
+
+        console.log('=== RESUME: Active Training Session Found (JOIN query) ===')
         console.log({
           email,
           trainingSessionId: existingTrainingSession.id,
           existingSessionId: existingTrainingSession.session_id,
-          phase: existingTrainingSession.current_training_phase,
+          currentPhase: resumePhase,
           progress: existingTrainingSession.overall_progress,
           hasState: !!existingTrainingSession.training_state,
         })
-        console.log('=====================================================')
+        console.log('==========================================================')
 
-        // Create a new user_session but link it to the existing training_session
+        // Create a new user_session (each LTI launch creates a new login record)
         const result = await sessionManager.createStudentSession(ltiData, requestInfo)
         sessionId = result.sessionId
         token = result.token
 
-        // Update the training_session to use the new user_session_id
-        // Also update the student.user_id to the new LTI userId (it changes each launch)
+        // Update the training_session to use the new user_session's session_id
+        // This links the new login to the existing training progress
         const updatedStudent = {
           ...(existingTrainingSession.student as Record<string, unknown>),
-          user_id: ltiData.userId, // Update to current LTI userId
+          user_id: ltiData.userId, // Update to current LTI userId (changes each launch)
         }
 
         const { error: updateError } = await supabase
@@ -491,16 +527,23 @@ export async function POST(req: NextRequest) {
           userId: user.id,
           sessionId,
           trainingSessionId: existingTrainingSession.id,
-          phase: existingTrainingSession.current_training_phase,
+          resumePhase,
           progress: existingTrainingSession.overall_progress,
-        }, 'LTI Student Resume - Linked new session to existing training (by email)')
+        }, 'LTI Student Resume - Continuing from phase ' + resumePhase)
       } else {
-        // No active training session - create new session and training
+        // ==========================================================================
+        // NEW SESSION: No active training (completed or never started)
+        // ==========================================================================
+        console.log('=== NEW SESSION: No active training found ===')
+        console.log({ email, reason: existingTrainingSession ? 'Previous session completed' : 'First time user' })
+        console.log('=============================================')
+
+        // Create new user_session
         const result = await sessionManager.createStudentSession(ltiData, requestInfo)
         sessionId = result.sessionId
         token = result.token
 
-        // Create training session with student details
+        // Create new training_session starting at phase 0
         try {
           await sessionManager.createTrainingSession(
             sessionId,
@@ -513,14 +556,14 @@ export async function POST(req: NextRequest) {
               institution: ltiData.institution,
             }
           )
+          logger.info({
+            userId: user.id,
+            sessionId,
+            email,
+          }, 'LTI Student Launch - Created new training session at phase 0')
         } catch (error) {
           logger.warn({ error }, 'Failed to create training session - continuing without it')
         }
-
-        logger.info({
-          userId: user.id,
-          sessionId,
-        }, 'LTI Student Launch - Created new training session')
       }
 
       // Set session token cookie

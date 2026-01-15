@@ -657,6 +657,10 @@ export default function StreamingApp() {
           setIsCinematicMode(false)
           setShowExplosionControls(false)
 
+          // Determine the phase index to resume from
+          // currentTrainingPhase from DB is the authoritative source (stored as "0", "1", "2"...)
+          const phaseIndex = parseInt(phaseToRestore || '0', 10)
+
           // Restore phase from database (currentTrainingPhase is authoritative)
           if (phaseToRestore) {
             training.hooks.trainingState.setPhase(phaseToRestore)
@@ -669,11 +673,19 @@ export default function StreamingApp() {
             console.log('📂 Restored task index:', taskIndexToRestore)
           }
 
-          // Start training mode in UE5
-          training.startTraining()
+          // Resume training from the saved phase
+          // If phase > 0, use startFromTask to tell UE5 to jump to that phase
+          // Otherwise, use regular startTraining (phase 0)
+          if (phaseIndex > 0) {
+            console.log(`🔄 Resuming training from phase ${phaseIndex}`)
+            training.startFromTask(phaseIndex)
+          } else {
+            training.startTraining()
+          }
 
           console.log('📂 Training resumed:', {
             phase: phaseToRestore,
+            phaseIndex,
             taskIndex: taskIndexToRestore,
             progress: overallProgress
           })
