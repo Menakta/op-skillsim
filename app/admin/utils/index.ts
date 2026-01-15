@@ -284,37 +284,60 @@ export async function exportChartToPDF(
   // Dynamically import html2canvas
   const html2canvas = (await import('html2canvas')).default
 
+  // Get computed styles before cloning to preserve percentage-based heights
+  const elementsWithComputedHeights = new Map<Element, { height: string; width: string }>()
+  chartElement.querySelectorAll('*').forEach((el) => {
+    const computed = window.getComputedStyle(el)
+    elementsWithComputedHeights.set(el, {
+      height: computed.height,
+      width: computed.width,
+    })
+  })
+
   // Clone the element to apply export-specific styles without affecting the UI
   const clone = chartElement.cloneNode(true) as HTMLElement
   clone.style.position = 'absolute'
   clone.style.left = '-9999px'
   clone.style.top = '0'
   clone.style.width = `${chartElement.offsetWidth}px`
+  clone.style.height = `${chartElement.offsetHeight}px`
   clone.style.backgroundColor = '#1a1a2e'
   clone.style.padding = '16px'
   clone.style.borderRadius = '8px'
+  clone.style.overflow = 'visible'
 
-  // Apply dark theme colors to all text elements in the clone
-  const allElements = clone.querySelectorAll('*')
-  allElements.forEach((el) => {
-    const element = el as HTMLElement
-    const computedStyle = window.getComputedStyle(element)
+  // Apply computed dimensions and dark theme colors to cloned elements
+  const originalElements = Array.from(chartElement.querySelectorAll('*'))
+  const clonedElements = Array.from(clone.querySelectorAll('*'))
+
+  clonedElements.forEach((clonedEl, index) => {
+    const element = clonedEl as HTMLElement
+    const originalEl = originalElements[index]
+    const computedStyle = window.getComputedStyle(originalEl)
+
+    // Preserve computed height and width (converts percentage to px)
+    const savedDimensions = elementsWithComputedHeights.get(originalEl)
+    if (savedDimensions) {
+      if (savedDimensions.height !== 'auto' && savedDimensions.height !== '0px') {
+        element.style.height = savedDimensions.height
+      }
+      if (savedDimensions.width !== 'auto' && savedDimensions.width !== '0px') {
+        element.style.width = savedDimensions.width
+      }
+    }
 
     // Make text visible on dark background
-    if (computedStyle.color === 'rgb(0, 0, 0)' ||
-        computedStyle.color === 'rgba(0, 0, 0, 0)' ||
-        computedStyle.color.includes('var(')) {
+    const currentColor = computedStyle.color
+    if (currentColor === 'rgb(0, 0, 0)' ||
+        currentColor === 'rgba(0, 0, 0, 0)' ||
+        currentColor.startsWith('rgba(0, 0, 0')) {
       element.style.color = '#e5e5e5'
     }
 
-    // Ensure text elements have proper color
-    if (element.tagName === 'P' || element.tagName === 'SPAN' ||
-        element.tagName === 'DIV' || element.tagName === 'TEXT') {
-      const currentColor = computedStyle.color
-      // If color is very dark or transparent, make it light
-      if (currentColor === 'rgb(0, 0, 0)' || currentColor.startsWith('rgba(0, 0, 0')) {
-        element.style.color = '#e5e5e5'
-      }
+    // Copy background color
+    const bgColor = computedStyle.backgroundColor
+    if (bgColor && bgColor !== 'rgba(0, 0, 0, 0)' && bgColor !== 'transparent') {
+      element.style.backgroundColor = bgColor
     }
   })
 
@@ -322,7 +345,7 @@ export async function exportChartToPDF(
   document.body.appendChild(clone)
 
   // Wait for fonts and styles to apply
-  await new Promise(resolve => setTimeout(resolve, 100))
+  await new Promise(resolve => setTimeout(resolve, 150))
 
   // Capture the chart as an image with proper settings
   const canvas = await html2canvas(clone, {
@@ -331,10 +354,8 @@ export async function exportChartToPDF(
     logging: false,
     useCORS: true,
     allowTaint: true,
-    width: clone.scrollWidth,
-    height: clone.scrollHeight,
-    windowWidth: clone.scrollWidth,
-    windowHeight: clone.scrollHeight,
+    width: clone.offsetWidth,
+    height: clone.offsetHeight,
   })
 
   // Remove the clone
