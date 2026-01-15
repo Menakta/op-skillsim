@@ -213,7 +213,7 @@ export default function ProfilePage() {
         <span>Back</span>
       </button>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
         {/* User Info Card */}
         <Card>
           <CardHeader>
@@ -221,7 +221,7 @@ export default function ProfilePage() {
           </CardHeader>
           <CardContent>
             {/* Avatar Section */}
-            <div className="flex items-center gap-4 mb-6 pb-6 border-b theme-border">
+            <div className="flex items-center gap-4 mb-3 pb-3 border-b theme-border">
               <div className="w-16 h-16 rounded-full theme-bg-brand flex items-center justify-center">
                 <User className="w-8 h-8 text-white" />
               </div>
