@@ -284,12 +284,61 @@ export async function exportChartToPDF(
   // Dynamically import html2canvas
   const html2canvas = (await import('html2canvas')).default
 
-  // Capture the chart as an image
-  const canvas = await html2canvas(chartElement, {
+  // Clone the element to apply export-specific styles without affecting the UI
+  const clone = chartElement.cloneNode(true) as HTMLElement
+  clone.style.position = 'absolute'
+  clone.style.left = '-9999px'
+  clone.style.top = '0'
+  clone.style.width = `${chartElement.offsetWidth}px`
+  clone.style.backgroundColor = '#1a1a2e'
+  clone.style.padding = '16px'
+  clone.style.borderRadius = '8px'
+
+  // Apply dark theme colors to all text elements in the clone
+  const allElements = clone.querySelectorAll('*')
+  allElements.forEach((el) => {
+    const element = el as HTMLElement
+    const computedStyle = window.getComputedStyle(element)
+
+    // Make text visible on dark background
+    if (computedStyle.color === 'rgb(0, 0, 0)' ||
+        computedStyle.color === 'rgba(0, 0, 0, 0)' ||
+        computedStyle.color.includes('var(')) {
+      element.style.color = '#e5e5e5'
+    }
+
+    // Ensure text elements have proper color
+    if (element.tagName === 'P' || element.tagName === 'SPAN' ||
+        element.tagName === 'DIV' || element.tagName === 'TEXT') {
+      const currentColor = computedStyle.color
+      // If color is very dark or transparent, make it light
+      if (currentColor === 'rgb(0, 0, 0)' || currentColor.startsWith('rgba(0, 0, 0')) {
+        element.style.color = '#e5e5e5'
+      }
+    }
+  })
+
+  // Append clone to body temporarily
+  document.body.appendChild(clone)
+
+  // Wait for fonts and styles to apply
+  await new Promise(resolve => setTimeout(resolve, 100))
+
+  // Capture the chart as an image with proper settings
+  const canvas = await html2canvas(clone, {
     backgroundColor: '#1a1a2e',
     scale: 2,
     logging: false,
+    useCORS: true,
+    allowTaint: true,
+    width: clone.scrollWidth,
+    height: clone.scrollHeight,
+    windowWidth: clone.scrollWidth,
+    windowHeight: clone.scrollHeight,
   })
+
+  // Remove the clone
+  document.body.removeChild(clone)
 
   const imgData = canvas.toDataURL('image/png')
 
@@ -338,9 +387,9 @@ export async function exportChartToPDF(
   doc.text(`Generated: ${timestamp}`, 14, startY)
   startY += 10
 
-  // Calculate image dimensions to fit the page
+  // Calculate image dimensions to fit the page with more space
   const maxWidth = pageWidth - 28
-  const maxHeight = pageHeight - startY - 30
+  const maxHeight = pageHeight - startY - 20
 
   const imgWidth = canvas.width
   const imgHeight = canvas.height
@@ -358,7 +407,7 @@ export async function exportChartToPDF(
   // Add footer
   doc.setFontSize(8)
   doc.setTextColor(128)
-  doc.text('Page 1 of 1', pageWidth / 2, pageHeight - 10, { align: 'center' })
+  doc.text('Page 1 of 1', pageWidth / 2, pageHeight - 8, { align: 'center' })
 
   // Add logo to footer
   if (logoBase64) {
@@ -368,7 +417,7 @@ export async function exportChartToPDF(
       logoBase64,
       'PNG',
       pageWidth - 14 - logoWidth,
-      pageHeight - 14,
+      pageHeight - 12,
       logoWidth,
       logoHeight
     )
