@@ -8,7 +8,8 @@
  * Responsive with hamburger menu on mobile.
  */
 
-import { Bell, Menu, Sun, Moon } from 'lucide-react'
+import { Menu, Sun, Moon, User2 } from 'lucide-react'
+import Link from 'next/link'
 import { useTheme } from '@/app/context/ThemeContext'
 
 interface HeaderProps {
@@ -50,11 +51,14 @@ export function Header({ title, subtitle, onMenuClick, showMenuButton = false }:
           {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
         </button>
 
-        {/* Notifications */}
-        <button className="relative p-2 rounded-lg transition-colors theme-btn-ghost">
-          <Bell className="w-5 h-5" />
-          <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-        </button>
+        {/* Profile Link */}
+        <Link
+          href="/admin/profile"
+          className="relative transition-colors theme-bg-secondary theme-text-primary p-3 rounded-full hover:bg-purple-700"
+          aria-label="View profile"
+        >
+          <User2 className="w-5 h-5" />
+        </Link>
       </div>
     </header>
   )

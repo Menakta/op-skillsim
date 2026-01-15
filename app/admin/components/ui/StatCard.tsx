@@ -40,7 +40,7 @@ const ICON_BG_CLASSES = {
 
 export function StatCard({ label, value, icon, trend, color = 'default' }: StatCardProps) {
   return (
-    <div className="bg-[#39BEAE] rounded-xl p-3 sm:p-6 ">
+    <div className="bg-[#39BEAE] rounded-lg p-3 sm:p-6 ">
       <div className="flex items-start justify-between">
         <div>
           <div className={`text-3xl font-bold mb-1 text-white`}>

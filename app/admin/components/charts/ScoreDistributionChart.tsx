@@ -1,10 +1,10 @@
 'use client'
 
 /**
- * PhaseDistributionChart Component
+ * ScoreDistributionChart Component
  *
- * Horizontal bar chart showing active training sessions by phase.
- * Uses React Query for data fetching with 10-minute cache.
+ * Bar chart showing student score distribution across percentage ranges.
+ * Uses React Query for data fetching.
  * Export to PDF available for LTI users only.
  */
 
@@ -20,7 +20,7 @@ import {
   Cell,
 } from 'recharts'
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card'
-import { useTrainingAnalytics } from '../../hooks'
+import { useResults } from '../../hooks'
 import { useCurrentUser } from '../../hooks/useCurrentUser'
 import { exportChartToPDF } from '../../utils'
 
@@ -28,23 +28,26 @@ import { exportChartToPDF } from '../../utils'
 // Types
 // =============================================================================
 
-interface PhaseDistributionChartProps {
+interface ScoreDistributionChartProps {
   className?: string
+}
+
+interface ScoreRange {
+  range: string
+  count: number
+  fill: string
 }
 
 // =============================================================================
 // Constants
 // =============================================================================
 
-const PHASE_COLORS = [
-  '#f65c64',
-  '#EC4899',
-  '#F59E0B',
-  '#10B981',
-  '#3B82F6',
-  '#6366F1',
-  '#EF4444',
-  '#14B8A6',
+const SCORE_RANGES = [
+  { min: 1, max: 20, label: '1-20%', fill: '#EF4444' },
+  { min: 21, max: 40, label: '21-40%', fill: '#F97316' },
+  { min: 41, max: 60, label: '41-60%', fill: '#F59E0B' },
+  { min: 61, max: 80, label: '61-80%', fill: '#22C55E' },
+  { min: 81, max: 100, label: '81-100%', fill: '#10B981' },
 ]
 
 // =============================================================================
@@ -56,10 +59,7 @@ interface CustomTooltipProps {
   payload?: Array<{
     name: string
     value: number
-    payload: {
-      phaseName?: string
-      count: number
-    }
+    payload: ScoreRange
   }>
 }
 
@@ -67,13 +67,11 @@ function BarTooltip({ active, payload }: CustomTooltipProps) {
   if (!active || !payload || !payload.length) return null
 
   const data = payload[0]
-  const phaseName = data.payload.phaseName || data.name
-  const count = data.value
 
   return (
     <div className="theme-bg-elevated theme-text-primary text-sm px-3 py-2 rounded-lg shadow-lg theme-border border">
-      <p className="font-medium">{phaseName}</p>
-      <p className="theme-text-secondary">{count} active sessions</p>
+      <p className="font-medium">{data.payload.range}</p>
+      <p className="theme-text-secondary">{data.value} students</p>
     </div>
   )
 }
@@ -82,22 +80,29 @@ function BarTooltip({ active, payload }: CustomTooltipProps) {
 // Main Component
 // =============================================================================
 
-export function PhaseDistributionChart({ className = '' }: PhaseDistributionChartProps) {
+export function ScoreDistributionChart({ className = '' }: ScoreDistributionChartProps) {
   const chartRef = useRef<HTMLDivElement>(null)
   const [isExporting, setIsExporting] = useState(false)
-  const { data, isLoading, error } = useTrainingAnalytics()
+  const { data, isLoading, error } = useResults()
   const { user } = useCurrentUser()
 
   const canExport = user?.isLti === true
 
-  const barData = data?.phaseCounts.map((item, index) => ({
-    phaseKey: item.phaseKey,
-    phaseName: item.phaseName,
-    count: item.count,
-    fill: PHASE_COLORS[index % PHASE_COLORS.length],
-  })) || []
+  // Calculate score distribution
+  const chartData: ScoreRange[] = SCORE_RANGES.map(range => {
+    const count = data?.results.filter(
+      result => result.scorePercentage >= range.min && result.scorePercentage <= range.max
+    ).length || 0
 
-  const hasActiveData = data && data.totals.active > 0
+    return {
+      range: range.label,
+      count,
+      fill: range.fill,
+    }
+  })
+
+  const totalStudents = data?.results.length || 0
+  const hasData = totalStudents > 0
 
   const handleExport = async () => {
     if (!chartRef.current || !data) return
@@ -107,10 +112,10 @@ export function PhaseDistributionChart({ className = '' }: PhaseDistributionChar
       const timestamp = new Date().toISOString().split('T')[0]
       await exportChartToPDF(
         chartRef.current,
-        `phase-distribution-chart-${timestamp}.pdf`,
+        `score-distribution-chart-${timestamp}.pdf`,
         {
-          title: 'Active Training Sessions by Phase',
-          subtitle: `Total Active Sessions: ${data.totals.active}`,
+          title: 'Student Score Distribution',
+          subtitle: `Total Results: ${totalStudents}`,
         }
       )
     } catch (err) {
@@ -124,8 +129,8 @@ export function PhaseDistributionChart({ className = '' }: PhaseDistributionChar
     <Card className={className}>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle>Active Training Sessions by Phase</CardTitle>
-          {canExport && hasActiveData && (
+          <CardTitle>Score Distribution</CardTitle>
+          {canExport && hasData && (
             <button
               onClick={handleExport}
               disabled={isExporting}
@@ -150,29 +155,25 @@ export function PhaseDistributionChart({ className = '' }: PhaseDistributionChar
             <div className="h-64 flex items-center justify-center">
               <p className="text-sm theme-text-error">{error.message}</p>
             </div>
-          ) : !hasActiveData ? (
+          ) : !hasData ? (
             <div className="h-64 flex items-center justify-center flex-col gap-2">
-              <p className="text-sm theme-text-muted">No active training sessions</p>
+              <p className="text-sm theme-text-muted">No quiz results available</p>
               <p className="text-xs theme-text-tertiary">
-                Active training sessions distribution will appear here
+                Score distribution will appear here once students complete quizzes
               </p>
             </div>
           ) : (
-            <div className="h-72">
+            <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
-                  data={barData}
-                  margin={{ top: 5, right: 20, left: 10, bottom: 60 }}
+                  data={chartData}
+                  margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
                 >
                   <XAxis
-                    dataKey="phaseName"
+                    dataKey="range"
                     tick={{ fill: 'var(--color-text-primary)', fontSize: 12 }}
                     tickLine={{ stroke: 'var(--color-border)' }}
                     axisLine={{ stroke: 'var(--color-border)' }}
-                    angle={-45}
-                    textAnchor="end"
-                    interval={0}
-                    height={60}
                   />
                   <YAxis
                     tick={{ fill: 'var(--color-text-primary)', fontSize: 12 }}
@@ -184,9 +185,9 @@ export function PhaseDistributionChart({ className = '' }: PhaseDistributionChar
                   <Bar
                     dataKey="count"
                     radius={[4, 4, 0, 0]}
-                    maxBarSize={40}
+                    maxBarSize={50}
                   >
-                    {barData.map((entry, index) => (
+                    {chartData.map((entry, index) => (
                       <Cell key={`bar-${index}`} fill={entry.fill} />
                     ))}
                   </Bar>
@@ -195,16 +196,16 @@ export function PhaseDistributionChart({ className = '' }: PhaseDistributionChar
             </div>
           )}
 
-          {hasActiveData && !isLoading && (
-            <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t theme-border">
-              {barData.filter(p => p.count > 0).map((phase) => (
-                <div key={phase.phaseKey} className="flex items-center gap-1.5">
+          {hasData && !isLoading && (
+            <div className="flex flex-wrap justify-center gap-4 mt-4 pt-4 border-t theme-border">
+              {chartData.map((item) => (
+                <div key={item.range} className="flex items-center gap-1.5">
                   <div
                     className="w-2.5 h-2.5 rounded-sm"
-                    style={{ backgroundColor: phase.fill }}
+                    style={{ backgroundColor: item.fill }}
                   />
                   <span className="text-xs theme-text-muted">
-                    {phase.phaseName}: {phase.count}
+                    {item.range}: {item.count}
                   </span>
                 </div>
               ))}

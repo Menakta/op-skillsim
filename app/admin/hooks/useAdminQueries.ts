@@ -37,6 +37,7 @@ export const adminQueryKeys = {
   fittings: ['admin', 'fittings'] as const,
   trainingAnalytics: ['admin', 'training-analytics'] as const,
   sessionsChart: (range: string) => ['admin', 'sessions-chart', range] as const,
+  userSessions: (email: string) => ['admin', 'user-sessions', email] as const,
 }
 
 // =============================================================================
@@ -668,6 +669,53 @@ export function useSessionsChart(range: 'weekly' | 'monthly' | 'yearly') {
     queryFn: () => fetchSessionsChart(range),
     staleTime: TEN_MINUTES,
     refetchInterval: TEN_MINUTES,
+    retry: 1,
+  })
+}
+
+// =============================================================================
+// User Sessions Types and Fetcher
+// =============================================================================
+
+export interface UserLoginSession {
+  id: string
+  sessionId: string
+  sessionType: 'lti' | 'teacher'
+  role: string
+  status: string
+  createdAt: string
+  lastActivity: string
+  expiresAt: string
+  ipAddress: string | null
+  userAgent: string | null
+  loginCount: number
+}
+
+async function fetchUserSessions(email: string): Promise<UserLoginSession[]> {
+  const response = await fetch(`/api/admin/user-sessions?email=${encodeURIComponent(email)}`)
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`)
+  }
+
+  const data = await response.json()
+
+  if (!data.success) {
+    throw new Error(data.error || 'Failed to fetch user sessions')
+  }
+
+  return data.sessions || []
+}
+
+/**
+ * Hook to fetch user's login sessions by email
+ * Only fetches if email is provided
+ */
+export function useUserSessions(email: string | undefined) {
+  return useQuery({
+    queryKey: adminQueryKeys.userSessions(email || ''),
+    queryFn: () => fetchUserSessions(email!),
+    enabled: !!email,
     retry: 1,
   })
 }

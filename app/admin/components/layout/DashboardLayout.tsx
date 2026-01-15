@@ -149,7 +149,7 @@ export function DashboardLayout({ children, title, subtitle }: DashboardLayoutPr
           onMenuClick={() => setSidebarOpen(true)}
           showMenuButton={true}
         />
-        <main className="flex-1 p-4 md:p-6">{children}</main>
+        <main className="flex-1 p-2 md:p-3">{children}</main>
       </div>
     </div>
   )

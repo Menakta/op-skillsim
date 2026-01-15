@@ -18,7 +18,7 @@ import { ProgressBar } from './components/ui/ProgressBar'
 import { EmptyState } from './components/ui/EmptyState'
 import { LoadingState } from './components/ui/LoadingState'
 import { Pagination } from './components/ui/Pagination'
-import { SessionsChart, SessionStatusChart, PhaseDistributionChart } from './components/charts'
+import { SessionsChart, SessionStatusChart, PhaseDistributionChart,ScoreDistributionChart } from './components/charts'
 import { useSessions, useQuestions, useFittings, useResults } from './hooks'
 import { formatTimeAgo } from './utils'
 
@@ -174,7 +174,7 @@ export default function TeacherDashboardPage() {
   return (
     <DashboardLayout title="Dashboard" subtitle="Welcome back! Here's your overview.">
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-2 mb-4">
         <Link href="/admin/sessions" className="block transition-all hover:scale-[1.02] hover:shadow-lg">
           <StatCard
             label="Total Sessions"
@@ -206,19 +206,78 @@ export default function TeacherDashboardPage() {
       </div>
 
       {/* Training Analytics Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 mb-3">
         <SessionStatusChart />
         <PhaseDistributionChart />
       </div>
 
       {/* Sessions Chart - Lazy loaded */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className='lg:col-span-2'>
-          <SessionsChart className="mb-6" />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 mb-3">
+        <div className='col-span-1 lg:col-span-2'>
+          <SessionsChart  />
+
+        </div>
+        <div className="col-span-1 lg:col-span-1">
+        <ScoreDistributionChart className='p-1'  />
 
         </div>
         {/* Top Performers */}
-        <Card className="mb-6">
+       
+      </div>
+
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-2">
+        {/* Recent Activity */}
+        <Card className="col-span-1 md:col-span-2">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+            <CardTitle>Recent Activity</CardTitle>
+            <a href="/admin/sessions" className="text-sm theme-text-brand hover:opacity-80">
+              View all →
+            </a>
+          </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            {stats.recentActivity.length === 0 ? (
+              <div className="px-6 py-8 text-center theme-text-muted">
+                No recent activity yet
+              </div>
+            ) : (
+              <>
+                <div className="divide-y theme-divide">
+                  {paginatedActivity.map((activity) => (
+                    <div key={activity.id} className="px-6 py-4 transition-colors theme-bg-hover">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="font-medium theme-text-primary">{activity.studentName}</p>
+                          <p className="text-sm theme-text-muted">{activity.action}</p>
+                          {activity.details && (
+                            <p className="text-xs mt-1 theme-text-tertiary">{activity.details}</p>
+                          )}
+                        </div>
+                        <span className="text-xs theme-text-muted">
+                          {formatTimeAgo(activity.timestamp)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {stats.recentActivity.length > ITEMS_PER_PAGE && (
+                  <div className="px-6 py-4 border-t theme-border">
+                    <Pagination
+                      currentPage={activityPage}
+                      totalPages={Math.ceil(stats.recentActivity.length / ITEMS_PER_PAGE)}
+                      totalItems={stats.recentActivity.length}
+                      itemsPerPage={ITEMS_PER_PAGE}
+                      onPageChange={setActivityPage}
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
+         <Card className="col-span-1 md:col-span-1">
           <CardHeader>
             <div className='flex items-center justify-between'>
                <CardTitle>Top Performers</CardTitle>
@@ -276,62 +335,8 @@ export default function TeacherDashboardPage() {
         </Card>
       </div>
 
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Activity */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-            <CardTitle>Recent Activity</CardTitle>
-            <a href="/admin/sessions" className="text-sm theme-text-brand hover:opacity-80">
-              View all →
-            </a>
-          </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            {stats.recentActivity.length === 0 ? (
-              <div className="px-6 py-8 text-center theme-text-muted">
-                No recent activity yet
-              </div>
-            ) : (
-              <>
-                <div className="divide-y theme-divide">
-                  {paginatedActivity.map((activity) => (
-                    <div key={activity.id} className="px-6 py-4 transition-colors theme-bg-hover">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="font-medium theme-text-primary">{activity.studentName}</p>
-                          <p className="text-sm theme-text-muted">{activity.action}</p>
-                          {activity.details && (
-                            <p className="text-xs mt-1 theme-text-tertiary">{activity.details}</p>
-                          )}
-                        </div>
-                        <span className="text-xs theme-text-muted">
-                          {formatTimeAgo(activity.timestamp)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {stats.recentActivity.length > ITEMS_PER_PAGE && (
-                  <div className="px-6 py-4 border-t theme-border">
-                    <Pagination
-                      currentPage={activityPage}
-                      totalPages={Math.ceil(stats.recentActivity.length / ITEMS_PER_PAGE)}
-                      totalItems={stats.recentActivity.length}
-                      itemsPerPage={ITEMS_PER_PAGE}
-                      onPageChange={setActivityPage}
-                    />
-                  </div>
-                )}
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Student Progress Overview */}
-      <Card className="mt-6 p-0 lg:p-4">
+      <Card className="mt-3 p-0 lg:p-4">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Student Progress Overview</CardTitle>
@@ -398,47 +403,7 @@ export default function TeacherDashboardPage() {
       </Card>
 
       {/* Quick Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-        <Card className="p-6">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-xl theme-bg-success flex items-center justify-center">
-              <Award className="w-7 h-7 theme-text-success" />
-            </div>
-            <div>
-              <p className="text-3xl font-bold theme-text-primary">
-                {stats.passedAssessments}
-              </p>
-              <p className="text-sm theme-text-muted">Passed Trainings</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-xl theme-bg-error flex items-center justify-center">
-              <Award className="w-7 h-7 theme-text-error" />
-            </div>
-            <div>
-              <p className="text-3xl font-bold theme-text-primary">
-                {stats.failedAssessments}
-              </p>
-              <p className="text-sm theme-text-muted">Below Target</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-xl theme-bg-brand-muted flex items-center justify-center">
-              <TrendingUp className="w-7 h-7 theme-text-brand" />
-            </div>
-            <div>
-              <p className="text-3xl font-bold theme-text-primary">{stats.averageScore}%</p>
-              <p className="text-sm theme-text-muted">Average Score</p>
-            </div>
-          </div>
-        </Card>
-      </div>
+     
     </DashboardLayout>
   )
 }

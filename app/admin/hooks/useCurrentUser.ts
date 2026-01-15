@@ -7,11 +7,16 @@
 
 import { useEffect, useState } from 'react'
 
-interface CurrentUser {
+export interface CurrentUser {
   role: 'student' | 'teacher' | 'admin'
   isLti: boolean
   email: string
   userId: string
+  fullName: string | null
+  sessionId: string
+  sessionType: 'lti' | 'teacher' | 'admin'
+  expiresAt: number | null
+  returnUrl: string | null
 }
 
 /**
@@ -34,6 +39,11 @@ export function useCurrentUser() {
               isLti: data.session.isLti || false,
               email: data.session.email || '',
               userId: data.session.userId || '',
+              fullName: data.session.fullName || null,
+              sessionId: data.session.sessionId || '',
+              sessionType: data.session.sessionType || 'teacher',
+              expiresAt: data.session.expiresAt || null,
+              returnUrl: data.session.returnUrl || null,
             })
           }
         }

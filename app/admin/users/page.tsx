@@ -8,11 +8,9 @@
  */
 
 import { useState, useMemo, useCallback } from 'react'
-import { UserPlus, Users, Clock, CheckCircle, XCircle, UserCheck, Trash2 } from 'lucide-react'
+import { UserPlus, Users, Clock, CheckCircle, XCircle, Trash2 } from 'lucide-react'
 import { DashboardLayout } from '../components/layout/DashboardLayout'
 import { Card, CardContent } from '../components/ui/Card'
-import { DataTable, MobileCardList } from '../components/ui/DataTable'
-import { Badge } from '../components/ui/Badge'
 import { SearchInput } from '../components/ui/SearchInput'
 import { FilterButton } from '../components/ui/FilterButton'
 import { StatCard } from '../components/ui/StatCard'
@@ -23,67 +21,14 @@ import { useUsers, useUpdateUserApproval, useUpdateUserRole, useDeleteUsers } fr
 import { useExport } from '../hooks/useExport'
 import { useIsLtiAdmin } from '../hooks/useCurrentUser'
 import { useAdmin } from '../context/AdminContext'
-import { formatDate, type ExportColumn } from '../utils'
-import type { RegisteredUser, Column, ApprovalFilter, BadgeVariant, ApprovalStatus } from '../types'
-
-type UserRole = 'student' | 'teacher' | 'admin'
+import type { ApprovalFilter, ApprovalStatus } from '../types'
+import { UsersTable, EXPORT_COLUMNS, type UserRole } from './components'
 
 // =============================================================================
 // Constants
 // =============================================================================
 
 const ITEMS_PER_PAGE = 10
-
-// PDF Export columns configuration
-const EXPORT_COLUMNS: ExportColumn<RegisteredUser>[] = [
-  { key: 'full_name', header: 'Name', getValue: (u) => u.full_name || 'N/A' },
-  { key: 'email', header: 'Email' },
-  { key: 'role', header: 'Role', getValue: (u) => u.role.charAt(0).toUpperCase() + u.role.slice(1) },
-  { key: 'registration_type', header: 'Type', getValue: (u) => u.registration_type.charAt(0).toUpperCase() + u.registration_type.slice(1) },
-  { key: 'approval_status', header: 'Status', getValue: (u) => u.approval_status.charAt(0).toUpperCase() + u.approval_status.slice(1) },
-  { key: 'institution', header: 'Institution', getValue: (u) => u.institution || 'N/A' },
-  { key: 'created_at', header: 'Registered', getValue: (u) => formatDate(u.created_at) },
-]
-
-// =============================================================================
-// Helper Functions
-// =============================================================================
-
-function getInitials(name: string | null): string {
-  if (!name) return '?'
-  return name
-    .split(' ')
-    .map(n => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2)
-}
-
-function getApprovalBadgeVariant(status: ApprovalStatus): BadgeVariant {
-  switch (status) {
-    case 'approved':
-      return 'success'
-    case 'pending':
-      return 'warning'
-    case 'rejected':
-      return 'danger'
-    default:
-      return 'default'
-  }
-}
-
-function getRegistrationTypeBadgeVariant(type: string): BadgeVariant {
-  switch (type) {
-    case 'outsider':
-      return 'purple'
-    case 'lti':
-      return 'info'
-    case 'demo':
-      return 'default'
-    default:
-      return 'default'
-  }
-}
 
 // =============================================================================
 // Page Component
@@ -97,7 +42,6 @@ export default function UsersPage() {
   const { userRole: currentUserRole } = useAdmin()
   const { isLtiAdmin } = useIsLtiAdmin()
 
-  // Only admins can change roles
   const isAdmin = currentUserRole === 'admin'
 
   // State
@@ -105,8 +49,6 @@ export default function UsersPage() {
   const [statusFilter, setStatusFilter] = useState<ApprovalFilter>('all')
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set())
-
-  // Delete confirmation state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   // Extract data
@@ -141,23 +83,40 @@ export default function UsersPage() {
     setCurrentPage(1)
   }, [searchQuery, statusFilter])
 
-  // Handle approval action
-  const handleApproval = async (userId: string, newStatus: ApprovalStatus) => {
+  // Handlers
+  const handleApproval = useCallback(async (userId: string, newStatus: ApprovalStatus) => {
     try {
       await updateApproval.mutateAsync({ userId, approval_status: newStatus })
     } catch (error) {
       console.error('Failed to update approval status:', error)
     }
-  }
+  }, [updateApproval])
 
-  // Handle role change (admin only)
-  const handleRoleChange = async (userId: string, newRole: UserRole) => {
+  const handleRoleChange = useCallback(async (userId: string, newRole: UserRole) => {
     try {
       await updateRole.mutateAsync({ userId, role: newRole })
     } catch (error) {
       console.error('Failed to update user role:', error)
     }
-  }
+  }, [updateRole])
+
+  const handleDeleteClick = useCallback(() => {
+    setShowDeleteConfirm(true)
+  }, [])
+
+  const handleDeleteConfirm = useCallback(async () => {
+    const ids = Array.from(selectedUsers)
+    if (ids.length === 0) return
+
+    try {
+      await deleteUsers.mutateAsync({ ids })
+      setSelectedUsers(new Set())
+      setShowDeleteConfirm(false)
+      refetch()
+    } catch (error) {
+      console.error('Delete failed:', error)
+    }
+  }, [selectedUsers, deleteUsers, refetch])
 
   // Export hook
   const {
@@ -176,185 +135,6 @@ export default function UsersPage() {
     filenamePrefix: 'registered-users',
     title: 'Registered Users',
   })
-
-  // Handle delete button click
-  const handleDeleteClick = useCallback(() => {
-    setShowDeleteConfirm(true)
-  }, [])
-
-  // Handle delete confirmation
-  const handleDeleteConfirm = useCallback(async () => {
-    const ids = Array.from(selectedUsers)
-    if (ids.length === 0) return
-
-    try {
-      await deleteUsers.mutateAsync({ ids })
-      setSelectedUsers(new Set())
-      setShowDeleteConfirm(false)
-      refetch()
-    } catch (error) {
-      console.error('Delete failed:', error)
-    }
-  }, [selectedUsers, deleteUsers, refetch])
-
-  // Selection handlers
-  const handleSelectUser = (userId: string) => {
-    setSelectedUsers(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(userId)) {
-        newSet.delete(userId)
-      } else {
-        newSet.add(userId)
-      }
-      return newSet
-    })
-  }
-
-  const handleSelectAll = () => {
-    if (selectedUsers.size === filteredUsers.length) {
-      setSelectedUsers(new Set())
-    } else {
-      setSelectedUsers(new Set(filteredUsers.map(u => u.id)))
-    }
-  }
-
-  // Column definitions
-  const columns: Column<RegisteredUser>[] = useMemo(() => [
-    {
-      key: 'user',
-      header: 'User',
-      render: (user) => (
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center flex-shrink-0">
-            <span className="text-white text-sm font-medium">
-              {getInitials(user.full_name)}
-            </span>
-          </div>
-          <div className="min-w-0">
-            <p className="font-medium theme-text-primary truncate">
-              {user.full_name || 'No name'}
-            </p>
-            <p className="text-xs theme-text-muted truncate">{user.email}</p>
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: 'type',
-      header: 'Type',
-      render: (user) => (
-        <Badge variant={getRegistrationTypeBadgeVariant(user.registration_type)}>
-          {user.registration_type}
-        </Badge>
-      ),
-    },
-    {
-      key: 'status',
-      header: 'Status',
-      render: (user) => (
-        <Badge variant={getApprovalBadgeVariant(user.approval_status)}>
-          {user.approval_status}
-        </Badge>
-      ),
-    },
-    {
-      key: 'role',
-      header: 'Role',
-      className: 'hidden lg:table-cell',
-      headerClassName: 'hidden lg:table-cell',
-      render: (user) => (
-        isAdmin ? (
-          <select
-            value={user.role}
-            onChange={(e) => {
-              e.stopPropagation()
-              handleRoleChange(user.id, e.target.value as UserRole)
-            }}
-            disabled={updateRole.isPending}
-            className="px-2 py-1 rounded-md text-sm theme-bg-secondary theme-text-primary border theme-border focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 cursor-pointer"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <option value="student">Student</option>
-            <option value="teacher">Teacher</option>
-            <option value="admin">Admin</option>
-          </select>
-        ) : (
-          <span className="theme-text-secondary capitalize">{user.role}</span>
-        )
-      ),
-    },
-    {
-      key: 'registered',
-      header: 'Registered',
-      className: 'hidden lg:table-cell',
-      headerClassName: 'hidden lg:table-cell',
-      render: (user) => (
-        <span className="theme-text-muted text-sm">
-          {formatDate(user.created_at)}
-        </span>
-      ),
-    },
-    {
-      key: 'actions',
-      header: 'Actions',
-      render: (user) => (
-        <div className="flex items-center gap-2">
-          {user.approval_status === 'pending' && (
-            <>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleApproval(user.id, 'approved')
-                }}
-                disabled={updateApproval.isPending}
-                className="p-1.5 text-green-400 hover:bg-green-400/20 rounded-lg transition-colors disabled:opacity-50"
-                title="Approve"
-              >
-                <CheckCircle className="w-4 h-4" />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleApproval(user.id, 'rejected')
-                }}
-                disabled={updateApproval.isPending}
-                className="p-1.5 text-red-400 hover:bg-red-400/20 rounded-lg transition-colors disabled:opacity-50"
-                title="Reject"
-              >
-                <XCircle className="w-4 h-4" />
-              </button>
-            </>
-          )}
-          {user.approval_status === 'approved' && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                handleApproval(user.id, 'rejected')
-              }}
-              disabled={updateApproval.isPending}
-              className="p-1.5 text-red-400 hover:bg-red-400/20 rounded-lg transition-colors disabled:opacity-50"
-              title="Revoke Access"
-            >
-              <XCircle className="w-4 h-4" />
-            </button>
-          )}
-          {user.approval_status === 'rejected' && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                handleApproval(user.id, 'approved')
-              }}
-              disabled={updateApproval.isPending}
-              className="p-1.5 text-green-400 hover:bg-green-400/20 rounded-lg transition-colors disabled:opacity-50"
-              title="Approve"
-            >
-              <CheckCircle className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-      ),
-    },
-  ], [updateApproval.isPending, updateRole.isPending, isAdmin, handleApproval, handleRoleChange])
 
   // Loading state
   if (isLoading) {
@@ -385,7 +165,7 @@ export default function UsersPage() {
   return (
     <DashboardLayout title="Registered Users" subtitle="Manage user registrations and approvals">
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-2 mb-3">
         <StatCard
           label="Total Users"
           value={stats.total}
@@ -419,9 +199,9 @@ export default function UsersPage() {
       </div>
 
       {/* Filters */}
-      <Card className="mb-6 lg:w-[49%] w-full">
+      <Card className="mb-3 lg:w-[49%] w-full">
         <CardContent className="py-4">
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
             <SearchInput
               value={searchQuery}
               onChange={setSearchQuery}
@@ -455,7 +235,6 @@ export default function UsersPage() {
                 Rejected
               </FilterButton>
 
-              {/* Export Dropdown */}
               <ExportDropdown
                 isOpen={showExportMenu}
                 onToggle={() => setShowExportMenu(!showExportMenu)}
@@ -468,7 +247,6 @@ export default function UsersPage() {
                 selectedCount={selectedUsers.size}
               />
 
-              {/* Delete Button - Only visible to LTI Admins */}
               {isLtiAdmin && selectedUsers.size > 0 && (
                 <button
                   onClick={handleDeleteClick}
@@ -483,133 +261,23 @@ export default function UsersPage() {
         </CardContent>
       </Card>
 
-      {/* Desktop Table */}
-      <DataTable<RegisteredUser>
-        title="Registered Users"
+      {/* Users Table */}
+      <UsersTable
         data={paginatedUsers}
-        columns={columns}
         totalItems={filteredUsers.length}
         currentPage={currentPage}
         totalPages={totalPages}
         itemsPerPage={ITEMS_PER_PAGE}
         onPageChange={setCurrentPage}
-        emptyIcon={<UserCheck className="w-12 h-12" />}
-        emptyTitle="No users found"
-        emptyDescription={searchQuery || statusFilter !== 'all' ? 'Try adjusting your filters' : 'No registered users yet'}
-        getRowKey={(user) => user.id}
-        showActions={false}
-        selectable={true}
         selectedKeys={selectedUsers}
         onSelectionChange={setSelectedUsers}
-      />
-
-      {/* Mobile Card List */}
-      <MobileCardList<RegisteredUser>
-        title="Registered Users"
-        data={paginatedUsers}
-        totalItems={filteredUsers.length}
-        currentPage={currentPage}
-        totalPages={totalPages}
-        itemsPerPage={ITEMS_PER_PAGE}
-        onPageChange={setCurrentPage}
-        emptyIcon={<UserCheck className="w-12 h-12" />}
-        emptyTitle="No users found"
-        emptyDescription={searchQuery || statusFilter !== 'all' ? 'Try adjusting your filters' : 'No registered users yet'}
-        getRowKey={(user) => user.id}
-        renderCard={(user) => (
-          <Card className="p-4">
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex items-center gap-3">
-                {/* Selection checkbox */}
-                <input
-                  type="checkbox"
-                  checked={selectedUsers.has(user.id)}
-                  onChange={() => handleSelectUser(user.id)}
-                  className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-[#39BEAE] focus:ring-[#39BEAE] focus:ring-offset-0 cursor-pointer"
-                />
-                <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center flex-shrink-0">
-                  <span className="text-white text-sm font-medium">
-                    {getInitials(user.full_name)}
-                  </span>
-                </div>
-                <div>
-                  <p className="font-medium theme-text-primary">
-                    {user.full_name || 'No name'}
-                  </p>
-                  <p className="text-xs theme-text-muted">{user.email}</p>
-                </div>
-              </div>
-              <Badge variant={getApprovalBadgeVariant(user.approval_status)}>
-                {user.approval_status}
-              </Badge>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Badge variant={getRegistrationTypeBadgeVariant(user.registration_type)}>
-                  {user.registration_type}
-                </Badge>
-                {isAdmin ? (
-                  <select
-                    value={user.role}
-                    onChange={(e) => handleRoleChange(user.id, e.target.value as UserRole)}
-                    disabled={updateRole.isPending}
-                    className="px-2 py-1 rounded-md text-xs theme-bg-secondary theme-text-primary border theme-border focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 cursor-pointer"
-                  >
-                    <option value="student">Student</option>
-                    <option value="teacher">Teacher</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                ) : (
-                  <span className="text-xs theme-text-muted capitalize">{user.role}</span>
-                )}
-              </div>
-
-              <div className="flex items-center gap-1">
-                {user.approval_status === 'pending' && (
-                  <>
-                    <button
-                      onClick={() => handleApproval(user.id, 'approved')}
-                      disabled={updateApproval.isPending}
-                      className="p-2 text-green-400 hover:bg-green-400/20 rounded-lg transition-colors disabled:opacity-50"
-                    >
-                      <CheckCircle className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => handleApproval(user.id, 'rejected')}
-                      disabled={updateApproval.isPending}
-                      className="p-2 text-red-400 hover:bg-red-400/20 rounded-lg transition-colors disabled:opacity-50"
-                    >
-                      <XCircle className="w-5 h-5" />
-                    </button>
-                  </>
-                )}
-                {user.approval_status === 'approved' && (
-                  <button
-                    onClick={() => handleApproval(user.id, 'rejected')}
-                    disabled={updateApproval.isPending}
-                    className="p-2 text-red-400 hover:bg-red-400/20 rounded-lg transition-colors disabled:opacity-50"
-                  >
-                    <XCircle className="w-5 h-5" />
-                  </button>
-                )}
-                {user.approval_status === 'rejected' && (
-                  <button
-                    onClick={() => handleApproval(user.id, 'approved')}
-                    disabled={updateApproval.isPending}
-                    className="p-2 text-green-400 hover:bg-green-400/20 rounded-lg transition-colors disabled:opacity-50"
-                  >
-                    <CheckCircle className="w-5 h-5" />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <p className="text-xs theme-text-muted mt-2">
-              Registered {formatDate(user.created_at)}
-            </p>
-          </Card>
-        )}
+        isAdmin={isAdmin}
+        isPendingApproval={updateApproval.isPending}
+        isPendingRole={updateRole.isPending}
+        onApproval={handleApproval}
+        onRoleChange={handleRoleChange}
+        searchQuery={searchQuery}
+        statusFilter={statusFilter}
       />
 
       {/* Delete Confirmation Dialog */}

@@ -1,4 +1,4 @@
-"use client";
+'use client'
 
 /**
  * Fitting Options Page
@@ -8,102 +8,78 @@
  * View-only - no editing capability.
  */
 
-import { useState, useEffect, useMemo } from "react";
-import { RefreshCw, AlertCircle, Wrench, Check, XCircle } from "lucide-react";
-import { DashboardLayout } from "../components/layout";
+import { useState, useMemo } from 'react'
+import { AlertCircle, Wrench, Check, XCircle } from 'lucide-react'
+import { DashboardLayout } from '../components/layout'
 import {
   Card,
-  CardHeader,
-  CardTitle,
   CardContent,
-} from "../components/ui/Card";
-import { Badge } from "../components/ui/Badge";
-import { SearchInput } from "../components/ui/SearchInput";
-import { EmptyState } from "../components/ui/EmptyState";
-import { LoadingState } from "../components/ui/LoadingState";
-import { Pagination } from "../components/ui/Pagination";
-import type { FittingOption } from "@/app/types";
+  StatCard,
+  SearchInput,
+  FilterButton,
+  EmptyState,
+  LoadingState,
+  Pagination,
+} from '../components'
+import { useFittings } from '../hooks'
+import { FittingCard } from './components'
 
 // =============================================================================
 // Constants
 // =============================================================================
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 10
+
+// =============================================================================
+// Types
+// =============================================================================
+
+type FilterType = 'all' | 'correct' | 'distractor'
 
 // =============================================================================
 // Main Component
 // =============================================================================
 
 export default function FittingsPage() {
-  const [fittings, setFittings] = useState<FittingOption[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filterType, setFilterType] = useState<
-    "all" | "correct" | "distractor"
-  >("all");
-  const [currentPage, setCurrentPage] = useState(1);
+  const { data: fittings = [], isLoading, error, refetch } = useFittings()
 
-  // Fetch fitting options
-  useEffect(() => {
-    loadFittings();
-  }, []);
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filterType, setFilterType] = useState<FilterType>('all')
+  const [currentPage, setCurrentPage] = useState(1)
 
-  async function loadFittings() {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await fetch("/api/admin/fittings");
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch fitting options");
-      }
-
-      const data = await response.json();
-      setFittings(data.fittings || []);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to load fitting options"
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
+  // Stats
+  const correctCount = useMemo(() => fittings.filter(f => f.is_correct).length, [fittings])
+  const distractorCount = useMemo(() => fittings.filter(f => !f.is_correct).length, [fittings])
 
   // Filter fittings
   const filteredFittings = useMemo(() => {
-    return fittings.filter((fitting) => {
+    return fittings.filter(fitting => {
       const matchesSearch =
         fitting.fitting_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
         fitting.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (fitting.description?.toLowerCase().includes(searchQuery.toLowerCase()) ??
-          false);
+        (fitting.description?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
 
       const matchesFilter =
-        filterType === "all" ||
-        (filterType === "correct" && fitting.is_correct) ||
-        (filterType === "distractor" && !fitting.is_correct);
+        filterType === 'all' ||
+        (filterType === 'correct' && fitting.is_correct) ||
+        (filterType === 'distractor' && !fitting.is_correct)
 
-      return matchesSearch && matchesFilter;
-    });
-  }, [fittings, searchQuery, filterType]);
+      return matchesSearch && matchesFilter
+    })
+  }, [fittings, searchQuery, filterType])
 
-  // Reset to page 1 when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, filterType]);
+  // Reset page when filters change
+  useMemo(() => {
+    setCurrentPage(1)
+  }, [searchQuery, filterType])
 
-  // Paginated fittings
+  // Pagination
   const paginatedFittings = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredFittings.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredFittings, currentPage]);
+    const start = (currentPage - 1) * ITEMS_PER_PAGE
+    return filteredFittings.slice(start, start + ITEMS_PER_PAGE)
+  }, [filteredFittings, currentPage])
 
-  const totalPages = Math.ceil(filteredFittings.length / ITEMS_PER_PAGE);
-
-  // Stats
-  const correctCount = fittings.filter((f) => f.is_correct).length;
-  const distractorCount = fittings.filter((f) => !f.is_correct).length;
+  const totalPages = Math.ceil(filteredFittings.length / ITEMS_PER_PAGE)
 
   return (
     <DashboardLayout
@@ -111,19 +87,19 @@ export default function FittingsPage() {
       subtitle="View pipe fitting options for training"
     >
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 sm:gap-2 xs:gap-1 gap-4 mb-6">
-        <StatMini
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
+        <StatCard
           label="Total Fittings"
           value={fittings.length}
           icon={<Wrench className="w-5 h-5" />}
         />
-        <StatMini
+        <StatCard
           label="Correct Answers"
           value={correctCount}
           icon={<Check className="w-5 h-5" />}
           color="green"
         />
-        <StatMini
+        <StatCard
           label="Distractors"
           value={distractorCount}
           icon={<XCircle className="w-5 h-5" />}
@@ -131,36 +107,32 @@ export default function FittingsPage() {
         />
       </div>
 
-      {/* Header Actions */}
-      <Card className="mb-6 w-full lg:w-[49%]">
+      {/* Filters */}
+      <Card className="mb-3 w-full lg:w-[49%]">
         <CardContent className="py-4">
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col sm:flex-row gap-4 justify-between">
-              <SearchInput
-                value={searchQuery}
-                onChange={setSearchQuery}
-                placeholder="Search fittings..."
-                className="w-full lg:w-1/2"
-              />
-            </div>
-
-            {/* Filter Buttons */}
+          <div className="flex flex-col gap-2">
+            <SearchInput
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder="Search fittings..."
+              className="w-full lg:w-1/2"
+            />
             <div className="flex flex-wrap gap-2">
               <FilterButton
-                active={filterType === "all"}
-                onClick={() => setFilterType("all")}
+                active={filterType === 'all'}
+                onClick={() => setFilterType('all')}
               >
                 All ({fittings.length})
               </FilterButton>
               <FilterButton
-                active={filterType === "correct"}
-                onClick={() => setFilterType("correct")}
+                active={filterType === 'correct'}
+                onClick={() => setFilterType('correct')}
               >
                 Correct ({correctCount})
               </FilterButton>
               <FilterButton
-                active={filterType === "distractor"}
-                onClick={() => setFilterType("distractor")}
+                active={filterType === 'distractor'}
+                onClick={() => setFilterType('distractor')}
               >
                 Distractors ({distractorCount})
               </FilterButton>
@@ -170,7 +142,7 @@ export default function FittingsPage() {
       </Card>
 
       {/* Info Notice */}
-      <div className="mb-6 p-4 rounded-lg border theme-bg-info theme-border-info">
+      <div className="mb-3 p-4 rounded-lg border theme-bg-info theme-border-info">
         <p className="text-sm theme-text-info">
           <strong>Note:</strong> Correct fittings are valid answers in the
           training simulation. Distractors are incorrect options shown to test
@@ -179,7 +151,7 @@ export default function FittingsPage() {
       </div>
 
       {/* Loading State */}
-      {loading && (
+      {isLoading && (
         <Card>
           <CardContent>
             <LoadingState message="Loading fitting options..." />
@@ -188,14 +160,16 @@ export default function FittingsPage() {
       )}
 
       {/* Error State */}
-      {error && !loading && (
+      {error && !isLoading && (
         <Card>
           <CardContent className="py-12">
             <div className="flex flex-col items-center justify-center">
               <AlertCircle className="w-8 h-8 theme-text-error mb-4" />
-              <p className="theme-text-error mb-4">{error}</p>
+              <p className="theme-text-error mb-4">
+                {error instanceof Error ? error.message : 'Failed to load fitting options'}
+              </p>
               <button
-                onClick={loadFittings}
+                onClick={() => refetch()}
                 className="px-4 py-2 rounded-lg theme-btn-primary"
               >
                 Try Again
@@ -206,7 +180,7 @@ export default function FittingsPage() {
       )}
 
       {/* Empty State */}
-      {!loading && !error && fittings.length === 0 && (
+      {!isLoading && !error && fittings.length === 0 && (
         <Card>
           <EmptyState
             icon={<Wrench className="w-8 h-8 theme-text-muted" />}
@@ -217,10 +191,10 @@ export default function FittingsPage() {
       )}
 
       {/* Fittings Grid */}
-      {!loading && !error && filteredFittings.length > 0 && (
+      {!isLoading && !error && filteredFittings.length > 0 && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {paginatedFittings.map((fitting) => (
+            {paginatedFittings.map(fitting => (
               <FittingCard key={fitting.fitting_id} fitting={fitting} />
             ))}
           </div>
@@ -239,121 +213,15 @@ export default function FittingsPage() {
       )}
 
       {/* No Results */}
-      {!loading &&
-        !error &&
-        fittings.length > 0 &&
-        filteredFittings.length === 0 && (
-          <Card>
-            <EmptyState
-              icon={<Wrench className="w-8 h-8 theme-text-muted" />}
-              title="No matching fittings"
-              description="Try adjusting your search or filter criteria"
-            />
-          </Card>
-        )}
+      {!isLoading && !error && fittings.length > 0 && filteredFittings.length === 0 && (
+        <Card>
+          <EmptyState
+            icon={<Wrench className="w-8 h-8 theme-text-muted" />}
+            title="No matching fittings"
+            description="Try adjusting your search or filter criteria"
+          />
+        </Card>
+      )}
     </DashboardLayout>
-  );
-}
-
-// =============================================================================
-// Sub-components
-// =============================================================================
-
-interface StatMiniProps {
-  label: string;
-  value: string | number;
-  icon: React.ReactNode;
-  color?: "default" | "green" | "red";
-}
-
-function StatMini({ label, value, icon, color = "default" }: StatMiniProps) {
-  const bgColors = {
-    default: "bg-[#39BEAE]",
-    green: "bg-green-600",
-    red: "bg-red-600",
-  };
-
-  return (
-    <div
-      className={`${bgColors[color]} rounded-xl p-4 flex items-center gap-4`}
-    >
-      <div className="w-10 h-10 rounded-lg flex items-center justify-center text-white bg-white/30">
-        {icon}
-      </div>
-      <div>
-        <p className="text-2xl font-bold text-white">{value}</p>
-        <p className="text-gray-100 text-sm">{label}</p>
-      </div>
-    </div>
-  );
-}
-
-interface FilterButtonProps {
-  children: React.ReactNode;
-  active: boolean;
-  onClick: () => void;
-}
-
-function FilterButton({ children, active, onClick }: FilterButtonProps) {
-  return (
-    <button
-      onClick={onClick}
-      className={`
-        px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer
-        ${
-          active
-            ? "bg-[#39BEAE] text-white"
-            : "theme-bg-tertiary theme-text-primary hover:theme-bg-hover"
-        }
-      `}
-    >
-      {children}
-    </button>
-  );
-}
-
-// =============================================================================
-// Fitting Card Component (View Only)
-// =============================================================================
-
-interface FittingCardProps {
-  fitting: FittingOption;
-}
-
-function FittingCard({ fitting }: FittingCardProps) {
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="flex-1 min-w-0">
-          {/* Header */}
-          <div className="flex flex-wrap items-center gap-2 mb-2">
-            <Badge variant="info">{fitting.fitting_id}</Badge>
-            <Badge variant={fitting.is_correct ? "success" : "warning"}>
-              {fitting.is_correct ? "Correct" : "Distractor"}
-            </Badge>
-          </div>
-
-          {/* Name */}
-          <h3 className="font-medium theme-text-primary mb-1">
-            {fitting.name}
-          </h3>
-
-          {/* Description */}
-          {fitting.description && (
-            <p className="text-sm theme-text-muted mb-2">
-              {fitting.description}
-            </p>
-          )}
-
-          {/* Reference */}
-          {fitting.nzs3500_reference && (
-            <p className="text-xs theme-text-tertiary">
-              <span className="font-medium">Ref:</span>{" "}
-              {fitting.nzs3500_reference}
-            </p>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  );
+  )
 }

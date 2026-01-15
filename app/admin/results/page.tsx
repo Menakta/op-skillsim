@@ -14,20 +14,15 @@ import {
   Card,
   CardContent,
   StatCard,
-  Badge,
   SearchInput,
   LoadingState,
-  DataTable,
-  MobileCardList,
   FilterButton,
-  ResultDetailModal,
   ExportDropdown,
   ConfirmDialog,
-  type Column,
 } from '../components'
 import type { QuizResult, ResultFilter } from '../types'
-import { formatDate, getInitials, type ExportColumn } from '../utils'
 import { useResults, useExport, useDeleteResults, useIsLtiAdmin } from '../hooks'
+import { ResultsTable, PDF_COLUMNS } from './components'
 
 // =============================================================================
 // Constants
@@ -39,18 +34,6 @@ const ITEMS_PER_PAGE = 10
 // Main Component
 // =============================================================================
 
-// PDF export column configuration
-const PDF_COLUMNS: ExportColumn<QuizResult>[] = [
-  { key: 'studentName', header: 'Student Name' },
-  { key: 'studentEmail', header: 'Email' },
-  { key: 'courseName', header: 'Course' },
-  { key: 'scorePercentage', header: 'Score (%)' },
-  { key: 'correctCount', header: 'Correct' },
-  { key: 'totalQuestions', header: 'Total' },
-  { key: 'passed', header: 'Result', getValue: (r: QuizResult) => r.passed ? 'Passed' : 'Failed' },
-  { key: 'answeredAt', header: 'Submitted', getValue: (r: QuizResult) => formatDate(r.answeredAt) },
-]
-
 export default function ResultsPage() {
   const { data, isLoading, error, refetch } = useResults()
   const { isLtiAdmin } = useIsLtiAdmin()
@@ -61,11 +44,7 @@ export default function ResultsPage() {
   const [courseFilter, setCourseFilter] = useState<string>('all')
   const [selectedResult, setSelectedResult] = useState<QuizResult | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
-
-  // Selection state
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set())
-
-  // Delete confirmation state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   const results = data?.results || []
@@ -91,11 +70,19 @@ export default function ResultsPage() {
     })
   }, [results, searchQuery, resultFilter, courseFilter])
 
-  // Reset to page 1 and clear selection when filters change
+  // Reset page and selection when filters change
   useMemo(() => {
     setCurrentPage(1)
     setSelectedKeys(new Set())
   }, [searchQuery, resultFilter, courseFilter])
+
+  // Pagination
+  const paginatedResults = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE
+    return filteredResults.slice(start, start + ITEMS_PER_PAGE)
+  }, [filteredResults, currentPage])
+
+  const totalPages = Math.ceil(filteredResults.length / ITEMS_PER_PAGE)
 
   // Export hook
   const {
@@ -115,12 +102,11 @@ export default function ResultsPage() {
     title: 'Quiz Results',
   })
 
-  // Handle delete button click
+  // Delete handlers
   const handleDeleteClick = useCallback(() => {
     setShowDeleteConfirm(true)
   }, [])
 
-  // Handle delete confirmation
   const handleDeleteConfirm = useCallback(async () => {
     const ids = Array.from(selectedKeys)
     if (ids.length === 0) return
@@ -134,80 +120,6 @@ export default function ResultsPage() {
       console.error('Delete failed:', error)
     }
   }, [selectedKeys, deleteResults, refetch])
-
-  // Paginated results
-  const paginatedResults = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE
-    return filteredResults.slice(start, start + ITEMS_PER_PAGE)
-  }, [filteredResults, currentPage])
-
-  const totalPages = Math.ceil(filteredResults.length / ITEMS_PER_PAGE)
-
-  // Table columns configuration
-  const columns: Column<QuizResult>[] = useMemo(() => [
-    {
-      key: 'student',
-      header: 'Student',
-      render: (result) => (
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center flex-shrink-0">
-            <span className="text-white text-xs font-medium">
-              {getInitials(result.studentName)}
-            </span>
-          </div>
-          <div className="min-w-0">
-            <p className="theme-text-primary font-medium truncate">{result.studentName}</p>
-            <p className="theme-text-muted text-xs truncate">{result.studentEmail}</p>
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: 'course',
-      header: 'Course',
-      headerClassName: 'hidden lg:table-cell',
-      className: 'hidden lg:table-cell',
-      render: (result) => <p className="theme-text-primary">{result.courseName}</p>,
-    },
-    {
-      key: 'score',
-      header: 'Score',
-      render: (result) => (
-        <span className={`text-lg font-bold ${
-          result.scorePercentage >= 75 ? 'text-green-400' :
-          result.scorePercentage >= 50 ? 'text-yellow-400' : 'text-red-400'
-        }`}>
-          {result.scorePercentage}%
-        </span>
-      ),
-    },
-    {
-      key: 'questions',
-      header: 'Questions',
-      render: (result) => (
-        <>
-          <span className="theme-text-primary">{result.correctCount}</span>
-          <span className="theme-text-muted">/{result.totalQuestions}</span>
-        </>
-      ),
-    },
-    {
-      key: 'result',
-      header: 'Result',
-      render: (result) => (
-        <Badge variant={result.passed ? 'success' : 'danger'}>
-          {result.passed ? 'Passed' : 'Failed'}
-        </Badge>
-      ),
-    },
-    {
-      key: 'submitted',
-      header: 'Submitted',
-      headerClassName: 'hidden lg:table-cell',
-      className: 'hidden lg:table-cell',
-      render: (result) => <span className="theme-text-secondary">{formatDate(result.answeredAt)}</span>,
-    },
-  ], [])
 
   if (isLoading) {
     return (
@@ -226,8 +138,6 @@ export default function ResultsPage() {
       </DashboardLayout>
     )
   }
-
-  const avgScore = stats?.avgScore || 0
 
   return (
     <DashboardLayout title="Results" subtitle="View and analyze quiz results">
@@ -284,7 +194,7 @@ export default function ResultsPage() {
                   stroke="#39BEAE"
                   strokeWidth="8"
                   fill="none"
-                  strokeDasharray={`${(stats?.passRate ||0) * 2.51} 251`}
+                  strokeDasharray={`${(stats?.passRate || 0) * 2.51} 251`}
                   strokeLinecap="round"
                 />
               </svg>
@@ -349,7 +259,7 @@ export default function ResultsPage() {
                 selectedCount={selectedKeys.size}
               />
 
-              {/* Delete Button - Only visible to LTI Admins */}
+              {/* Delete Button */}
               {isLtiAdmin && selectedKeys.size > 0 && (
                 <button
                   onClick={handleDeleteClick}
@@ -364,83 +274,20 @@ export default function ResultsPage() {
         </CardContent>
       </Card>
 
-      {/* Results Table - Desktop */}
-      <DataTable<QuizResult>
-        title="Quiz Results"
+      {/* Results Table */}
+      <ResultsTable
         data={paginatedResults}
-        columns={columns}
         totalItems={filteredResults.length}
         currentPage={currentPage}
         totalPages={totalPages}
         itemsPerPage={ITEMS_PER_PAGE}
         onPageChange={setCurrentPage}
-        onRowAction={setSelectedResult}
-        emptyIcon={<Award className="w-8 h-8 text-gray-400" />}
-        emptyTitle="No results found"
-        emptyDescription={results.length === 0 ? "No quiz submissions yet" : "Try adjusting your search or filter criteria"}
-        getRowKey={(result) => result.id}
-        selectable={true}
+        selectedResult={selectedResult}
+        setSelectedResult={setSelectedResult}
         selectedKeys={selectedKeys}
         onSelectionChange={setSelectedKeys}
+        hasData={results.length > 0}
       />
-
-      {/* Results Cards - Mobile */}
-      <MobileCardList<QuizResult>
-        title="Quiz Results"
-        data={paginatedResults}
-        totalItems={filteredResults.length}
-        currentPage={currentPage}
-        totalPages={totalPages}
-        itemsPerPage={ITEMS_PER_PAGE}
-        onPageChange={setCurrentPage}
-        onItemClick={setSelectedResult}
-        emptyIcon={<Award className="w-8 h-8 text-gray-400" />}
-        emptyTitle="No results found"
-        emptyDescription={results.length === 0 ? "No quiz submissions yet" : "Try adjusting your search or filter criteria"}
-        getRowKey={(result) => result.id}
-        renderCard={(result) => (
-          <Card className="p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-3 min-w-0 flex-1">
-                <div className="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center flex-shrink-0">
-                  <span className="text-white font-medium text-sm">
-                    {getInitials(result.studentName)}
-                  </span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="theme-text-primary font-medium truncate">{result.studentName}</p>
-                  <p className="theme-text-muted text-xs truncate">{result.courseName}</p>
-                </div>
-              </div>
-              <div className="text-right flex-shrink-0">
-                <span className={`text-xl font-bold ${
-                  result.scorePercentage >= 75 ? 'text-green-400' :
-                  result.scorePercentage >= 50 ? 'text-yellow-400' : 'text-red-400'
-                }`}>
-                  {result.scorePercentage}%
-                </span>
-                <p className="text-xs theme-text-muted">
-                  {result.correctCount}/{result.totalQuestions}
-                </p>
-              </div>
-            </div>
-            <div className="mt-3 flex items-center justify-between">
-              <Badge variant={result.passed ? 'success' : 'danger'}>
-                {result.passed ? 'Passed' : 'Failed'}
-              </Badge>
-              <span className="text-xs theme-text-muted">{formatDate(result.answeredAt)}</span>
-            </div>
-          </Card>
-        )}
-      />
-
-      {/* Result Detail Modal */}
-      {selectedResult && (
-        <ResultDetailModal
-          result={selectedResult}
-          onClose={() => setSelectedResult(null)}
-        />
-      )}
 
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog

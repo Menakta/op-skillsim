@@ -7,3 +7,4 @@
 export * from './SessionsChart'
 export * from './SessionStatusChart'
 export * from './PhaseDistributionChart'
+export * from './ScoreDistributionChart'
