@@ -537,27 +537,17 @@ export async function POST(req: NextRequest) {
         sessionId = result.sessionId
         token = result.token
 
-        // Create new training_session starting at phase 0
-        try {
-          await sessionManager.createTrainingSession(
-            sessionId,
-            ltiData.courseId,
-            ltiData.courseName,
-            {
-              userId: ltiData.userId,
-              email: ltiData.email,
-              fullName: ltiData.fullName,
-              institution: ltiData.institution,
-            }
-          )
-          logger.info({
-            userId: user.id,
-            sessionId,
-            email,
-          }, 'LTI Student Launch - Created new training session at phase 0')
-        } catch (error) {
-          logger.warn({ error }, 'Failed to create training session - continuing without it')
-        }
+        // NOTE: We do NOT create a training_session here anymore.
+        // The training_session will be created when:
+        // 1. User clicks "Start New Training Session" in SessionSelectionScreen
+        // 2. OR when user clicks "Skip to Training" from cinematic mode
+        // This allows students to see the session selection screen first
+        // and decide whether to start fresh or resume an existing session.
+        logger.info({
+          userId: user.id,
+          sessionId,
+          email,
+        }, 'LTI Student Launch - User session created, training session will be created on demand')
       }
 
       // Set session token cookie

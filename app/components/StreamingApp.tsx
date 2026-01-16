@@ -7,7 +7,7 @@ import {useStreamer,useLaunchRequest,VideoStream} from '@pureweb/platform-sdk-re
 
 // Critical path imports - needed immediately
 import { useQuestions } from '../features/questions'
-import { LoadingScreen, StarterScreen, SessionSelectionScreen, CinematicTimer, CinematicMobileControls, type LoadingStep, type ActiveSession } from '../features'
+import { LoadingScreen, StarterScreen, SessionSelectionScreen, ResumeConfirmationModal, CinematicTimer, CinematicMobileControls, type LoadingStep, type ActiveSession } from '../features'
 import { IdleWarningModal, useIdleDetection } from '../features/idle'
 import { useStatePersistence } from '../features/training'
 import type { QuestionData } from '../lib/messageTypes'
@@ -195,6 +195,10 @@ export default function StreamingApp() {
   const [sessionsLoading, setSessionsLoading] = useState(false)
   const [selectedSession, setSelectedSession] = useState<ActiveSession | null>(null)
   const [startNewSessionAfterStream, setStartNewSessionAfterStream] = useState(false)
+
+  // Resume confirmation modal state - shown after stream connects
+  const [showResumeConfirmation, setShowResumeConfirmation] = useState(false)
+  const [resumePhaseIndex, setResumePhaseIndex] = useState(0)
 
   // Session end state
   const [showSessionEndModal, setShowSessionEndModal] = useState(false)
@@ -395,11 +399,13 @@ export default function StreamingApp() {
         setActiveSessions(result.data as ActiveSession[])
         setShowStarterScreen(false)
         setShowSessionSelection(true)
-        setSessionsLoading(false)
       } else {
-        // No active sessions - proceed to start new session with cinematic mode
+        // No active sessions - proceed to cinematic mode
+        // Session will be created when user clicks "Skip to Training"
+        console.log('🆕 No active sessions found - proceeding to cinematic mode')
         setShowStarterScreen(false)
         setStartNewSessionAfterStream(true)
+        setIsCinematicMode(true)
         setStreamStarted(true)
       }
     } catch (error) {
@@ -658,24 +664,24 @@ export default function StreamingApp() {
 
   /**
    * When stream connects and user selected a session to resume,
-   * automatically start training from that phase (skip cinematic mode).
+   * show confirmation modal with button to start training.
    */
   useEffect(() => {
     if (streamerStatus !== StreamerStatus.Connected) return
 
     // If user selected a session to resume from SessionSelectionScreen
     if (selectedSession) {
-      // Only send the resume command once per session
+      // Only show the resume modal once per session
       if (hasResumedSessionRef.current === selectedSession.id) {
-        console.log('📂 Already sent resume command for this session, skipping')
+        console.log('📂 Already showed resume modal for this session, skipping')
         return
       }
 
       const phaseIndex = parseInt(selectedSession.current_training_phase, 10) || 0
-      console.log(`📂 Resuming selected session from phase ${phaseIndex}`)
+      console.log(`📂 Stream connected - showing resume confirmation for phase ${phaseIndex}`)
       console.log(`📂 Session ID: ${selectedSession.id}`)
 
-      // Mark this session as resumed
+      // Mark this session as handled
       hasResumedSessionRef.current = selectedSession.id
       hasRestoredStateRef.current = true
 
@@ -685,20 +691,13 @@ export default function StreamingApp() {
       setIsCinematicMode(false)
       setShowExplosionControls(false)
 
-      // Give connection time to stabilize, then start from the saved phase
-      const timer = setTimeout(() => {
-        console.log(`🔄 Sending start_from_task:${phaseIndex} to UE5 NOW`)
-        if (phaseIndex > 0) {
-          training.startFromTask(phaseIndex)
-        } else {
-          training.startTraining()
-        }
-      }, 2500)
+      // Show the resume confirmation modal
+      setResumePhaseIndex(phaseIndex)
+      setShowResumeConfirmation(true)
 
       // Skip navigation walkthrough for resumed sessions
       setShowNavigationWalkthrough(false)
-
-      return () => clearTimeout(timer)
+      return
     }
 
     // If starting a new session (no selected session), cinematic mode will be shown
@@ -971,32 +970,38 @@ export default function StreamingApp() {
 
   /**
    * Handle starting a brand new training session
-   * This shows cinematic mode first, then training starts from phase 0
+   * This shows cinematic mode first, session created when user clicks "Skip to Training"
    */
-  const handleStartNewSession = useCallback(async () => {
-    console.log('🆕 Starting new training session')
-    setSessionsLoading(true)
-
-    try {
-      // Create a new session in the database
-      const result = await trainingSessionService.createNewSession({
-        courseName: 'VR Pipe Training',
-      })
-      if (!result.success) {
-        console.error('Failed to create new session:', result.error)
-      }
-    } catch (error) {
-      console.error('Error creating new session:', error)
-    }
+  const handleStartNewSession = useCallback(() => {
+    console.log('🆕 Starting new training session - cinematic mode first')
 
     // Clear any selected session and proceed with cinematic mode
+    // Session will be created when user clicks "Skip to Training"
     setSelectedSession(null)
     setShowSessionSelection(false)
     setStartNewSessionAfterStream(true)
     setIsCinematicMode(true) // Show cinematic mode for new sessions
     setStreamStarted(true)
-    setSessionsLoading(false)
   }, [])
+
+  // ==========================================================================
+  // Resume Confirmation Handler
+  // ==========================================================================
+
+  /**
+   * Handle clicking the resume/start button in the confirmation modal
+   * This sends the start_from_task command to UE5
+   */
+  const handleResumeConfirmation = useCallback(() => {
+    console.log(`🚀 User clicked resume - sending start_from_task:${resumePhaseIndex} to UE5`)
+    setShowResumeConfirmation(false)
+
+    if (resumePhaseIndex > 0) {
+      training.startFromTask(resumePhaseIndex)
+    } else {
+      training.startTraining()
+    }
+  }, [training, resumePhaseIndex])
 
   // ==========================================================================
   // Cinematic Mode Handlers
@@ -1004,28 +1009,32 @@ export default function StreamingApp() {
 
   /**
    * Handle skipping to training from cinematic mode
-   * If we have a selected session (resume), use startFromTask
-   * Otherwise, start fresh training from phase 0
+   * For new sessions: create session in DB and start from phase 0
    */
-  const handleSkipToTraining = useCallback(() => {
-    console.log('⏭️ Skipping to training mode')
+  const handleSkipToTraining = useCallback(async () => {
+    console.log('⏭️ Skipping to training mode - starting from phase 0')
     setIsCinematicMode(false)
     setShowExplosionControls(false)
 
-    if (selectedSession) {
-      // Resume from selected session's phase
-      const phaseIndex = parseInt(selectedSession.current_training_phase, 10) || 0
-      console.log(`🔄 Resuming training from phase ${phaseIndex}`)
-      if (phaseIndex > 0) {
-        training.startFromTask(phaseIndex)
-      } else {
-        training.startTraining()
+    // For LTI students starting a new session, create the training session now
+    if (isLtiSession && userRole === 'student' && startNewSessionAfterStream) {
+      console.log('🆕 Creating new training session before starting training')
+      try {
+        const result = await trainingSessionService.createNewSession({
+          courseName: 'VR Pipe Training',
+        })
+        if (result.success) {
+          console.log('✅ Training session created:', result.data?.id)
+        } else {
+          console.error('Failed to create training session:', result.error)
+        }
+      } catch (error) {
+        console.error('Error creating training session:', error)
       }
-    } else {
-      // Start fresh training from beginning
-      training.startTraining()
     }
-  }, [training, selectedSession])
+
+    training.startTraining()
+  }, [training, isLtiSession, userRole, startNewSessionAfterStream])
 
   // ==========================================================================
   // Derived State
@@ -1334,6 +1343,14 @@ export default function StreamingApp() {
         retryCount={retryCount}
         maxRetries={MAX_RETRIES}
         showRetryInfo={retryCount > 0}
+      />
+
+      {/* Resume Confirmation Modal - Show after stream connects when resuming */}
+      <ResumeConfirmationModal
+        isOpen={showResumeConfirmation}
+        phaseIndex={resumePhaseIndex}
+        onStartTraining={handleResumeConfirmation}
+        loading={sessionsLoading}
       />
 
       {/* Session End Modal - Show when session is disconnected/closed */}
