@@ -205,29 +205,199 @@ export function CinematicMobileControls({
 
   return (
     <>
-      {/* Desktop: Show panels directly on left and right */}
+      {/* Desktop: Dropdown panels on left side */}
       <div className="hidden sm:block">
-        <ExplosionControls
-          value={explosionValue}
-          onValueChange={onExplosionValueChange}
-          onExplode={onExplode}
-          onAssemble={onAssemble}
-          isVisible={true}
-        />
-      </div>
+        <div className={`fixed left-4 top-20 z-30 w-56 backdrop-blur-md rounded-xl border overflow-hidden ${
+          isDark ? 'bg-black/80 border-white/10' : 'bg-white/90 border-gray-200 shadow-lg'
+        }`}>
+          {/* Explosion Dropdown */}
+          <div>
+            <button
+              onClick={() => {
+                setShowExplosionPanel(!showExplosionPanel)
+                if (!showExplosionPanel) {
+                  setShowWaypointPanel(false)
+                  setShowLayerPanel(false)
+                }
+              }}
+              className={`w-full flex items-center justify-between px-3 py-2.5 transition-colors ${
+                isDark
+                  ? 'bg-gradient-to-r from-[#39BEAE]/20 to-transparent hover:from-[#39BEAE]/30'
+                  : 'bg-gradient-to-r from-[#39BEAE]/10 to-transparent hover:from-[#39BEAE]/20'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-[#39BEAE]" />
+                <span className={`font-semibold text-xs ${isDark ? 'text-white' : 'text-gray-900'}`}>Building Explosion</span>
+              </div>
+              <ChevronDown className={`w-4 h-4 transition-transform ${showExplosionPanel ? 'rotate-180' : ''} ${isDark ? 'text-gray-400' : 'text-gray-500'}`} />
+            </button>
+            {showExplosionPanel && (
+              <div className={`p-3 space-y-3 border-t ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className={`text-xs ${isDark ? 'text-white/70' : 'text-gray-600'}`}>Explosion Level</label>
+                    <span className="text-[#39BEAE] font-mono font-semibold text-sm">{Math.round(explosionValue)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={explosionValue}
+                    onChange={(e) => onExplosionValueChange(Number(e.target.value))}
+                    className={`w-full h-2 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#39BEAE] [&::-webkit-slider-thumb]:cursor-pointer ${isDark ? 'bg-gray-700' : 'bg-gray-300'}`}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={onExplode} className="flex items-center justify-center gap-1.5 px-3 py-2 bg-[#39BEAE] hover:bg-[#2ea89a] text-white rounded-lg transition-all text-xs font-medium">
+                    Explode
+                  </button>
+                  <button onClick={onAssemble} className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg transition-all text-xs font-medium ${isDark ? 'bg-gray-600 hover:bg-gray-500 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}>
+                    Assemble
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
-      <div className="hidden sm:block">
-        <WaypointControls
-          waypoints={waypoints}
-          activeWaypointIndex={activeWaypointIndex}
-          activeWaypointName={activeWaypointName}
-          waypointProgress={waypointProgress}
-          onRefresh={onRefreshWaypoints}
-          onActivate={onActivateWaypoint}
-          onDeactivate={onDeactivateWaypoint}
-          onProgressChange={onWaypointProgressChange}
-          isVisible={true}
-        />
+          {/* Waypoint Dropdown */}
+          <div className={`border-t ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
+            <button
+              onClick={() => {
+                setShowWaypointPanel(!showWaypointPanel)
+                if (!showWaypointPanel) {
+                  setShowExplosionPanel(false)
+                  setShowLayerPanel(false)
+                }
+              }}
+              className={`w-full flex items-center justify-between px-3 py-2.5 transition-colors ${
+                isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Navigation className="w-4 h-4 text-[#39BEAE]" />
+                <span className={`font-semibold text-xs ${isDark ? 'text-white' : 'text-gray-900'}`}>Waypoints</span>
+              </div>
+              <ChevronDown className={`w-4 h-4 transition-transform ${showWaypointPanel ? 'rotate-180' : ''} ${isDark ? 'text-gray-400' : 'text-gray-500'}`} />
+            </button>
+            {showWaypointPanel && (
+              <div className={`p-3 space-y-3 border-t max-h-60 overflow-y-auto ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
+                {activeWaypointIndex >= 0 && (
+                  <div className="p-2.5 bg-[#39BEAE]/20 rounded-lg border border-[#39BEAE]/30">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[#39BEAE] font-medium text-xs">Active: {activeWaypointName}</span>
+                      <button onClick={onDeactivateWaypoint} className="p-1 text-gray-400 hover:text-red-400 rounded"><X className="w-3.5 h-3.5" /></button>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={waypointProgress}
+                      onChange={(e) => onWaypointProgressChange?.(Number(e.target.value))}
+                      className={`w-full h-2 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#39BEAE] [&::-webkit-slider-thumb]:cursor-pointer ${isDark ? 'bg-gray-700' : 'bg-gray-300'}`}
+                    />
+                  </div>
+                )}
+                <div className="space-y-1.5">
+                  {waypoints.map((waypoint) => (
+                    <button
+                      key={waypoint.index}
+                      onClick={() => activeWaypointIndex === waypoint.index ? onDeactivateWaypoint() : onActivateWaypoint(waypoint.index)}
+                      className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-left transition-all text-xs ${
+                        activeWaypointIndex === waypoint.index
+                          ? 'bg-[#39BEAE] text-white'
+                          : isDark ? 'bg-gray-800/50 text-gray-300 hover:bg-gray-700/50' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {waypoint.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Layers Dropdown */}
+          <div className={`border-t ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
+            <button
+              onClick={() => {
+                setShowLayerPanel(!showLayerPanel)
+                if (!showLayerPanel) {
+                  setShowExplosionPanel(false)
+                  setShowWaypointPanel(false)
+                }
+              }}
+              className={`w-full flex items-center justify-between px-3 py-2.5 transition-colors ${
+                isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Eye className="w-4 h-4 text-[#39BEAE]" />
+                <span className={`font-semibold text-xs ${isDark ? 'text-white' : 'text-gray-900'}`}>Layers</span>
+              </div>
+              <ChevronDown className={`w-4 h-4 transition-transform ${showLayerPanel ? 'rotate-180' : ''} ${isDark ? 'text-gray-400' : 'text-gray-500'}`} />
+            </button>
+            {showLayerPanel && (
+              <div className={`border-t ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
+                <div className={`px-3 py-2 flex gap-2 border-b ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
+                  <button onClick={onShowAllLayers} className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium ${isDark ? 'bg-gray-700/50 hover:bg-gray-600/50 text-gray-300' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'}`}>
+                    <Eye className="w-3 h-3" /> Show All
+                  </button>
+                  <button onClick={onHideAllLayers} className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium ${isDark ? 'bg-gray-700/50 hover:bg-gray-600/50 text-gray-300' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'}`}>
+                    <EyeOff className="w-3 h-3" /> Hide All
+                  </button>
+                </div>
+                <div className="p-2 max-h-48 overflow-y-auto space-y-1">
+                  {mainGroups.map((group) => {
+                    const children = getChildren(group.name)
+                    const hasChildren = children.length > 0
+                    const isExpanded = expandedGroups.has(group.name)
+                    return (
+                      <div key={group.name}>
+                        <div className="flex items-center gap-1">
+                          {hasChildren ? (
+                            <button onClick={() => toggleExpanded(group.name)} className={`p-0.5 rounded ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-900'}`}>
+                              {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                            </button>
+                          ) : <div className="w-4" />}
+                          <button
+                            onClick={() => onToggleMainGroup(group.name)}
+                            className={`flex-1 flex items-center gap-1.5 px-2 py-1 rounded-lg text-left text-xs ${
+                              group.visible
+                                ? isDark ? 'bg-[#39BEAE]/20 text-white' : 'bg-[#39BEAE]/20 text-gray-900'
+                                : isDark ? 'bg-gray-800/30 text-gray-400 hover:bg-gray-700/50' : 'bg-gray-100/50 text-gray-500 hover:bg-gray-200/50'
+                            }`}
+                          >
+                            {group.visible ? <Eye className="w-3 h-3 text-[#39BEAE]" /> : <EyeOff className="w-3 h-3" />}
+                            <span className="truncate">{group.name}</span>
+                          </button>
+                        </div>
+                        {hasChildren && isExpanded && (
+                          <div className={`ml-4 mt-1 space-y-1 border-l pl-2 ${isDark ? 'border-gray-700/50' : 'border-gray-300/50'}`}>
+                            {children.map((child) => (
+                              <button
+                                key={`${child.parentName}-${child.childIndex}`}
+                                onClick={() => onToggleChildGroup(child.parentName!, child.childIndex!)}
+                                className={`w-full flex items-center gap-1.5 px-2 py-1 rounded-lg text-left text-xs ${
+                                  child.visible
+                                    ? isDark ? 'bg-[#39BEAE]/10 text-white' : 'bg-[#39BEAE]/10 text-gray-900'
+                                    : isDark ? 'bg-gray-800/20 text-gray-500 hover:bg-gray-700/30' : 'bg-gray-100/30 text-gray-500 hover:bg-gray-200/30'
+                                }`}
+                              >
+                                {child.visible ? <Eye className="w-2.5 h-2.5 text-[#39BEAE]" /> : <EyeOff className="w-2.5 h-2.5" />}
+                                <span className="truncate">{child.name}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Desktop: Camera Controls at bottom center */}
@@ -238,19 +408,6 @@ export function CinematicMobileControls({
           onSetPerspective={onSetCameraPerspective}
           onToggleAutoOrbit={onToggleAutoOrbit}
           onResetCamera={onResetCamera}
-          isVisible={true}
-        />
-      </div>
-
-      {/* Desktop: Layer Controls at bottom right */}
-      <div className="hidden sm:block">
-        <LayerControls
-          hierarchicalGroups={hierarchicalGroups}
-          onRefresh={onRefreshLayers}
-          onToggleMainGroup={onToggleMainGroup}
-          onToggleChildGroup={onToggleChildGroup}
-          onShowAll={onShowAllLayers}
-          onHideAll={onHideAllLayers}
           isVisible={true}
         />
       </div>
