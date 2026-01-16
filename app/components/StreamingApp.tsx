@@ -1020,9 +1020,7 @@ export default function StreamingApp() {
     if (isLtiSession && userRole === 'student' && startNewSessionAfterStream) {
       console.log('🆕 Creating new training session before starting training')
       try {
-        const result = await trainingSessionService.createNewSession({
-          courseName: 'VR Pipe Training',
-        })
+        const result = await trainingSessionService.createNewSession()
         if (result.success) {
           console.log('✅ Training session created:', result.data?.id)
         } else {

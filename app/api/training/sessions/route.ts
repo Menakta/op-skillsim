@@ -174,28 +174,40 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    const body = await request.json().catch(() => ({}))
-    const { courseId, courseName } = body
-
     const supabase = getSupabaseAdmin()
 
-    // Build student details for JSONB column
+    // Get the user session to retrieve LTI context (courseId, courseName, full_name, institution)
+    const { data: userSession } = await supabase
+      .from('user_sessions')
+      .select('lti_context')
+      .eq('session_id', session.sessionId)
+      .single()
+
+    // Parse LTI context
+    const ltiContext = userSession?.lti_context
+      ? (typeof userSession.lti_context === 'string'
+          ? JSON.parse(userSession.lti_context)
+          : userSession.lti_context)
+      : {}
+
+    // Build student details for JSONB column using LTI context
     const student = {
       user_id: session.userId,
       email: session.email,
-      full_name: 'Unknown Student',
-      institution: 'Unknown Institution',
+      full_name: ltiContext.full_name || 'Unknown Student',
+      institution: ltiContext.institution || 'Unknown Institution',
       enrolled_at: new Date().toISOString(),
     }
 
     // Force create a NEW training session
     // This is used when student explicitly wants to start fresh
+    // Use courseId and courseName from LTI context
     const { data: newSession, error: createError } = await supabase
       .from('training_sessions')
       .insert({
         session_id: session.sessionId,
-        course_id: courseId || 'default',
-        course_name: courseName || 'VR Pipe Training',
+        course_id: ltiContext.courseId || 'default',
+        course_name: ltiContext.courseName || 'VR Pipe Training',
         current_training_phase: '0',
         overall_progress: 0,
         status: 'active',
