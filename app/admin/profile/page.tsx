@@ -248,11 +248,6 @@ export default function ProfilePage() {
                 </Badge>
               }
             />
-            <ProfileRow
-              icon={<User className="w-5 h-5 theme-text-brand" />}
-              label="User ID"
-              value={<span className="font-mono text-sm">{user.userId || 'N/A'}</span>}
-            />
           </CardContent>
         </Card>
 
@@ -274,15 +269,6 @@ export default function ProfilePage() {
                     <Badge variant="success">LTI Authenticated</Badge>
                   )}
                 </div>
-              }
-            />
-            <ProfileRow
-              icon={<Calendar className="w-5 h-5 theme-text-brand" />}
-              label="Session ID"
-              value={
-                <span className="font-mono text-sm break-all">
-                  {user.sessionId || 'N/A'}
-                </span>
               }
             />
             <ProfileRow
