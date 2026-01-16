@@ -30,11 +30,13 @@ export const WEB_TO_UE_MESSAGES = {
   PIPE_SELECT: 'pipe_select',            // y-junction, elbow, 100mm, 150mm
 
   // Pressure Testing
-  TEST_PLUG_SELECT: 'test_plug_select',  // AirPlug
-  PRESSURE_TEST_START: 'pressure_test_start', // air_test, player_closed_q6
+  TEST_PLUG_SELECT: 'test_plug_select',  // AirPlug, WaterPlug, AccessCap
+  PRESSURE_TEST_START: 'pressure_test_start', // air_test, water_test, player_closed_q6
 
   // Question/Answer
   QUESTION_ANSWER: 'question_answer',    // Q1:1:true (questionId:tryCount:isCorrect)
+  QUESTION_HINT: 'question_hint',        // Q1 - Request hint for question
+  QUESTION_CLOSE: 'question_close',      // Q1 - Close question without answering
 
   // Camera Control
   CAMERA_CONTROL: 'camera_control',      // Front, Back, Left, Right, Top, Bottom, IsometricNE/SE/SW, orbit_start, orbit_stop, reset
@@ -72,6 +74,9 @@ export const UE_TO_WEB_MESSAGES = {
   // Question
   QUESTION_REQUEST: 'question_request',     // Q1-Q6
 
+  // Pressure Test
+  PRESSURE_TEST_RESULT: 'pressure_test_result', // passed:pressure:testType (e.g., true:20:air_test)
+
   // Waypoints
   WAYPOINT_LIST: 'waypoint_list',           // count:index:name,...
   WAYPOINT_UPDATE: 'waypoint_update',       // activeIndex:name:isActive:progress%
@@ -85,23 +90,30 @@ export const UE_TO_WEB_MESSAGES = {
   EXPLOSION_UPDATE: 'explosion_update',     // value:isAnimating
 
   // Camera
-  CAMERA_UPDATE: 'camera_update'            // mode:perspective:distance:isTransitioning
+  CAMERA_UPDATE: 'camera_update',           // mode:perspective:distance:isTransitioning
+
+  // Error
+  ERROR: 'error'                            // code:details (error message from UE5)
 } as const
 
 // =============================================================================
 // Tool and Task Definitions
 // =============================================================================
 
-export type ToolName = 'XRay' | 'Shovel' | 'Measuring' | 'PipeConnection' | 'Glue' | 'PressureTester' | 'None'
+export type ToolName = 'XRay' | 'Shovel' | 'Measuring' | 'PipeConnection' | 'Glue' | 'PressureTester' | 'Cutting' | 'None'
 
 /** Dynamic pipe type - fitting_id from Supabase fitting_options table */
 export type PipeType = string
 
-export type PressureTestType = 'air-plug' | 'conduct-test'
+export type PressureTestType = 'air-plug' | 'water-plug' | 'access-cap' | 'conduct-test'
+
+export type TestPlugType = 'AirPlug' | 'WaterPlug' | 'AccessCap'
+
+export type PressureTestAction = 'air_test' | 'water_test' | 'player_closed_q6'
 
 export type CameraPerspective =
   | 'Front' | 'Back' | 'Left' | 'Right' | 'Top' | 'Bottom'
-  | 'IsometricNE' | 'IsometricSE' | 'IsometricSW'
+  | 'IsometricNE' | 'IsometricSE' | 'IsometricSW' | 'IsometricNW'
 
 export type CameraMode = 'Manual' | 'Orbit'
 
@@ -218,6 +230,13 @@ export interface WaypointUpdateData {
   [key: string]: unknown
 }
 
+export interface PressureTestResultData {
+  passed: boolean
+  pressure: number
+  testType: PressureTestAction
+  [key: string]: unknown
+}
+
 // Re-export TrainingState from hook for backward compatibility
 export type { TrainingState } from '../hooks/useTrainingMessagesComposite'
 
@@ -252,6 +271,7 @@ export type IncomingMessageType =
   | 'task_complete'
   | 'task_debug'
   | 'question_request'
+  | 'pressure_test_result'
   | 'waypoint_list'
   | 'waypoint_update'
   | 'layer_list'
@@ -259,6 +279,7 @@ export type IncomingMessageType =
   | 'layer_update'
   | 'explosion_update'
   | 'camera_update'
+  | 'error'
   | 'unknown'
 
 export interface ParsedMessage {
@@ -355,6 +376,22 @@ function parseDataString(type: IncomingMessageType, dataString: string): Record<
 
     case 'question_request':
       return { questionId: parts[0] || 'Q1' }
+
+    case 'pressure_test_result': {
+      // passed:pressure:testType (e.g., true:20:air_test)
+      return {
+        passed: parts[0] === 'true',
+        pressure: parseFloat(parts[1]) || 0,
+        testType: (parts[2] || 'air_test') as PressureTestAction
+      } as PressureTestResultData
+    }
+
+    case 'error':
+      return {
+        message: dataString,
+        code: parts[0] || 'UNKNOWN',
+        details: parts.slice(1).join(':') || ''
+      }
 
     case 'waypoint_list': {
       // count:index:name,index:name,...
@@ -483,17 +520,27 @@ export function createPipeSelectMessage(pipe: PipeType): string {
 }
 
 // Pressure Test
-export function createTestPlugSelectMessage(plugType: string): string {
+export function createTestPlugSelectMessage(plugType: TestPlugType): string {
   return createMessage(WEB_TO_UE_MESSAGES.TEST_PLUG_SELECT, plugType)
 }
 
-export function createPressureTestStartMessage(testType: 'air_test' | 'player_closed_q6'): string {
+export function createPressureTestStartMessage(testType: PressureTestAction): string {
   return createMessage(WEB_TO_UE_MESSAGES.PRESSURE_TEST_START, testType)
 }
 
 // Question Answer
 export function createQuestionAnswerMessage(questionId: string, tryCount: number, isCorrect: boolean): string {
   return createMessage(WEB_TO_UE_MESSAGES.QUESTION_ANSWER, `${questionId}:${tryCount}:${isCorrect}`)
+}
+
+// Question Hint
+export function createQuestionHintMessage(questionId: string): string {
+  return createMessage(WEB_TO_UE_MESSAGES.QUESTION_HINT, questionId)
+}
+
+// Question Close
+export function createQuestionCloseMessage(questionId: string): string {
+  return createMessage(WEB_TO_UE_MESSAGES.QUESTION_CLOSE, questionId)
 }
 
 // Camera Control
@@ -512,7 +559,7 @@ export function createWaypointControlMessage(action: 'list' | 'deactivate' | `ac
 }
 
 // Layer Control
-export function createLayerControlMessage(action: 'list' | `toggle:${number}` | `isolate:${number}`): string {
+export function createLayerControlMessage(action: 'list' | `toggle:${number}` | `isolate:${number}` | `show:${string}` | `hide:${string}`): string {
   return createMessage(WEB_TO_UE_MESSAGES.LAYER_CONTROL, action)
 }
 
@@ -539,7 +586,8 @@ export const TOOL_INFO: Record<ToolName, { icon: string; name: string; descripti
   'Measuring': { icon: '📏', name: 'Measuring Tape', description: 'Measuring tape for precision' },
   'PipeConnection': { icon: '🔧', name: 'Pipe Connection', description: 'Pipe connection tool' },
   'Glue': { icon: '🧴', name: 'Glue Applicator', description: 'Glue application tool' },
-  'PressureTester': { icon: '🔧', name: 'Pressure Tester', description: 'Pressure testing tool' }
+  'PressureTester': { icon: '🔧', name: 'Pressure Tester', description: 'Pressure testing tool' },
+  'Cutting': { icon: '✂️', name: 'Pipe Cutter', description: 'Cutting tool for pipe sections' }
 }
 
 // =============================================================================

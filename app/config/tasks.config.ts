@@ -118,6 +118,12 @@ export const TOOL_INFO: Record<ToolName, ToolInfo> = {
     name: 'Pressure Tester',
     description: 'Pressure testing tool',
     shortName: 'Test'
+  },
+  'Cutting': {
+    icon: '/icons/cut.png',
+    name: 'Pipe Cutter',
+    description: 'Cutting tool for pipe sections',
+    shortName: 'Cut'
   }
 }
 

@@ -1317,11 +1317,11 @@ export default function StreamingApp() {
       {/* Starter Screen - Show after navigation walkthrough is closed */}
       <StarterScreen
         isOpen={showStarterScreen}
-        title="Start exercise"
+        title="Start Streaming"
         subtitle="Click the button below to begin your training session"
         onStart={handleStartStream}
         onHover={handleStartHover}
-        buttonText="Start Session"
+        buttonText="Start"
       />
 
       {/* Session Selection Screen - Show when student has active sessions */}
