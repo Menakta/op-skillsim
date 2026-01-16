@@ -649,6 +649,9 @@ export default function StreamingApp() {
     }
   }, [streamerStatus, training])
 
+  // Track if we've sent the resume command for this session
+  const hasResumedSessionRef = useRef<string | null>(null)
+
   // ==========================================================================
   // Handle Session Resume on Connection
   // ==========================================================================
@@ -659,51 +662,67 @@ export default function StreamingApp() {
    */
   useEffect(() => {
     if (streamerStatus !== StreamerStatus.Connected) return
-    if (hasRestoredStateRef.current) return
-
-    // Mark restoration as attempted
-    hasRestoredStateRef.current = true
 
     // If user selected a session to resume from SessionSelectionScreen
     if (selectedSession) {
+      // Only send the resume command once per session
+      if (hasResumedSessionRef.current === selectedSession.id) {
+        console.log('📂 Already sent resume command for this session, skipping')
+        return
+      }
+
       const phaseIndex = parseInt(selectedSession.current_training_phase, 10) || 0
       console.log(`📂 Resuming selected session from phase ${phaseIndex}`)
+      console.log(`📂 Session ID: ${selectedSession.id}`)
+
+      // Mark this session as resumed
+      hasResumedSessionRef.current = selectedSession.id
+      hasRestoredStateRef.current = true
 
       // Set training state
       training.hooks.trainingState.setPhase(selectedSession.current_training_phase)
       training.hooks.trainingState.setCurrentTaskIndex(phaseIndex)
+      setIsCinematicMode(false)
+      setShowExplosionControls(false)
 
       // Give connection time to stabilize, then start from the saved phase
-      setTimeout(() => {
+      const timer = setTimeout(() => {
+        console.log(`🔄 Sending start_from_task:${phaseIndex} to UE5 NOW`)
         if (phaseIndex > 0) {
-          console.log(`🔄 Sending start_from_task:${phaseIndex} to UE5`)
           training.startFromTask(phaseIndex)
         } else {
           training.startTraining()
         }
-      }, 2000)
+      }, 2500)
 
       // Skip navigation walkthrough for resumed sessions
       setShowNavigationWalkthrough(false)
-      return
+
+      return () => clearTimeout(timer)
     }
 
     // If starting a new session (no selected session), cinematic mode will be shown
     // Training will start when user clicks "Skip to Training"
     if (startNewSessionAfterStream) {
       console.log('🆕 New session - cinematic mode active, waiting for user to skip to training')
+      hasRestoredStateRef.current = true
       setShowNavigationWalkthrough(false)
       return
     }
 
     // Fallback for non-student or non-LTI users
     if (!isLtiSession || userRole !== 'student') {
+      hasRestoredStateRef.current = true
       return
     }
 
     // Legacy behavior: Check for saved training state (for backwards compatibility)
+    if (hasRestoredStateRef.current) return
+
     const restoreSession = async () => {
       console.log('📂 Checking for saved training state (legacy)...')
+      hasRestoredStateRef.current = true
+
       const restoredData = await statePersistence.restoreState()
 
       if (restoredData) {
