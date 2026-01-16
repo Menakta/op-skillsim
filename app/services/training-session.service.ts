@@ -360,6 +360,112 @@ export const trainingSessionService = {
       }
     }
   },
+
+  /**
+   * Get all active training sessions for the current student
+   * Used to show session selection screen
+   */
+  async getActiveSessions(): Promise<ServiceResult<TrainingSession[]>> {
+    try {
+      const response = await fetch('/api/training/sessions', {
+        method: 'GET',
+        credentials: 'include',
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        return {
+          success: false,
+          error: data.error || 'Failed to get active sessions',
+        }
+      }
+
+      return {
+        success: true,
+        data: data.sessions || [],
+      }
+    } catch (error) {
+      console.error('Training session service error:', error)
+      return {
+        success: false,
+        error: 'Network error: Failed to get active sessions',
+      }
+    }
+  },
+
+  /**
+   * Create a new training session (force new, even if active exists)
+   * Used when student explicitly chooses to start fresh
+   */
+  async createNewSession(
+    request: StartTrainingRequest = {}
+  ): Promise<ServiceResult<TrainingSession>> {
+    try {
+      const response = await fetch('/api/training/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(request),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        return {
+          success: false,
+          error: data.error || 'Failed to create new training session',
+        }
+      }
+
+      return {
+        success: true,
+        data: data.session,
+      }
+    } catch (error) {
+      console.error('Training session service error:', error)
+      return {
+        success: false,
+        error: 'Network error: Failed to create new training session',
+      }
+    }
+  },
+
+  /**
+   * Resume an existing training session by ID
+   * Updates the session_id to link to current login session
+   */
+  async resumeSession(
+    trainingSessionId: string
+  ): Promise<ServiceResult<TrainingSession>> {
+    try {
+      const response = await fetch(`/api/training/sessions/${trainingSessionId}/resume`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        return {
+          success: false,
+          error: data.error || 'Failed to resume training session',
+        }
+      }
+
+      return {
+        success: true,
+        data: data.session,
+      }
+    } catch (error) {
+      console.error('Training session service error:', error)
+      return {
+        success: false,
+        error: 'Network error: Failed to resume training session',
+      }
+    }
+  },
 }
 
 export default trainingSessionService

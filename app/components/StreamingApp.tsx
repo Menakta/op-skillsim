@@ -7,13 +7,14 @@ import {useStreamer,useLaunchRequest,VideoStream} from '@pureweb/platform-sdk-re
 
 // Critical path imports - needed immediately
 import { useQuestions } from '../features/questions'
-import { LoadingScreen, StarterScreen, CinematicTimer, CinematicMobileControls, type LoadingStep } from '../features'
+import { LoadingScreen, StarterScreen, SessionSelectionScreen, CinematicTimer, CinematicMobileControls, type LoadingStep, type ActiveSession } from '../features'
 import { IdleWarningModal, useIdleDetection } from '../features/idle'
 import { useStatePersistence } from '../features/training'
 import type { QuestionData } from '../lib/messageTypes'
-import type { PersistedTrainingState } from '../types'
+import type { PersistedTrainingState, TrainingSession } from '../types'
 import { TASK_SEQUENCE } from '../config'
 import { useTheme } from '../context/ThemeContext'
+import { trainingSessionService } from '../services'
 
 // Lazy load heavy components - only loaded when stream connects
 const ControlPanel = dynamic(() => import('../components/ControlPanel'), {
@@ -187,6 +188,13 @@ export default function StreamingApp() {
   const [showStarterScreen, setShowStarterScreen] = useState(true)
   const [showNavigationWalkthrough, setShowNavigationWalkthrough] = useState(false)
   const [streamStarted, setStreamStarted] = useState(false)
+
+  // Session selection state
+  const [showSessionSelection, setShowSessionSelection] = useState(false)
+  const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([])
+  const [sessionsLoading, setSessionsLoading] = useState(false)
+  const [selectedSession, setSelectedSession] = useState<ActiveSession | null>(null)
+  const [startNewSessionAfterStream, setStartNewSessionAfterStream] = useState(false)
 
   // Session end state
   const [showSessionEndModal, setShowSessionEndModal] = useState(false)
@@ -369,11 +377,39 @@ export default function StreamingApp() {
     setShowNavigationWalkthrough(false)
   }, [])
 
-  // Handler for starting the stream
-  const handleStartStream = useCallback(() => {
-    setShowStarterScreen(false)
-    setStreamStarted(true)
-  }, [])
+  // Handler for starting the stream - checks for active sessions first (students only)
+  const handleStartStream = useCallback(async () => {
+    // For non-LTI or non-student users, skip session selection
+    if (!isLtiSession || userRole !== 'student') {
+      setShowStarterScreen(false)
+      setStreamStarted(true)
+      return
+    }
+
+    // Check for active sessions
+    setSessionsLoading(true)
+    try {
+      const result = await trainingSessionService.getActiveSessions()
+      if (result.success && result.data.length > 0) {
+        // Has active sessions - show session selection screen
+        setActiveSessions(result.data as ActiveSession[])
+        setShowStarterScreen(false)
+        setShowSessionSelection(true)
+        setSessionsLoading(false)
+      } else {
+        // No active sessions - proceed to start new session with cinematic mode
+        setShowStarterScreen(false)
+        setStartNewSessionAfterStream(true)
+        setStreamStarted(true)
+      }
+    } catch (error) {
+      console.error('Failed to check active sessions:', error)
+      // On error, proceed normally
+      setShowStarterScreen(false)
+      setStreamStarted(true)
+    }
+    setSessionsLoading(false)
+  }, [isLtiSession, userRole])
 
   // Prefetch heavy components when user hovers on Start button
   const prefetchedRef = useRef(false)
@@ -614,41 +650,75 @@ export default function StreamingApp() {
   }, [streamerStatus, training])
 
   // ==========================================================================
-  // Restore State on Connection (for session resume)
+  // Handle Session Resume on Connection
   // ==========================================================================
 
+  /**
+   * When stream connects and user selected a session to resume,
+   * automatically start training from that phase (skip cinematic mode).
+   */
   useEffect(() => {
     if (streamerStatus !== StreamerStatus.Connected) return
     if (hasRestoredStateRef.current) return
-    if (!isLtiSession || userRole !== 'student') return
 
+    // Mark restoration as attempted
+    hasRestoredStateRef.current = true
+
+    // If user selected a session to resume from SessionSelectionScreen
+    if (selectedSession) {
+      const phaseIndex = parseInt(selectedSession.current_training_phase, 10) || 0
+      console.log(`📂 Resuming selected session from phase ${phaseIndex}`)
+
+      // Set training state
+      training.hooks.trainingState.setPhase(selectedSession.current_training_phase)
+      training.hooks.trainingState.setCurrentTaskIndex(phaseIndex)
+
+      // Give connection time to stabilize, then start from the saved phase
+      setTimeout(() => {
+        if (phaseIndex > 0) {
+          console.log(`🔄 Sending start_from_task:${phaseIndex} to UE5`)
+          training.startFromTask(phaseIndex)
+        } else {
+          training.startTraining()
+        }
+      }, 2000)
+
+      // Skip navigation walkthrough for resumed sessions
+      setShowNavigationWalkthrough(false)
+      return
+    }
+
+    // If starting a new session (no selected session), cinematic mode will be shown
+    // Training will start when user clicks "Skip to Training"
+    if (startNewSessionAfterStream) {
+      console.log('🆕 New session - cinematic mode active, waiting for user to skip to training')
+      setShowNavigationWalkthrough(false)
+      return
+    }
+
+    // Fallback for non-student or non-LTI users
+    if (!isLtiSession || userRole !== 'student') {
+      return
+    }
+
+    // Legacy behavior: Check for saved training state (for backwards compatibility)
     const restoreSession = async () => {
-      console.log('📂 Checking for saved training state...')
+      console.log('📂 Checking for saved training state (legacy)...')
       const restoredData = await statePersistence.restoreState()
-
-      // Mark restoration as attempted (even if no state was found)
-      // This allows auto-save to start after we've checked for existing state
-      hasRestoredStateRef.current = true
 
       if (restoredData) {
         const { trainingState, currentTrainingPhase, overallProgress } = restoredData
 
-        console.log('📂 Restoring training session:', {
+        console.log('📂 Restoring training session (legacy):', {
           currentTrainingPhase,
           overallProgress,
           hasTrainingState: !!trainingState,
-          stateMode: trainingState?.mode,
-          statePhase: trainingState?.phase,
-          stateTaskIndex: trainingState?.currentTaskIndex,
         })
 
-        // Determine the phase to restore - use currentTrainingPhase from DB as primary source
         const phaseToRestore = currentTrainingPhase || trainingState?.phase
         const taskIndexToRestore = trainingState?.currentTaskIndex
         const modeToRestore = trainingState?.mode || 'training'
 
-        // Check if we should resume training (not in cinematic mode and has progress)
-        // Phase is now stored as index string ("0", "1", "2"...)
         const shouldResumeTraining = modeToRestore === 'training' ||
           (phaseToRestore && phaseToRestore !== '0') ||
           (overallProgress && overallProgress > 0)
@@ -657,25 +727,15 @@ export default function StreamingApp() {
           setIsCinematicMode(false)
           setShowExplosionControls(false)
 
-          // Determine the phase index to resume from
-          // currentTrainingPhase from DB is the authoritative source (stored as "0", "1", "2"...)
           const phaseIndex = parseInt(phaseToRestore || '0', 10)
 
-          // Restore phase from database (currentTrainingPhase is authoritative)
           if (phaseToRestore) {
             training.hooks.trainingState.setPhase(phaseToRestore)
-            console.log('📂 Restored phase from DB:', phaseToRestore)
           }
 
-          // Restore task index from training_state if available
           if (taskIndexToRestore !== undefined && taskIndexToRestore > 0) {
             training.hooks.trainingState.setCurrentTaskIndex(taskIndexToRestore)
-            console.log('📂 Restored task index:', taskIndexToRestore)
           }
-
-          // Resume training from the saved phase
-          // If phase > 0, use startFromTask to tell UE5 to jump to that phase
-          // Otherwise, use regular startTraining (phase 0)
           if (phaseIndex > 0) {
             console.log(`🔄 Resuming training from phase ${phaseIndex}`)
             training.startFromTask(phaseIndex)
@@ -706,7 +766,7 @@ export default function StreamingApp() {
     // Give a small delay for connection to stabilize
     const timer = setTimeout(restoreSession, 2000)
     return () => clearTimeout(timer)
-  }, [streamerStatus, isLtiSession, userRole, statePersistence, training])
+  }, [streamerStatus, isLtiSession, userRole, statePersistence, training, selectedSession, startNewSessionAfterStream])
 
   // ==========================================================================
   // Auto-Save State on Changes
@@ -861,16 +921,92 @@ export default function StreamingApp() {
   }, [completedPhase, training])
 
   // ==========================================================================
+  // Session Selection Handlers
+  // ==========================================================================
+
+  /**
+   * Handle resuming an existing training session
+   * This skips cinematic mode and goes directly to training at the saved phase
+   */
+  const handleResumeSession = useCallback(async (session: ActiveSession) => {
+    console.log('📂 Resuming session:', session.id, 'at phase:', session.current_training_phase)
+    setSessionsLoading(true)
+
+    try {
+      // Resume the session in the database (link to current login session)
+      const result = await trainingSessionService.resumeSession(session.id)
+      if (!result.success) {
+        console.error('Failed to resume session:', result.error)
+      }
+    } catch (error) {
+      console.error('Error resuming session:', error)
+    }
+
+    // Store the selected session to use after stream connects
+    setSelectedSession(session)
+    setShowSessionSelection(false)
+    setIsCinematicMode(false) // Skip cinematic mode for resumed sessions
+    setStreamStarted(true)
+    setSessionsLoading(false)
+  }, [])
+
+  /**
+   * Handle starting a brand new training session
+   * This shows cinematic mode first, then training starts from phase 0
+   */
+  const handleStartNewSession = useCallback(async () => {
+    console.log('🆕 Starting new training session')
+    setSessionsLoading(true)
+
+    try {
+      // Create a new session in the database
+      const result = await trainingSessionService.createNewSession({
+        courseName: 'VR Pipe Training',
+      })
+      if (!result.success) {
+        console.error('Failed to create new session:', result.error)
+      }
+    } catch (error) {
+      console.error('Error creating new session:', error)
+    }
+
+    // Clear any selected session and proceed with cinematic mode
+    setSelectedSession(null)
+    setShowSessionSelection(false)
+    setStartNewSessionAfterStream(true)
+    setIsCinematicMode(true) // Show cinematic mode for new sessions
+    setStreamStarted(true)
+    setSessionsLoading(false)
+  }, [])
+
+  // ==========================================================================
   // Cinematic Mode Handlers
   // ==========================================================================
 
+  /**
+   * Handle skipping to training from cinematic mode
+   * If we have a selected session (resume), use startFromTask
+   * Otherwise, start fresh training from phase 0
+   */
   const handleSkipToTraining = useCallback(() => {
     console.log('⏭️ Skipping to training mode')
     setIsCinematicMode(false)
     setShowExplosionControls(false)
-    // Start training when skipping cinematic mode
-    training.startTraining()
-  }, [training])
+
+    if (selectedSession) {
+      // Resume from selected session's phase
+      const phaseIndex = parseInt(selectedSession.current_training_phase, 10) || 0
+      console.log(`🔄 Resuming training from phase ${phaseIndex}`)
+      if (phaseIndex > 0) {
+        training.startFromTask(phaseIndex)
+      } else {
+        training.startTraining()
+      }
+    } else {
+      // Start fresh training from beginning
+      training.startTraining()
+    }
+  }, [training, selectedSession])
 
   // ==========================================================================
   // Derived State
@@ -1009,7 +1145,7 @@ export default function StreamingApp() {
   const showLoadingScreen = streamStarted && !isConnected && !showErrorModal
 
   // Force dark background when starter or loading screen is visible
-  const forcesDarkBg = showStarterScreen || showLoadingScreen
+  const forcesDarkBg = showStarterScreen || showLoadingScreen || showSessionSelection
 
   // ==========================================================================
   // Main Render - Using New Modular Components
@@ -1158,6 +1294,15 @@ export default function StreamingApp() {
         onStart={handleStartStream}
         onHover={handleStartHover}
         buttonText="Start Session"
+      />
+
+      {/* Session Selection Screen - Show when student has active sessions */}
+      <SessionSelectionScreen
+        isOpen={showSessionSelection}
+        sessions={activeSessions}
+        onResumeSession={handleResumeSession}
+        onStartNewSession={handleStartNewSession}
+        loading={sessionsLoading}
       />
 
       {/* Loading Screen - Show after user clicks start until stream is connected */}
