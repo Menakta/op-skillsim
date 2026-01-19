@@ -319,11 +319,14 @@ export async function DELETE(req: NextRequest) {
           .eq('user_id', id)
 
         // Delete quiz_responses for this user (if table exists)
-        await supabase
-          .from('quiz_responses')
-          .delete()
-          .eq('user_id', id)
-          .catch(() => {}) // Ignore if table doesn't exist
+        try {
+          await supabase
+            .from('quiz_responses')
+            .delete()
+            .eq('user_id', id)
+        } catch {
+          // Ignore if table doesn't exist
+        }
 
         // Delete the user from auth.users using admin API with hard delete
         // This triggers the cleanup function to delete auth.identities and auth.sessions
