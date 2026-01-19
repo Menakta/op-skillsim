@@ -11,15 +11,17 @@
 import { Menu, Sun, Moon, User2 } from 'lucide-react'
 import Link from 'next/link'
 import { useTheme } from '@/app/context/ThemeContext'
+import { NotificationBell } from '../notifications'
 
 interface HeaderProps {
   title: string
   subtitle?: string
   onMenuClick?: () => void
   showMenuButton?: boolean
+  isAdmin?: boolean
 }
 
-export function Header({ title, subtitle, onMenuClick, showMenuButton = false }: HeaderProps) {
+export function Header({ title, subtitle, onMenuClick, showMenuButton = false, isAdmin = false }: HeaderProps) {
   const { theme, toggleTheme } = useTheme()
 
   return (
@@ -42,6 +44,9 @@ export function Header({ title, subtitle, onMenuClick, showMenuButton = false }:
       </div>
 
       <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
+        {/* Notification Bell - Admin only */}
+        <NotificationBell isAdmin={isAdmin} />
+
         {/* Theme Toggle */}
         <button
           onClick={toggleTheme}

@@ -148,6 +148,7 @@ export function DashboardLayout({ children, title, subtitle }: DashboardLayoutPr
           subtitle={subtitle}
           onMenuClick={() => setSidebarOpen(true)}
           showMenuButton={true}
+          isAdmin={user?.role === 'admin'}
         />
         <main className="flex-1 p-2 md:p-3">{children}</main>
       </div>

@@ -333,3 +333,9 @@ export interface UsersStats {
 }
 
 export type ApprovalFilter = 'all' | 'pending' | 'approved' | 'rejected'
+
+// =============================================================================
+// Admin Notification Types
+// =============================================================================
+
+export * from './notifications'
