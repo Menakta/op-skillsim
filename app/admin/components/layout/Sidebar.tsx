@@ -33,7 +33,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Sessions', href: '/admin/sessions', icon: Users },
   { label: 'Users', href: '/admin/users', icon: UserCheck },
   { label: 'Questionnaires', href: '/admin/questionnaires', icon: ClipboardList },
-  { label: 'Fittings', href: '/admin/fittings', icon: Wrench },
+  // { label: 'Fittings', href: '/admin/fittings', icon: Wrench },
   { label: 'Results', href: '/admin/results', icon: BarChart3 },
 ]
 
