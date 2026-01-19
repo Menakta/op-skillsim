@@ -111,8 +111,8 @@ export async function GET(request: NextRequest) {
 
     logger.info({ userId, email }, 'Email confirmed successfully')
 
-    // Redirect to login page with success message
-    return NextResponse.redirect(new URL('/login?message=email_confirmed', baseUrl))
+    // Redirect to email-verified page (user must wait for admin approval)
+    return NextResponse.redirect(new URL('/email-verified', baseUrl))
 
   } catch (error) {
     logger.error({ error }, 'Email confirmation error')
