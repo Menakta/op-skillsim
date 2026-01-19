@@ -680,7 +680,7 @@ export function useSessionsChart(range: 'weekly' | 'monthly' | 'yearly') {
 export interface UserLoginSession {
   id: string
   sessionId: string
-  sessionType: 'lti' | 'teacher'| 'admin'
+  sessionType: 'lti' | 'teacher'
   role: string
   status: string
   createdAt: string

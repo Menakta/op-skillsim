@@ -113,8 +113,8 @@ function SessionHistoryCard({ session, isCurrent }: SessionHistoryCardProps) {
           <Badge variant={getStatusBadgeVariant(session.status)}>
             {session.status}
           </Badge>
-          <Badge variant={getSessionTypeBadgeVariant(session.sessionType)}>
-            {session.sessionType.toUpperCase()}
+          <Badge variant={getSessionTypeBadgeVariant(session.role)}>
+            {session.role.toUpperCase()}
           </Badge>
           {isCurrent && (
             <Badge variant="info">Current</Badge>
