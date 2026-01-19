@@ -68,6 +68,16 @@ const SessionExpiryModal = dynamic(
   { ssr: false, loading: () => null }
 )
 
+const QuitTrainingModal = dynamic(
+  () => import('../features').then(mod => ({ default: mod.QuitTrainingModal })),
+  { ssr: false, loading: () => null }
+)
+
+const TrainingActionButtons = dynamic(
+  () => import('../components/ControlPanel/TrainingActionButtons'),
+  { ssr: false, loading: () => null }
+)
+
 // Lazy load hooks - deferred until needed
 import { useTrainingMessagesComposite } from '../hooks/useTrainingMessagesComposite'
 
@@ -216,6 +226,10 @@ export default function StreamingApp() {
   // Cinematic mode state
   const [isCinematicMode, setIsCinematicMode] = useState(true) // Start in cinematic mode
   const [showExplosionControls, setShowExplosionControls] = useState(true) // Show explosion controls in cinematic mode
+
+  // Training pause/quit state
+  const [isTrainingPaused, setIsTrainingPaused] = useState(false)
+  const [showQuitModal, setShowQuitModal] = useState(false)
 
   // State persistence - for session resume
   const [restoredState, setRestoredState] = useState<PersistedTrainingState | null>(null)
@@ -1134,6 +1148,56 @@ export default function StreamingApp() {
   }, [])
 
   // ==========================================================================
+  // Training Pause/Resume/Quit Handlers
+  // ==========================================================================
+
+  const handlePauseTraining = useCallback(() => {
+    console.log('⏸️ Pausing training')
+    training.pauseTraining()
+    setIsTrainingPaused(true)
+  }, [training])
+
+  const handleResumeTraining = useCallback(() => {
+    console.log('▶️ Resuming training')
+    training.resumeTraining()
+    setIsTrainingPaused(false)
+  }, [training])
+
+  const handleQuitTrainingClick = useCallback(() => {
+    // Show confirmation modal
+    setShowQuitModal(true)
+  }, [])
+
+  const handleQuitTrainingConfirm = useCallback(async () => {
+    console.log('🚪 Quitting training - saving progress')
+    setShowQuitModal(false)
+
+    // Save current progress before quitting
+    if (sessionStartTime) {
+      const timeSpentMs = Date.now() - sessionStartTime
+      await trainingSessionService.recordTimeSpent(timeSpentMs)
+    }
+
+    // Update session status (keep as active so user can resume)
+    // Progress is already saved via auto-save
+
+    // Redirect based on session type
+    if (isLtiSession && sessionReturnUrl) {
+      window.location.href = sessionReturnUrl
+    } else if (isTestUser) {
+      window.location.href = '/login'
+    } else {
+      // Fallback - show session end modal
+      setSessionEndReason('logged_out')
+      setShowSessionEndModal(true)
+    }
+  }, [sessionStartTime, isLtiSession, sessionReturnUrl, isTestUser])
+
+  const handleQuitTrainingCancel = useCallback(() => {
+    setShowQuitModal(false)
+  }, [])
+
+  // ==========================================================================
   // Loading Status Message & Step
   // ==========================================================================
 
@@ -1235,6 +1299,15 @@ export default function StreamingApp() {
           onSelectPressureTest={training.selectPressureTest}
         />
       )}
+
+      {/* Training Action Buttons (Pause/Resume, Quit) - Show during training mode */}
+      <TrainingActionButtons
+        isPaused={isTrainingPaused}
+        isVisible={isConnected && !isCinematicMode && training.state.trainingStarted}
+        onPause={handlePauseTraining}
+        onResume={handleResumeTraining}
+        onQuit={handleQuitTrainingClick}
+      />
 
       {/* Message Log - Only show when stream is connected and NOT in cinematic mode */}
       {isConnected && !isCinematicMode && (
@@ -1374,6 +1447,16 @@ export default function StreamingApp() {
         countdownDuration={300}
         onStayActive={resetIdle}
         onTimeout={handleIdleTimeout}
+      />
+
+      {/* Quit Training Modal - Confirmation when user clicks quit */}
+      <QuitTrainingModal
+        isOpen={showQuitModal}
+        onConfirm={handleQuitTrainingConfirm}
+        onCancel={handleQuitTrainingCancel}
+        currentPhase={training.state.currentTaskIndex}
+        totalPhases={training.state.totalTasks}
+        isLti={isLtiSession}
       />
 
       {/* Video Styles */}

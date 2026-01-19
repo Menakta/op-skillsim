@@ -70,6 +70,7 @@ export interface UseTrainingStateReturn {
   startTraining: () => void
   startFromTask: (phaseIndex: number) => void
   pauseTraining: () => void
+  resumeTraining: () => void
   resetTraining: () => void
   testConnection: () => void
   setMode: (mode: 'cinematic' | 'training') => void
@@ -324,9 +325,18 @@ export function useTrainingState(
     }
 
     // Save current state (session remains 'active' - user can resume)
+    setState(prev => ({ ...prev, isActive: false }))
 
     messageBus.sendMessage(WEB_TO_UE_MESSAGES.TRAINING_CONTROL, 'pause')
-  }, [messageBus])
+    eventBus.emit('training:paused', { taskIndex: state.currentTaskIndex })
+  }, [messageBus, state.currentTaskIndex])
+
+  const resumeTraining = useCallback(() => {
+    console.log('▶️ Resuming training')
+    setState(prev => ({ ...prev, isActive: true }))
+    messageBus.sendMessage(WEB_TO_UE_MESSAGES.TRAINING_CONTROL, 'resume')
+    eventBus.emit('training:resumed', { taskIndex: state.currentTaskIndex })
+  }, [messageBus, state.currentTaskIndex])
 
   const resetTraining = useCallback(async () => {
     // Mark session as completed (training is being reset/ended)
@@ -397,6 +407,7 @@ export function useTrainingState(
     startTraining,
     startFromTask,
     pauseTraining,
+    resumeTraining,
     resetTraining,
     testConnection,
     setMode,
