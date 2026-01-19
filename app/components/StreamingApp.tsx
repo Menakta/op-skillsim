@@ -272,10 +272,11 @@ export default function StreamingApp() {
               returnUrl: data.session.returnUrl
             })
 
-            // Debug log for LTI role investigation
+            // Debug log for LTI role investigation - shows RAW iQualify data
             console.log('--- LTI STREAM PAGE DEBUG ---', {
               email: data.session.email,
-              role: data.session.role,
+              rawLtiRole: data.session.rawLtiRole, // This is the actual role from iQualify (e.g., "Author", "Learner")
+              mappedRole: data.session.role, // This is what our app mapped it to (student/teacher/admin)
               isLti: data.session.isLti,
               userId: data.session.userId,
               fullSession: data.session

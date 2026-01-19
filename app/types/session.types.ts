@@ -26,6 +26,7 @@ export interface LtiContext {
   institution: string
   returnUrl?: string
   full_name?: string
+  rawLtiRole?: string // Raw role string from iQualify (e.g., "Author", "Learner") for debugging
 }
 
 // =============================================================================

@@ -77,6 +77,7 @@ export class SessionManager {
       resourceId: string
       institution: string
       returnUrl?: string
+      rawLtiRole?: string
     },
     requestInfo?: { ipAddress?: string; userAgent?: string }
   ): Promise<{ sessionId: string; token: string }> {
@@ -91,6 +92,7 @@ export class SessionManager {
       institution: ltiData.institution,
       returnUrl: ltiData.returnUrl,
       full_name: ltiData.fullName,
+      rawLtiRole: ltiData.rawLtiRole,
     }
 
     // Store session in database
@@ -141,7 +143,7 @@ export class SessionManager {
     fullName?: string,
     permissions?: TeacherPermissions,
     requestInfo?: { ipAddress?: string; userAgent?: string },
-    ltiData?: { returnUrl?: string; institution?: string }
+    ltiData?: { returnUrl?: string; institution?: string; rawLtiRole?: string }
   ): Promise<{ sessionId: string; token: string }> {
     const sessionId = this.generateSessionId()
     const now = new Date()
@@ -170,7 +172,7 @@ export class SessionManager {
       // Ignore errors, use default login count
     }
 
-    // Build LTI context for teacher sessions (stores full_name and returnUrl)
+    // Build LTI context for teacher sessions (stores full_name, returnUrl, and rawLtiRole)
     const ltiContext: LtiContext = {
       courseId: '',
       courseName: '',
@@ -178,6 +180,7 @@ export class SessionManager {
       institution: ltiData?.institution || '',
       returnUrl: ltiData?.returnUrl,
       full_name: fullName,
+      rawLtiRole: ltiData?.rawLtiRole,
     }
 
     // Store session in database
@@ -236,7 +239,7 @@ export class SessionManager {
     fullName?: string,
     permissions?: AdminPermissions,
     requestInfo?: { ipAddress?: string; userAgent?: string },
-    ltiData?: { returnUrl?: string; institution?: string }
+    ltiData?: { returnUrl?: string; institution?: string; rawLtiRole?: string }
   ): Promise<{ sessionId: string; token: string }> {
     const sessionId = this.generateSessionId()
     const now = new Date()
@@ -267,7 +270,7 @@ export class SessionManager {
       // Ignore errors, use default login count
     }
 
-    // Build LTI context for admin sessions (stores full_name and returnUrl)
+    // Build LTI context for admin sessions (stores full_name, returnUrl, and rawLtiRole)
     const ltiContext: LtiContext = {
       courseId: '',
       courseName: '',
@@ -275,6 +278,7 @@ export class SessionManager {
       institution: ltiData?.institution || '',
       returnUrl: ltiData?.returnUrl,
       full_name: fullName,
+      rawLtiRole: ltiData?.rawLtiRole,
     }
 
     // Store session in database

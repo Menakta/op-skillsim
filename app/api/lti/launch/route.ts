@@ -426,6 +426,7 @@ export async function POST(req: NextRequest) {
         resourceId: params.resource_link_id,
         institution: params.tool_consumer_instance_name || 'Unknown Institution',
         returnUrl: params.launch_presentation_return_url,
+        rawLtiRole: params.roles,
       }
 
       // Get request info for session tracking
@@ -588,6 +589,7 @@ export async function POST(req: NextRequest) {
         email,
         fullName,
         institution: params.tool_consumer_instance_name || 'Unknown Institution',
+        rawLtiRole: params.roles,
       }
 
       // Get request info for session tracking
@@ -681,10 +683,11 @@ export async function POST(req: NextRequest) {
       // Create session based on role
       let sessionResult: { sessionId: string; token: string }
 
-      // LTI data for session (returnUrl and institution)
+      // LTI data for session (returnUrl, institution, and raw role for debugging)
       const sessionLtiData = {
         returnUrl: params.launch_presentation_return_url,
         institution: ltiData.institution,
+        rawLtiRole: ltiData.rawLtiRole,
       }
 
       if (appRole === 'admin') {

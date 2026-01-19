@@ -42,9 +42,10 @@ export async function GET(request: NextRequest) {
       role = 'admin'
     }
 
-    // Get return URL and user name from database for LTI sessions
+    // Get return URL, user name, and raw LTI role from database for LTI sessions
     let returnUrl: string | null = null
     let fullName: string | null = null
+    let rawLtiRole: string | null = null
     if (session.sessionId) {
       const { data: dbSession } = await supabaseAdmin
         .from('user_sessions')
@@ -60,8 +61,9 @@ export async function GET(request: NextRequest) {
           : dbSession.lti_context
         returnUrl = ltiContext.returnUrl || null
         fullName = ltiContext.full_name || null
+        rawLtiRole = ltiContext.rawLtiRole || null
 
-        console.log('📋 [Session API] Parsed lti_context:', { returnUrl, fullName })
+        console.log('📋 [Session API] Parsed lti_context:', { returnUrl, fullName, rawLtiRole })
       }
     }
 
@@ -79,6 +81,7 @@ export async function GET(request: NextRequest) {
         isLti: session.isLti ?? true, // Default to true for backward compatibility
         expiresAt,
         returnUrl,
+        rawLtiRole, // Raw role from iQualify (e.g., "Author", "Learner") for debugging
       }
     })
   } catch {
