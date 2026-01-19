@@ -1303,7 +1303,7 @@ export default function StreamingApp() {
       {/* Training Action Buttons (Pause/Resume, Quit) - Show during training mode */}
       <TrainingActionButtons
         isPaused={isTrainingPaused}
-        isVisible={isConnected && !isCinematicMode && training.state.trainingStarted}
+        isVisible={isConnected && !isCinematicMode && (training.state.trainingStarted || training.state.isActive || training.state.mode === 'training')}
         onPause={handlePauseTraining}
         onResume={handleResumeTraining}
         onQuit={handleQuitTrainingClick}
