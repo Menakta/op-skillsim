@@ -271,6 +271,15 @@ export default function StreamingApp() {
               expiresAt: data.session.expiresAt ? new Date(data.session.expiresAt).toISOString() : null,
               returnUrl: data.session.returnUrl
             })
+
+            // Debug log for LTI role investigation
+            console.log('--- LTI STREAM PAGE DEBUG ---', {
+              email: data.session.email,
+              role: data.session.role,
+              isLti: data.session.isLti,
+              userId: data.session.userId,
+              fullSession: data.session
+            })
           }
         }
       } catch (err) {
