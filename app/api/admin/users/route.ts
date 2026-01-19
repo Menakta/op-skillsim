@@ -312,7 +312,7 @@ export async function DELETE(req: NextRequest) {
         // shouldSoftDelete: false ensures email is immediately available for re-registration
         const { error: deleteError } = await supabase.auth.admin.deleteUser(
           id,
-          false // shouldSoftDelete = false for hard delete
+          { shouldSoftDelete: false }
         )
 
         if (deleteError) {
