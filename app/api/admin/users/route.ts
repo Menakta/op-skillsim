@@ -306,11 +306,14 @@ export async function DELETE(req: NextRequest) {
           .delete()
           .eq('email', userProfile.email)
 
-        // Delete the user_profile
-        const { error: deleteError } = await supabase
-          .from('user_profiles')
-          .delete()
-          .eq('id', id)
+        // Delete the user from auth.users using admin API with hard delete
+        // This triggers the cleanup function to delete auth.identities and auth.sessions
+        // Then cascades to user_profiles via ON DELETE CASCADE
+        // shouldSoftDelete: false ensures email is immediately available for re-registration
+        const { error: deleteError } = await supabase.auth.admin.deleteUser(
+          id,
+          false // shouldSoftDelete = false for hard delete
+        )
 
         if (deleteError) {
           errors.push(`Failed to delete user ${id}: ${deleteError.message}`)
