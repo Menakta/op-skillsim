@@ -306,6 +306,25 @@ export async function DELETE(req: NextRequest) {
           .delete()
           .eq('email', userProfile.email)
 
+        // Delete training_sessions for this user (stored in student JSONB field)
+        await supabase
+          .from('training_sessions')
+          .delete()
+          .filter('student->>user_id', 'eq', id)
+
+        // Delete admin_notifications for this user
+        await supabase
+          .from('admin_notifications')
+          .delete()
+          .eq('user_id', id)
+
+        // Delete quiz_responses for this user (if table exists)
+        await supabase
+          .from('quiz_responses')
+          .delete()
+          .eq('user_id', id)
+          .catch(() => {}) // Ignore if table doesn't exist
+
         // Delete the user from auth.users using admin API with hard delete
         // This triggers the cleanup function to delete auth.identities and auth.sessions
         // Then cascades to user_profiles via ON DELETE CASCADE
