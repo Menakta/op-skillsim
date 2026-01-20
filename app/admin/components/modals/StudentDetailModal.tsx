@@ -4,7 +4,7 @@
  * Displays detailed information about a student session.
  */
 
-import { Mail, Calendar, Activity, GraduationCap, Clock, Globe } from 'lucide-react'
+import { Mail, Calendar, Activity, GraduationCap, Clock } from 'lucide-react'
 import { ProgressBar } from '../ui/ProgressBar'
 import { BaseModal } from './BaseModal'
 import type { SessionStudent } from '../../types'
@@ -77,16 +77,6 @@ export function StudentDetailModal({ student, onClose }: StudentDetailModalProps
 
       {/* Additional Details */}
       <div className="space-y-3">
-        <div className="flex items-center gap-3 text-sm">
-          <Globe className="w-4 h-4 text-gray-400" />
-          <span className="theme-text-secondary">IP Address:</span>
-          <span className="theme-text-primary">{student.ipAddress || 'N/A'}</span>
-        </div>
-        <div className="flex items-center gap-3 text-sm">
-          <Activity className="w-4 h-4 text-gray-400" />
-          <span className="theme-text-secondary">Login Count:</span>
-          <span className="theme-text-primary">{student.loginCount}</span>
-        </div>
         <div className="flex items-center gap-3 text-sm">
           <GraduationCap className="w-4 h-4 text-gray-400" />
           <span className="theme-text-secondary">Course:</span>

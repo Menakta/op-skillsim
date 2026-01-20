@@ -61,13 +61,13 @@ export function useCurrentUser() {
 }
 
 /**
- * Check if the current user is an LTI admin (can delete)
+ * Check if the current user is an LTI admin or teacher (can perform admin operations)
  */
 export function useIsLtiAdmin() {
   const { user, isLoading } = useCurrentUser()
 
   return {
-    isLtiAdmin: user?.role === 'admin' && user?.isLti === true,
+    isLtiAdmin: (user?.role === 'admin' || user?.role === 'teacher') && user?.isLti === true,
     isLoading,
     user,
   }

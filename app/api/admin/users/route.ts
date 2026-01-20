@@ -74,7 +74,7 @@ async function validateSession(req: NextRequest): Promise<SessionInfo | null> {
 // =============================================================================
 
 function isLtiAdmin(session: SessionInfo | null): boolean {
-  return session !== null && session.role === 'admin' && session.isLti === true
+  return session !== null && (session.role === 'admin' || session.role === 'teacher') && session.isLti === true
 }
 
 // =============================================================================
@@ -130,10 +130,10 @@ export async function GET(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
-    // Verify admin session (only admins can approve/reject/change roles)
+    // Verify admin/teacher session (admins and teachers can approve/reject/change roles)
     const session = await validateSession(req)
-    if (!session || session.role !== 'admin') {
-      return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 401 })
+    if (!session || (session.role !== 'admin' && session.role !== 'teacher')) {
+      return NextResponse.json({ error: 'Unauthorized - Admin or Teacher access required' }, { status: 401 })
     }
 
     const body = await req.json()

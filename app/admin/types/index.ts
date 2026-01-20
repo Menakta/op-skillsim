@@ -188,35 +188,26 @@ export interface SessionStudent {
   totalScore: number
   phasesCompleted: number
   timeSpent: number
-  ipAddress: string | null
-  userAgent: string | null
-  loginCount: number
 }
 
 export interface SessionTeacher {
   id: string
-  sessionId: string
   name: string
   email: string
+  institution: string
   createdAt: string
   lastActivity: string
   status: string
-  ipAddress: string | null
-  userAgent: string | null
-  loginCount: number
 }
 
 export interface SessionAdmin {
   id: string
-  sessionId: string
   name: string
   email: string
+  institution: string
   createdAt: string
   lastActivity: string
   status: string
-  ipAddress: string | null
-  userAgent: string | null
-  loginCount: number
 }
 
 export interface SessionsStats {

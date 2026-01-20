@@ -25,8 +25,8 @@ export const STUDENT_PDF_COLUMNS: ExportColumn<SessionStudent>[] = [
 export const TEACHER_PDF_COLUMNS: ExportColumn<SessionTeacher>[] = [
   { key: 'name', header: 'Name' },
   { key: 'email', header: 'Email' },
+  { key: 'institution', header: 'Institution' },
   { key: 'status', header: 'Status' },
-  { key: 'loginCount', header: 'Login Count' },
   { key: 'lastActivity', header: 'Last Activity', getValue: (t) => formatDate(t.lastActivity) },
   { key: 'createdAt', header: 'Created', getValue: (t) => formatDate(t.createdAt) },
 ]
@@ -34,8 +34,8 @@ export const TEACHER_PDF_COLUMNS: ExportColumn<SessionTeacher>[] = [
 export const ADMIN_PDF_COLUMNS: ExportColumn<SessionAdmin>[] = [
   { key: 'name', header: 'Name' },
   { key: 'email', header: 'Email' },
+  { key: 'institution', header: 'Institution' },
   { key: 'status', header: 'Status' },
-  { key: 'loginCount', header: 'Login Count' },
   { key: 'lastActivity', header: 'Last Activity', getValue: (a) => formatDate(a.lastActivity) },
   { key: 'createdAt', header: 'Created', getValue: (a) => formatDate(a.createdAt) },
 ]
@@ -128,11 +128,11 @@ export const teacherColumns: Column<SessionTeacher>[] = [
     ),
   },
   {
-    key: 'loginCount',
-    header: 'Login Count',
+    key: 'institution',
+    header: 'Institution',
     headerClassName: 'hidden lg:table-cell',
     className: 'hidden lg:table-cell',
-    render: (teacher) => <span className="theme-text-primary">{teacher.loginCount}</span>,
+    render: (teacher) => <span className="theme-text-secondary">{teacher.institution}</span>,
   },
   {
     key: 'lastActivity',
@@ -171,11 +171,11 @@ export const adminColumns: Column<SessionAdmin>[] = [
     ),
   },
   {
-    key: 'loginCount',
-    header: 'Login Count',
+    key: 'institution',
+    header: 'Institution',
     headerClassName: 'hidden lg:table-cell',
     className: 'hidden lg:table-cell',
-    render: (admin) => <span className="theme-text-primary">{admin.loginCount}</span>,
+    render: (admin) => <span className="theme-text-secondary">{admin.institution}</span>,
   },
   {
     key: 'lastActivity',

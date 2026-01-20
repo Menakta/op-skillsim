@@ -1,11 +1,10 @@
 /**
  * Sessions API Route
  *
- * GET /api/admin/sessions - Get all sessions from user_sessions table
- * Filters by role field:
- * - Students: role = 'student' (session_type = 'lti', data from training_sessions)
- * - Teachers: role = 'teacher' (session_type = 'teacher')
- * - Admins: role = 'admin' (session_type = 'teacher')
+ * GET /api/admin/sessions - Get all sessions
+ * Data sources:
+ * - Students: training_sessions table
+ * - Teachers/Admins: teacher_profiles table (distinguished by role column)
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -21,33 +20,6 @@ const JWT_SECRET = new TextEncoder().encode(
 // Types
 // =============================================================================
 
-interface LtiContext {
-  courseId?: string
-  courseName?: string
-  institution?: string
-  returnUrl?: string
-  resourceId?: string
-  full_name?: string
-}
-
-interface UserSession {
-  id: string
-  session_id: string
-  user_id: string
-  session_type: 'lti' | 'teacher'
-  email: string
-  role: 'student' | 'teacher' | 'admin'
-  lti_context: LtiContext | null
-  created_at: string
-  last_activity: string
-  expires_at: string
-  status: string
-  ip_address: string | null
-  user_agent: string | null
-  login_count: number
-  last_login_at: string
-}
-
 interface TrainingSession {
   id: string
   session_id: string
@@ -55,6 +27,7 @@ interface TrainingSession {
     full_name?: string
     email?: string
     institution?: string
+    user_id?: string
   } | null
   course_name: string
   course_id: string
@@ -68,6 +41,17 @@ interface TrainingSession {
   total_time_spent: number
   created_at: string
   updated_at: string
+}
+
+interface TeacherProfile {
+  id: string
+  email: string
+  full_name: string | null
+  role: 'teacher' | 'admin'
+  institution: string | null
+  permissions: Record<string, boolean> | null
+  created_at: string
+  last_login: string | null
 }
 
 // =============================================================================
@@ -106,7 +90,7 @@ async function getSessionFromRequest(request: NextRequest): Promise<SessionInfo 
 // =============================================================================
 
 function isLtiAdmin(session: SessionInfo | null): boolean {
-  return session !== null && session.role === 'admin' && session.isLti === true
+  return session !== null && (session.role === 'admin' || session.role === 'teacher') && session.isLti === true
 }
 
 // =============================================================================
@@ -133,21 +117,7 @@ export async function GET(request: NextRequest) {
 
     const supabase = getSupabaseAdmin()
 
-    // Fetch all user sessions
-    const { data: userSessions, error: userSessionsError } = await supabase
-      .from('user_sessions')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    if (userSessionsError) {
-      logger.error({ error: userSessionsError.message }, 'Failed to fetch user sessions')
-      return NextResponse.json(
-        { success: false, error: 'Failed to fetch user sessions' },
-        { status: 500 }
-      )
-    }
-
-    // Fetch all training sessions (for student data enrichment)
+    // Fetch all training sessions (for students)
     const { data: trainingSessions, error: trainingSessionsError } = await supabase
       .from('training_sessions')
       .select('*')
@@ -155,42 +125,30 @@ export async function GET(request: NextRequest) {
 
     if (trainingSessionsError) {
       logger.error({ error: trainingSessionsError.message }, 'Failed to fetch training sessions')
+      return NextResponse.json(
+        { success: false, error: 'Failed to fetch training sessions' },
+        { status: 500 }
+      )
     }
 
-    // Fetch teacher profiles (for teacher/admin real names)
+    // Fetch all teacher profiles (for teachers and admins)
     const { data: teacherProfiles, error: teacherProfilesError } = await supabase
       .from('teacher_profiles')
-      .select('id, email, full_name, role')
+      .select('*')
+      .order('created_at', { ascending: false })
 
     if (teacherProfilesError) {
       logger.error({ error: teacherProfilesError.message }, 'Failed to fetch teacher profiles')
+      return NextResponse.json(
+        { success: false, error: 'Failed to fetch teacher profiles' },
+        { status: 500 }
+      )
     }
 
-    // Create a map of email to teacher profile for quick lookup
-    const teacherProfileMap = new Map<string, { fullName?: string; role?: string }>()
-    for (const profile of teacherProfiles || []) {
-      if (profile.email) {
-        teacherProfileMap.set(profile.email, {
-          fullName: profile.full_name,
-          role: profile.role,
-        })
-      }
-    }
-
-    const allUserSessions = (userSessions || []) as UserSession[]
     const allTrainingSessions = (trainingSessions || []) as TrainingSession[]
+    const allTeacherProfiles = (teacherProfiles || []) as TeacherProfile[]
 
-    // Create a map of session_id to training session for quick lookup
-    const trainingSessionMap = new Map<string, TrainingSession>()
-    for (const ts of allTrainingSessions) {
-      // Use the most recent training session for each session_id
-      const existing = trainingSessionMap.get(ts.session_id)
-      if (!existing || new Date(ts.updated_at) > new Date(existing.updated_at)) {
-        trainingSessionMap.set(ts.session_id, ts)
-      }
-    }
-
-    // Separate sessions by role
+    // Build students list from training_sessions
     const students: Array<{
       id: string
       sessionId: string
@@ -206,127 +164,88 @@ export async function GET(request: NextRequest) {
       totalScore: number
       phasesCompleted: number
       timeSpent: number
-      ipAddress: string | null
-      userAgent: string | null
-      loginCount: number
     }> = []
 
+    for (const ts of allTrainingSessions) {
+      // Determine effective status
+      let effectiveStatus = ts.status || 'pending'
+      if (ts.overall_progress === 100) {
+        effectiveStatus = 'completed'
+      }
+
+      // Get name from student JSONB field or fallback
+      const email = ts.student?.email || ''
+      const isFakeLtiEmail = email.startsWith('lti-') || email.endsWith('@lti.local')
+      const emailPrefix = !isFakeLtiEmail && email ? email.split('@')[0] : undefined
+      const studentName = ts.student?.full_name || emailPrefix || 'Student'
+
+      students.push({
+        id: ts.id,
+        sessionId: ts.session_id,
+        name: studentName,
+        email: email,
+        institution: ts.student?.institution || 'Unknown',
+        courseName: ts.course_name || 'VR Pipe Training',
+        courseId: ts.course_id || '',
+        enrolledDate: ts.created_at,
+        lastActive: ts.updated_at,
+        progress: ts.overall_progress || 0,
+        status: effectiveStatus,
+        totalScore: ts.total_score || 0,
+        phasesCompleted: ts.phases_completed || 0,
+        timeSpent: ts.total_time_spent || 0,
+      })
+    }
+
+    // Build teachers and admins lists from teacher_profiles
     const teachers: Array<{
       id: string
-      sessionId: string
       name: string
       email: string
+      institution: string
       createdAt: string
       lastActivity: string
       status: string
-      ipAddress: string | null
-      userAgent: string | null
-      loginCount: number
     }> = []
 
     const admins: Array<{
       id: string
-      sessionId: string
       name: string
       email: string
+      institution: string
       createdAt: string
       lastActivity: string
       status: string
-      ipAddress: string | null
-      userAgent: string | null
-      loginCount: number
     }> = []
 
-    for (const userSession of allUserSessions) {
-      // Students: role = 'student' (enriched with training_sessions data)
-      if (userSession.role === 'student') {
-        // Get training session data for this student
-        const trainingSession = trainingSessionMap.get(userSession.session_id)
+    for (const profile of allTeacherProfiles) {
+      // Get name from profile or email prefix
+      const isFakeLtiEmail = profile.email.startsWith('lti-') || profile.email.endsWith('@lti.local')
+      const emailPrefix = !isFakeLtiEmail ? profile.email.split('@')[0] : undefined
+      const name = profile.full_name || emailPrefix || (profile.role === 'admin' ? 'Admin' : 'Teacher')
 
-        // Determine effective status
-        let effectiveStatus = trainingSession?.status || 'pending'
-        if (trainingSession?.overall_progress === 100) {
-          effectiveStatus = 'completed'
-        }
+      // Determine status based on last_login
+      const lastLogin = profile.last_login ? new Date(profile.last_login) : null
+      const now = new Date()
+      const hoursSinceLogin = lastLogin ? (now.getTime() - lastLogin.getTime()) / (1000 * 60 * 60) : Infinity
+      const status = hoursSinceLogin < 24 ? 'active' : 'inactive'
 
-        // Get name from: training session -> lti_context -> email prefix (if real email)
-        // Don't use email prefix if it's a fake LTI email (lti-* or ends with @lti.local)
-        const isFakeLtiEmail = userSession.email.startsWith('lti-') || userSession.email.endsWith('@lti.local')
-        const emailPrefix = !isFakeLtiEmail ? userSession.email.split('@')[0] : undefined
-        const studentName = trainingSession?.student?.full_name
-          || userSession.lti_context?.full_name
-          || emailPrefix
-          || 'Student'
-
-        students.push({
-          id: userSession.id,
-          sessionId: userSession.session_id,
-          name: studentName,
-          email: userSession.email,
-          institution: trainingSession?.student?.institution || userSession.lti_context?.institution || 'Unknown',
-          courseName: trainingSession?.course_name || userSession.lti_context?.courseName || 'VR Pipe Training',
-          courseId: trainingSession?.course_id || userSession.lti_context?.courseId || '',
-          enrolledDate: userSession.created_at,
-          lastActive: trainingSession?.updated_at || userSession.last_activity,
-          progress: trainingSession?.overall_progress || 0,
-          status: effectiveStatus,
-          totalScore: trainingSession?.total_score || 0,
-          phasesCompleted: trainingSession?.phases_completed || 0,
-          timeSpent: trainingSession?.total_time_spent || 0,
-          ipAddress: userSession.ip_address,
-          userAgent: userSession.user_agent,
-          loginCount: userSession.login_count,
-        })
+      const profileData = {
+        id: profile.id,
+        name,
+        email: profile.email,
+        institution: profile.institution || 'Unknown',
+        createdAt: profile.created_at,
+        lastActivity: profile.last_login || profile.created_at,
+        status,
       }
-      // Teachers: role = 'teacher'
-      else if (userSession.role === 'teacher') {
-        // Get name from: teacher_profiles -> lti_context -> email prefix (if real email)
-        // Don't use email prefix if it's a fake LTI email (lti-* or ends with @lti.local)
-        const teacherProfile = teacherProfileMap.get(userSession.email)
-        const isFakeLtiEmail = userSession.email.startsWith('lti-') || userSession.email.endsWith('@lti.local')
-        const emailPrefix = !isFakeLtiEmail ? userSession.email.split('@')[0] : undefined
-        const teacherName = teacherProfile?.fullName
-          || userSession.lti_context?.full_name
-          || emailPrefix
-          || 'Teacher'
 
-        teachers.push({
-          id: userSession.id,
-          sessionId: userSession.session_id,
-          name: teacherName,
-          email: userSession.email,
-          createdAt: userSession.created_at,
-          lastActivity: userSession.last_activity,
-          status: userSession.status,
-          ipAddress: userSession.ip_address,
-          userAgent: userSession.user_agent,
-          loginCount: userSession.login_count,
-        })
-      }
-      // Admins: role = 'admin'
-      else if (userSession.role === 'admin') {
-        // Get name from: teacher_profiles -> lti_context -> email prefix (if real email)
-        // Don't use email prefix if it's a fake LTI email (lti-* or ends with @lti.local)
-        const adminProfile = teacherProfileMap.get(userSession.email)
-        const isFakeLtiEmail = userSession.email.startsWith('lti-') || userSession.email.endsWith('@lti.local')
-        const emailPrefix = !isFakeLtiEmail ? userSession.email.split('@')[0] : undefined
-        const adminName = adminProfile?.fullName
-          || userSession.lti_context?.full_name
-          || emailPrefix
-          || 'Admin'
-
-        admins.push({
-          id: userSession.id,
-          sessionId: userSession.session_id,
-          name: adminName,
-          email: userSession.email,
-          createdAt: userSession.created_at,
-          lastActivity: userSession.last_activity,
-          status: userSession.status,
-          ipAddress: userSession.ip_address,
-          userAgent: userSession.user_agent,
-          loginCount: userSession.login_count,
-        })
+      // Separate by role column
+      if (profile.role === 'admin') {
+        admins.push(profileData)
+      } else {
+        // role === 'teacher' or any other value defaults to teacher
+        teachers.push(profileData)
       }
     }
 
@@ -372,7 +291,7 @@ export async function GET(request: NextRequest) {
 }
 
 // =============================================================================
-// DELETE - Delete sessions (single or bulk) - LTI Admin only
+// DELETE - Delete sessions (single or bulk) - LTI Admin/Teacher only
 // =============================================================================
 
 export async function DELETE(request: NextRequest) {
@@ -386,7 +305,7 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // Only LTI admins can delete
+    // Only LTI admins/teachers can delete
     if (!isLtiAdmin(session)) {
       return NextResponse.json(
         { success: false, error: 'Access denied. Only LTI administrators can delete sessions.' },
@@ -417,52 +336,43 @@ export async function DELETE(request: NextRequest) {
 
     for (const id of ids) {
       try {
-        // For students, also delete related training_sessions and quiz_responses
         if (type === 'student') {
-          // Get the user_session to find the session_id
-          const { data: userSession } = await supabase
-            .from('user_sessions')
-            .select('session_id')
+          // For students: delete from training_sessions and related quiz_responses
+          // The id is now the training_sessions.id directly
+
+          // Delete quiz_responses for this training session
+          await supabase
+            .from('quiz_responses')
+            .delete()
+            .eq('session_id', id)
+
+          // Delete the training_session
+          const { error: deleteError } = await supabase
+            .from('training_sessions')
+            .delete()
             .eq('id', id)
-            .single()
 
-          if (userSession) {
-            // Find training_session by session_id
-            const { data: trainingSession } = await supabase
-              .from('training_sessions')
-              .select('id')
-              .eq('session_id', userSession.session_id)
-              .single()
+          if (deleteError) {
+            errors.push(`Failed to delete training session ${id}: ${deleteError.message}`)
+          } else {
+            deletedIds.push(id)
+          }
+        } else {
+          // For teachers/admins: delete from teacher_profiles
+          // The id is now the teacher_profiles.id directly
+          const { error: deleteError } = await supabase
+            .from('teacher_profiles')
+            .delete()
+            .eq('id', id)
 
-            if (trainingSession) {
-              // Delete quiz_responses for this training session
-              await supabase
-                .from('quiz_responses')
-                .delete()
-                .eq('session_id', trainingSession.id)
-
-              // Delete the training_session
-              await supabase
-                .from('training_sessions')
-                .delete()
-                .eq('id', trainingSession.id)
-            }
+          if (deleteError) {
+            errors.push(`Failed to delete profile ${id}: ${deleteError.message}`)
+          } else {
+            deletedIds.push(id)
           }
         }
-
-        // Delete the user_session
-        const { error: deleteError } = await supabase
-          .from('user_sessions')
-          .delete()
-          .eq('id', id)
-
-        if (deleteError) {
-          errors.push(`Failed to delete session ${id}: ${deleteError.message}`)
-        } else {
-          deletedIds.push(id)
-        }
       } catch (err) {
-        errors.push(`Error deleting session ${id}: ${err instanceof Error ? err.message : 'Unknown error'}`)
+        errors.push(`Error deleting ${type} ${id}: ${err instanceof Error ? err.message : 'Unknown error'}`)
       }
     }
 
@@ -471,7 +381,7 @@ export async function DELETE(request: NextRequest) {
       type,
       adminEmail: session.email,
       deletedIds,
-    }, 'Sessions deleted by LTI admin')
+    }, 'Sessions deleted by LTI admin/teacher')
 
     return NextResponse.json({
       success: true,

@@ -61,7 +61,7 @@ async function getSessionFromRequest(request: NextRequest): Promise<SessionInfo 
 // =============================================================================
 
 function isLtiAdmin(session: SessionInfo | null): boolean {
-  return session !== null && session.role === 'admin' && session.isLti === true
+  return session !== null && (session.role === 'admin' || session.role === 'teacher') && session.isLti === true
 }
 
 // =============================================================================

@@ -23,7 +23,7 @@ async function validateAdminSession(req: NextRequest): Promise<boolean> {
 
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET)
-    return payload.role === 'admin'
+    return payload.role === 'admin' || payload.role === 'teacher'
   } catch {
     return false
   }

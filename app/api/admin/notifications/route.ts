@@ -25,8 +25,8 @@ async function validateAdminSession(req: NextRequest): Promise<{ userId: string;
     const { payload } = await jwtVerify(token, JWT_SECRET)
     const role = payload.role as string
 
-    // Only admins can access notifications
-    if (role !== 'admin') {
+    // Admins and teachers can access notifications
+    if (role !== 'admin' && role !== 'teacher') {
       return null
     }
 

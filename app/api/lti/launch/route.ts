@@ -193,13 +193,21 @@ function getLaunchUrl(req: NextRequest): string {
 }
 
 function mapLtiRole(ltiRoles: string | undefined): UserRole {
-  if (!ltiRoles) return 'student'
+  // No role provided (coaches or other users) → admin
+  if (!ltiRoles) return 'admin'
   const roles = ltiRoles.toLowerCase()
+  // Learner → student
+  if (roles.includes('learner') || roles.includes('student')) {
+    return 'student'
+  }
+  // Instructor → teacher
   if (roles.includes('instructor') || roles.includes('teacher') || roles.includes('staff')) {
     return 'teacher'
   }
+  // Explicit admin role
   if (roles.includes('admin')) return 'admin'
-  return 'student'
+  // Unknown/unrecognized role (coaches, etc.) → admin
+  return 'admin'
 }
 
 function getRedirectPath(role: UserRole): string {
