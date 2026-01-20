@@ -236,7 +236,7 @@ export interface Course {
   title: string
 }
 
-export type StatusFilter = 'all' | 'active' | 'paused' | 'completed'
+export type StatusFilter = 'all' | 'active' | 'paused' | 'completed' |'inactive'
 export type ResultFilter = 'all' | 'passed' | 'failed'
 export type SessionTabType = 'students' | 'teachers' | 'admins'
 
