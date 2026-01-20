@@ -30,7 +30,7 @@ const ADMIN_ROUTES = ['/admin']
 const ADMIN_API_ROUTES = ['/api/admin']
 
 // Public routes that don't require authentication
-const PUBLIC_ROUTES = ['/login', '/api/auth', '/api/lti', '/register', '/pending-approval']
+const PUBLIC_ROUTES = ['/login', '/api/auth', '/api/lti', '/register', '/pending-approval', '/session-complete']
 
 interface SessionPayload {
   sessionId: string

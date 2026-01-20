@@ -84,6 +84,9 @@ import { useTrainingMessagesComposite } from '../hooks/useTrainingMessagesCompos
 // Redux sync - bridges hook state to Redux store
 import { useReduxSync } from '../store/useReduxSync'
 
+// Session complete redirect helper
+import { redirectToSessionComplete } from '../lib/sessionCompleteRedirect'
+
 // =============================================================================
 // Configuration
 // =============================================================================
@@ -1098,15 +1101,18 @@ export default function StreamingApp() {
   // ==========================================================================
 
   const handleSessionEndLogin = useCallback(() => {
-    if (isTestUser) {
-      // Test users (non-LTI) get redirected to login
-      setShowSessionEndModal(false)
-      window.location.href = '/login'
-    } else {
-      // LTI users just close the modal (they came from external LMS)
-      setShowSessionEndModal(false)
-    }
-  }, [isTestUser])
+    setShowSessionEndModal(false)
+    // Redirect to session-complete page for proper cleanup
+    redirectToSessionComplete({
+      reason: 'logged_out',
+      role: userRole,
+      progress: training.state.progress,
+      phasesCompleted: training.state.currentTaskIndex,
+      totalPhases: training.state.totalTasks,
+      returnUrl: sessionReturnUrl,
+      isLti: isLtiSession,
+    })
+  }, [userRole, training.state.progress, training.state.currentTaskIndex, training.state.totalTasks, sessionReturnUrl, isLtiSession])
 
   // ==========================================================================
   // Session Expiry Handler - Called when session expires from countdown modal
@@ -1136,17 +1142,17 @@ export default function StreamingApp() {
       })
     })
 
-    // Redirect based on session type
-    if (isLtiSession && sessionReturnUrl) {
-      window.location.href = sessionReturnUrl
-    } else if (isTestUser) {
-      window.location.href = '/login'
-    } else {
-      // Fallback - show session end modal
-      setSessionEndReason('inactive')
-      setShowSessionEndModal(true)
-    }
-  }, [sessionStartTime, training.state.totalTasks, isLtiSession, sessionReturnUrl, isTestUser])
+    // Redirect to session-complete page for proper cleanup
+    redirectToSessionComplete({
+      reason: 'idle',
+      role: userRole,
+      progress: training.state.progress,
+      phasesCompleted: training.state.currentTaskIndex,
+      totalPhases: training.state.totalTasks,
+      returnUrl: sessionReturnUrl,
+      isLti: isLtiSession,
+    })
+  }, [sessionStartTime, training.state.totalTasks, training.state.progress, training.state.currentTaskIndex, isLtiSession, sessionReturnUrl, userRole])
 
   // ==========================================================================
   // Training Complete Handler - Close modal and redirect appropriately
@@ -1191,17 +1197,17 @@ export default function StreamingApp() {
     // Update session status (keep as active so user can resume)
     // Progress is already saved via auto-save
 
-    // Redirect based on session type
-    if (isLtiSession && sessionReturnUrl) {
-      window.location.href = sessionReturnUrl
-    } else if (isTestUser) {
-      window.location.href = '/login'
-    } else {
-      // Fallback - show session end modal
-      setSessionEndReason('logged_out')
-      setShowSessionEndModal(true)
-    }
-  }, [sessionStartTime, isLtiSession, sessionReturnUrl, isTestUser])
+    // Redirect to session-complete page for proper cleanup
+    redirectToSessionComplete({
+      reason: 'quit',
+      role: userRole,
+      progress: training.state.progress,
+      phasesCompleted: training.state.currentTaskIndex,
+      totalPhases: training.state.totalTasks,
+      returnUrl: sessionReturnUrl,
+      isLti: isLtiSession,
+    })
+  }, [sessionStartTime, isLtiSession, sessionReturnUrl, userRole, training.state.progress, training.state.currentTaskIndex, training.state.totalTasks])
 
   const handleQuitTrainingCancel = useCallback(() => {
     setShowQuitModal(false)
@@ -1360,6 +1366,7 @@ export default function StreamingApp() {
         progress={training.state.progress}
         isLti={isLtiSession}
         returnUrl={sessionReturnUrl}
+        role={userRole}
         onClose={handleTrainingCompleteClose}
       />
 
@@ -1448,6 +1455,10 @@ export default function StreamingApp() {
         expiresAt={sessionExpiresAt || Date.now()}
         isLti={isLtiSession}
         returnUrl={sessionReturnUrl}
+        role={userRole}
+        progress={training.state.progress}
+        phasesCompleted={training.state.currentTaskIndex}
+        totalPhases={training.state.totalTasks}
         onSessionEnd={handleSessionExpiry}
       />
 

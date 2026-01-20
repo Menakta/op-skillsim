@@ -4,7 +4,7 @@
  * SessionExpiryModal Component
  *
  * Displays countdown when session is about to expire (3-5 minutes remaining).
- * Handles redirection based on LTI vs non-LTI sessions when time runs out.
+ * Redirects to session-complete page for proper cleanup.
  */
 
 import { useState, useEffect } from 'react'
@@ -12,6 +12,7 @@ import Image from 'next/image'
 import { Clock } from "lucide-react"
 import { BaseModal, ModalFooter } from '@/app/components/shared'
 import { Button } from '@/app/components/shared'
+import { redirectToSessionComplete } from '@/app/lib/sessionCompleteRedirect'
 
 // =============================================================================
 // Props Interface
@@ -22,6 +23,10 @@ interface SessionExpiryModalProps {
   expiresAt: number // timestamp in milliseconds
   isLti: boolean
   returnUrl?: string | null
+  role?: 'student' | 'teacher' | 'admin'
+  progress?: number
+  phasesCompleted?: number
+  totalPhases?: number
   onSessionEnd: () => void
 }
 
@@ -44,6 +49,10 @@ export function SessionExpiryModal({
   expiresAt,
   isLti,
   returnUrl,
+  role = 'student',
+  progress = 0,
+  phasesCompleted = 0,
+  totalPhases = 6,
   onSessionEnd
 }: SessionExpiryModalProps) {
   const [remainingSeconds, setRemainingSeconds] = useState(0)
@@ -73,16 +82,16 @@ export function SessionExpiryModal({
   }, [isOpen, expiresAt])
 
   const handleSessionEnd = () => {
-    if (isLti && returnUrl) {
-      // LTI user: redirect back to LMS
-      window.location.href = returnUrl
-    } else if (!isLti) {
-      // Non-LTI user: redirect to login
-      window.location.href = '/login'
-    } else {
-      // LTI user without return URL: call callback
-      onSessionEnd()
-    }
+    // Redirect to session-complete page for proper cleanup
+    redirectToSessionComplete({
+      reason: 'expired',
+      role,
+      progress,
+      phasesCompleted,
+      totalPhases,
+      returnUrl,
+      isLti,
+    })
   }
 
   const getButtonText = () => {
@@ -91,7 +100,7 @@ export function SessionExpiryModal({
     } else if (!isLti) {
       return 'Go to Login'
     }
-    return 'Close'
+    return 'End Session'
   }
 
   // Don't show close button - user must take action

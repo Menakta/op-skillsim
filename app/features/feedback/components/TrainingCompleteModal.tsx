@@ -4,13 +4,14 @@
  * TrainingCompleteModal Component
  *
  * Displays when student completes all training phases.
- * Handles redirection based on LTI vs non-LTI sessions.
+ * Redirects to session-complete page for proper cleanup.
  */
 
 import Image from 'next/image'
 import { CheckCircle } from "lucide-react"
 import { BaseModal, ModalMessage, ModalFooter } from '@/app/components/shared'
 import { Button } from '@/app/components/shared'
+import { redirectToSessionComplete } from '@/app/lib/sessionCompleteRedirect'
 
 // =============================================================================
 // Props Interface
@@ -22,6 +23,7 @@ interface TrainingCompleteModalProps {
   progress: number
   isLti: boolean
   returnUrl?: string | null
+  role?: 'student' | 'teacher' | 'admin'
   onClose: () => void
 }
 
@@ -35,20 +37,21 @@ export function TrainingCompleteModal({
   progress,
   isLti,
   returnUrl,
+  role = 'student',
   onClose
 }: TrainingCompleteModalProps) {
 
   const handleContinue = () => {
-    if (isLti && returnUrl) {
-      // LTI user: redirect back to LMS
-      window.location.href = returnUrl
-    } else if (!isLti) {
-      // Non-LTI user: redirect to login
-      window.location.href = '/login'
-    } else {
-      // LTI user without return URL: just close modal
-      onClose()
-    }
+    // Redirect to session-complete page for proper cleanup
+    redirectToSessionComplete({
+      reason: 'completed',
+      role,
+      progress,
+      phasesCompleted: totalTasks,
+      totalPhases: totalTasks,
+      returnUrl,
+      isLti,
+    })
   }
 
   const getButtonText = () => {
@@ -57,7 +60,7 @@ export function TrainingCompleteModal({
     } else if (!isLti) {
       return 'Back to Login'
     }
-    return 'Close'
+    return 'Continue'
   }
 
   return (
