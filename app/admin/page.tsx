@@ -190,13 +190,6 @@ export default function TeacherDashboardPage() {
             icon={<FileQuestion className="w-6 h-6" />}
           />
         </Link>
-        <Link href="/admin/fittings" className="block transition-all hover:scale-[1.02] hover:shadow-lg">
-          <StatCard
-            label="Fittings"
-            value={totalFittings}
-            icon={<Wrench className="w-6 h-6" />}
-          />
-        </Link>
         <Link href="/admin/results" className="block transition-all hover:scale-[1.02] hover:shadow-lg">
           <StatCard
             label="Results"
