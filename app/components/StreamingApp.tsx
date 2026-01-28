@@ -273,22 +273,6 @@ export default function StreamingApp() {
               setSessionReturnUrl(data.session.returnUrl)
             }
 
-            console.log('📋 Session info:', {
-              isLti,
-              role: data.session.role,
-              expiresAt: data.session.expiresAt ? new Date(data.session.expiresAt).toISOString() : null,
-              returnUrl: data.session.returnUrl
-            })
-
-            // Debug log for LTI role investigation - shows RAW iQualify data
-            console.log('--- LTI STREAM PAGE DEBUG ---', {
-              email: data.session.email,
-              rawLtiRole: data.session.rawLtiRole, // This is the actual role from iQualify (e.g., "Author", "Learner")
-              mappedRole: data.session.role, // This is what our app mapped it to (student/teacher/admin)
-              isLti: data.session.isLti,
-              userId: data.session.userId,
-              fullSession: data.session
-            })
           }
         }
       } catch (err) {
@@ -1004,8 +988,17 @@ export default function StreamingApp() {
    * Handle starting a brand new training session
    * This shows cinematic mode first, session created when user clicks "Skip to Training"
    */
-  const handleStartNewSession = useCallback(() => {
+  const handleStartNewSession = useCallback( async() => {
     console.log('🆕 Starting new training session - cinematic mode first')
+    try {
+      // Create a new session in the database (link to current login session)
+      const result = await trainingSessionService.createNewSession()
+      if (!result.success) {
+        console.error('Failed to start new session:', result.error)
+      }
+    } catch (error) {
+      console.error('Error starting new session:', error)
+    }
 
     // Clear any selected session and proceed with cinematic mode
     // Session will be created when user clicks "Skip to Training"
