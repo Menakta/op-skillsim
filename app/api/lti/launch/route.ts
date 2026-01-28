@@ -430,9 +430,9 @@ export async function POST(req: NextRequest) {
         email,
         fullName,
         courseId: params.context_id || '',
-        courseName: params.context_title || 'Unknown Course',
+        courseName: params.context_title || 'OP-Skillsim Plumbing Training',
         resourceId: params.resource_link_id,
-        institution: params.tool_consumer_instance_name || 'Unknown Institution',
+        institution: params.tool_consumer_instance_name || 'Open Polytechnic Kuratini Tuwhera',
         returnUrl: params.launch_presentation_return_url,
         rawLtiRole: params.roles,
       }
@@ -596,7 +596,7 @@ export async function POST(req: NextRequest) {
         userId: user.id,
         email,
         fullName,
-        institution: params.tool_consumer_instance_name || 'Unknown Institution',
+        institution: params.tool_consumer_instance_name || 'Open Polytechnic Kuratini Tuwhera',
         rawLtiRole: params.roles,
       }
 

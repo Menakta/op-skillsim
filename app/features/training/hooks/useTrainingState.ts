@@ -288,7 +288,7 @@ export function useTrainingState(
 
     // Start or get training session in database
     const result = await trainingSessionService.startSession({
-      courseName: 'VR Pipe Training',
+      courseName: 'OP-Skillsim Plumbing Training',
     })
 
     if (result.success && result.data) {

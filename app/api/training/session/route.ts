@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
           id: `demo_${session.sessionId}`,
           session_id: session.sessionId,
           course_id: 'demo',
-          course_name: 'Demo Training',
+          course_name: 'OP-Skillsim Plumbing Training',
           current_training_phase: '0', // Phase index as string
           overall_progress: 0,
           status: 'active',
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
           id: `test_${session.sessionId}`,
           session_id: session.sessionId,
           course_id: 'test',
-          course_name: 'Test Training',
+          course_name: 'OP-Skillsim Plumbing Training',
           current_training_phase: '0', // Phase index as string
           overall_progress: 0,
           status: 'active',
@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
       user_id: session.userId,
       email: session.email,
       full_name: 'Unknown Student',
-      institution: 'Unknown Institution',
+      institution: 'Open Polytechnic Kuratini Tuwhera',
       enrolled_at: new Date().toISOString(),
     }
 
@@ -176,7 +176,7 @@ export async function POST(request: NextRequest) {
       .insert({
         session_id: session.sessionId,
         course_id: courseId || 'default',
-        course_name: courseName || 'VR Pipe Training',
+        course_name: courseName || 'OP-Skillsim Plumbing Training',
         current_training_phase: initialPhase || '0', // Phase index as string (0-7)
         overall_progress: 0,
         status: 'active',

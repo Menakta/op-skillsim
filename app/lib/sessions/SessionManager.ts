@@ -453,13 +453,13 @@ export class SessionManager {
       user_id: studentDetails.userId,
       email: studentDetails.email,
       full_name: defaultName,
-      institution: studentDetails.institution || 'Unknown Institution',
+      institution: studentDetails.institution || 'Open Polytechnic Kuratini Tuwhera',
       enrolled_at: new Date().toISOString(),
     } : {
       user_id: 'unknown',
       email: 'unknown@unknown.local',
       full_name: 'Student',
-      institution: 'Unknown Institution',
+      institution: 'Open Polytechnic Kuratini Tuwhera',
       enrolled_at: new Date().toISOString(),
     }
 

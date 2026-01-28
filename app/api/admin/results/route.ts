@@ -153,7 +153,7 @@ export async function GET(request: NextRequest) {
       sessionMap.set(session.id, {
         userSessionId: session.session_id, // This links to user_sessions
         student: session.student,
-        courseName: session.course_name || 'VR Pipe Training',
+        courseName: session.course_name || 'OP-Skillsim Plumbing Training',
         courseId: session.course_id,
         status: session.overall_progress === 100 ? 'completed' : session.status,
         currentPhase: session.current_training_phase,
@@ -228,9 +228,9 @@ export async function GET(request: NextRequest) {
         // Student details from training_sessions.student JSONB column with fallbacks
         studentName,
         studentEmail: sessionInfo?.student?.email || userSessionInfo?.email || 'unknown@email.com',
-        studentInstitution: sessionInfo?.student?.institution || '',
+        studentInstitution: sessionInfo?.student?.institution || 'Open Polytechnic Kuratini Tuwhera',
         // Course info
-        courseName: sessionInfo?.courseName || 'VR Pipe Training',
+        courseName: sessionInfo?.courseName || 'OP-Skillsim Plumbing Training',
         courseId: sessionInfo?.courseId || '',
         // Quiz results
         totalQuestions,

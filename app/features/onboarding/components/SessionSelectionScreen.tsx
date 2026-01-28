@@ -127,7 +127,7 @@ export function SessionSelectionScreen({
                       <div className="flex items-center justify-between mb-2">
                         <div>
                           <div className="text-[#39BEAE] text-sm font-medium mb-1">
-                            {session.course_name || 'VR Pipe Training'}
+                            {session.course_name || 'OP-Skillsim Pipe Training'}
                           </div>
                           <div className="text-white font-medium">
                             Phase {phaseIndex + 1}: {phaseInfo.name}
