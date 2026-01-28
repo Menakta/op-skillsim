@@ -3,33 +3,40 @@
 /**
  * ResultExportPDF Component
  *
- * Generates a branded PDF certificate/report for students
- * who complete all training phases. Includes student info,
- * phase progress, quiz performance, and per-question timing.
+ * Generates a branded PDF training report for students
+ * who complete training. Uses data from training_sessions
+ * and quiz_responses tables.
  *
- * Uses jsPDF to build a PDF that matches the app's teal/navy theme.
+ * Layout:
+ *   h2: "Training Report" (centered page header)
+ *   h3: "Student Information" — table from training_sessions.student
+ *   h3: "Session Information" — table from training_sessions columns
+ *   h3: "Quiz Results" — table from quiz_responses.question_data
  */
 
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import { QUESTION_DATABASE, QUESTION_IDS } from '@/app/config/questions.config'
-import { TASK_SEQUENCE } from '@/app/config/tasks.config'
 import type { QuestionDataMap } from '@/app/types/quiz.types'
-import { keyToQuestionId } from '@/app/types/quiz.types'
 
 // =============================================================================
-// Types
+// Types — maps directly to training_sessions + quiz_responses tables
 // =============================================================================
 
-export interface StudentResultData {
-  firstName: string
-  lastName: string
-  institution: string
-  totalPhases: number
-  phasesCompleted: number
-  totalQuizzes: number
-  quizzesCompleted: number
-  totalTimeSpentMs: number
+export interface ResultPDFData {
+  // From training_sessions.student JSONB column
+  student: {
+    full_name: string
+    email: string
+    course_name: string
+    institution: string
+  }
+  // From training_sessions columns
+  session: {
+    phases_completed: number   // training_sessions.phases_completed
+    total_time_spent: number   // training_sessions.total_time_spent (seconds)
+    overall_progress: number   // training_sessions.overall_progress (0-100)
+  }
+  // From quiz_responses.question_data JSONB column
   questionData: QuestionDataMap
 }
 
@@ -41,12 +48,8 @@ const COLORS = {
   teal: [57, 190, 174] as [number, number, number],       // #39BEAE
   tealLight: [121, 207, 194] as [number, number, number],  // #79CFC2
   navy: [13, 29, 64] as [number, number, number],          // #0D1D40
-  navySecondary: [62, 66, 95] as [number, number, number], // #3E425F
   white: [255, 255, 255] as [number, number, number],
-  bgLight: [238, 238, 238] as [number, number, number],    // #eeeeee
-  bgCard: [247, 248, 250] as [number, number, number],     // #F7F8FA
-  textPrimary: [13, 29, 64] as [number, number, number],   // navy
-  textSecondary: [62, 66, 95] as [number, number, number], // #3E425F
+  textPrimary: [13, 29, 64] as [number, number, number],
   textMuted: [107, 111, 138] as [number, number, number],  // #6B6F8A
   border: [217, 217, 217] as [number, number, number],     // #D9D9D9
   success: [34, 197, 94] as [number, number, number],      // green-500
@@ -54,20 +57,27 @@ const COLORS = {
   rowAlt: [241, 248, 247] as [number, number, number],     // teal-tinted alt row
 }
 
+const TOTAL_PHASES = 6
+
 // =============================================================================
 // Helpers
 // =============================================================================
 
-function formatMs(ms: number): string {
-  if (!ms || ms === 0) return '0s'
-  const totalSeconds = Math.round(ms / 1000)
-  if (totalSeconds < 60) return `${totalSeconds}s`
-  const mins = Math.floor(totalSeconds / 60)
-  const secs = totalSeconds % 60
+function formatSeconds(seconds: number): string {
+  if (!seconds || seconds === 0) return '0s'
+  if (seconds < 60) return `${seconds}s`
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
   if (mins < 60) return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`
   const hours = Math.floor(mins / 60)
   const remainingMins = mins % 60
   return remainingMins > 0 ? `${hours}h ${remainingMins}m` : `${hours}h`
+}
+
+function formatMs(ms: number): string {
+  if (!ms || ms === 0) return '0s'
+  const totalSeconds = Math.round(ms / 1000)
+  return formatSeconds(totalSeconds)
 }
 
 async function loadImageAsBase64(path: string): Promise<string> {
@@ -90,40 +100,15 @@ async function loadImageAsBase64(path: string): Promise<string> {
 }
 
 // =============================================================================
-// Rounded Rectangle Helper
-// =============================================================================
-
-function drawRoundedRect(
-  doc: jsPDF,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  r: number,
-  fill: [number, number, number],
-  stroke?: [number, number, number]
-) {
-  doc.setFillColor(...fill)
-  if (stroke) {
-    doc.setDrawColor(...stroke)
-    doc.setLineWidth(0.3)
-    doc.roundedRect(x, y, w, h, r, r, 'FD')
-  } else {
-    doc.roundedRect(x, y, w, h, r, r, 'F')
-  }
-}
-
-// =============================================================================
 // PDF Generation
 // =============================================================================
 
-export async function generateResultPDF(data: StudentResultData): Promise<void> {
+export async function generateResultPDF(data: ResultPDFData): Promise<void> {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
 
   const pageW = doc.internal.pageSize.getWidth()   // 210
   const pageH = doc.internal.pageSize.getHeight()   // 297
   const margin = 14
-  const contentW = pageW - margin * 2
 
   // Load logo
   let logoBase64: string | null = null
@@ -135,7 +120,7 @@ export async function generateResultPDF(data: StudentResultData): Promise<void> 
   // HEADER BAND — navy background with teal accent
   // =========================================================================
 
-  const headerH = 44
+  const headerH = 38
   doc.setFillColor(...COLORS.navy)
   doc.rect(0, 0, pageW, headerH, 'F')
 
@@ -148,288 +133,168 @@ export async function generateResultPDF(data: StudentResultData): Promise<void> 
     doc.addImage(logoBase64, 'PNG', margin, 8, 38, 9)
   }
 
-  // Title text
+  // h2: "Training Report" — centered main header
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(20)
+  doc.setFontSize(22)
   doc.setTextColor(...COLORS.white)
-  doc.text('Training Results Report', margin, 30)
+  doc.text('Training Report', pageW / 2, 28, { align: 'center' })
 
   // Date on header (right side)
   doc.setFont('helvetica', 'normal')
-  doc.setFontSize(9)
+  doc.setFontSize(8)
   doc.setTextColor(...COLORS.tealLight)
   const dateStr = new Date().toLocaleDateString('en-NZ', {
     year: 'numeric', month: 'long', day: 'numeric'
   })
-  doc.text(dateStr, pageW - margin, 14, { align: 'right' })
-
-  // Timestamp
+  doc.text(dateStr, pageW - margin, 12, { align: 'right' })
   const timeStr = new Date().toLocaleTimeString('en-NZ', {
     hour: '2-digit', minute: '2-digit'
   })
-  doc.text(`Generated at ${timeStr}`, pageW - margin, 20, { align: 'right' })
+  doc.text(`Generated at ${timeStr}`, pageW - margin, 17, { align: 'right' })
 
   let curY = headerH + 1.5 + 10
 
   // =========================================================================
-  // SECTION 1 — Student Information Card
-  // =========================================================================
-
-  const cardH = 32
-  drawRoundedRect(doc, margin, curY, contentW, cardH, 3, COLORS.bgCard, COLORS.border)
-
-  // Section label
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(11)
-  doc.setTextColor(...COLORS.teal)
-  doc.text('Student Information', margin + 5, curY + 7)
-
-  // Divider line inside card
-  doc.setDrawColor(...COLORS.border)
-  doc.setLineWidth(0.2)
-  doc.line(margin + 5, curY + 10, margin + contentW - 5, curY + 10)
-
-  // Student details (two columns)
-  const col1X = margin + 5
-  const col2X = margin + contentW / 2 + 5
-  const detailY = curY + 17
-
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(9)
-
-  // Left column
-  doc.setTextColor(...COLORS.textMuted)
-  doc.text('First Name', col1X, detailY)
-  doc.setTextColor(...COLORS.textPrimary)
-  doc.setFont('helvetica', 'bold')
-  doc.text(data.firstName || 'N/A', col1X + 28, detailY)
-
-  doc.setFont('helvetica', 'normal')
-  doc.setTextColor(...COLORS.textMuted)
-  doc.text('Last Name', col1X, detailY + 7)
-  doc.setTextColor(...COLORS.textPrimary)
-  doc.setFont('helvetica', 'bold')
-  doc.text(data.lastName || 'N/A', col1X + 28, detailY + 7)
-
-  // Right column
-  doc.setFont('helvetica', 'normal')
-  doc.setTextColor(...COLORS.textMuted)
-  doc.text('Institution', col2X, detailY)
-  doc.setTextColor(...COLORS.textPrimary)
-  doc.setFont('helvetica', 'bold')
-  doc.text(data.institution || 'N/A', col2X + 28, detailY)
-
-  doc.setFont('helvetica', 'normal')
-  doc.setTextColor(...COLORS.textMuted)
-  doc.text('Total Time', col2X, detailY + 7)
-  doc.setTextColor(...COLORS.textPrimary)
-  doc.setFont('helvetica', 'bold')
-  doc.text(formatMs(data.totalTimeSpentMs), col2X + 28, detailY + 7)
-
-  curY += cardH + 8
-
-  // =========================================================================
-  // SECTION 2 — Training Overview (3 stat cards)
+  // SECTION 1 — Student Information (h3)
+  // Data source: training_sessions.student JSONB column
   // =========================================================================
 
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(11)
-  doc.setTextColor(...COLORS.teal)
-  doc.text('Training Overview', margin, curY + 1)
-  curY += 6
-
-  const statCardW = (contentW - 8) / 3   // 3 cards with gaps
-  const statCardH = 28
-  const gap = 4
-
-  const stats = [
-    {
-      label: 'Phases',
-      value: `${data.phasesCompleted} / ${data.totalPhases}`,
-      sub: data.phasesCompleted === data.totalPhases ? 'All Complete' : 'In Progress',
-      color: data.phasesCompleted === data.totalPhases ? COLORS.success : COLORS.teal,
-    },
-    {
-      label: 'Quizzes',
-      value: `${data.quizzesCompleted} / ${data.totalQuizzes}`,
-      sub: data.quizzesCompleted === data.totalQuizzes ? 'All Answered' : 'Partial',
-      color: data.quizzesCompleted === data.totalQuizzes ? COLORS.success : COLORS.teal,
-    },
-    {
-      label: 'Total Time',
-      value: formatMs(data.totalTimeSpentMs),
-      sub: 'Session Duration',
-      color: COLORS.teal,
-    }
-  ]
-
-  stats.forEach((stat, i) => {
-    const sx = margin + i * (statCardW + gap)
-
-    // Card background
-    drawRoundedRect(doc, sx, curY, statCardW, statCardH, 3, COLORS.white, COLORS.border)
-
-    // Teal top accent
-    doc.setFillColor(...stat.color)
-    // Draw a small bar at top of card
-    doc.roundedRect(sx, curY, statCardW, 3, 3, 3, 'F')
-    // Fill the bottom part that got rounded
-    doc.rect(sx, curY + 1.5, statCardW, 1.5, 'F')
-
-    // Label
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(8)
-    doc.setTextColor(...COLORS.textMuted)
-    doc.text(stat.label, sx + statCardW / 2, curY + 10, { align: 'center' })
-
-    // Value
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(16)
-    doc.setTextColor(...COLORS.navy)
-    doc.text(stat.value, sx + statCardW / 2, curY + 19, { align: 'center' })
-
-    // Sub-label
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(7)
-    doc.setTextColor(...stat.color)
-    doc.text(stat.sub, sx + statCardW / 2, curY + 24, { align: 'center' })
-  })
-
-  curY += statCardH + 10
-
-  // =========================================================================
-  // SECTION 3 — Training Phases Table
-  // =========================================================================
-
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(11)
-  doc.setTextColor(...COLORS.teal)
-  doc.text('Training Phases', margin, curY + 1)
-  curY += 4
-
-  const phaseRows = TASK_SEQUENCE.map((task, idx) => {
-    const completed = idx < data.phasesCompleted
-    return [
-      `Phase ${idx + 1}`,
-      task.name,
-      task.description,
-      completed ? 'Completed' : 'Not Completed',
-    ]
-  })
+  doc.setFontSize(13)
+  doc.setTextColor(...COLORS.navy)
+  doc.text('Student Information', margin, curY)
+  curY += 2
 
   autoTable(doc, {
-    head: [['Phase', 'Task Name', 'Description', 'Status']],
-    body: phaseRows,
+    body: [
+      ['Full Name', data.student.full_name || 'N/A'],
+      ['Email', data.student.email || 'N/A'],
+      ['Course', data.student.course_name || 'N/A'],
+      ['Institution', data.student.institution || 'N/A'],
+    ],
     startY: curY,
+    theme: 'plain',
     styles: {
-      fontSize: 8,
-      cellPadding: 3,
+      fontSize: 9,
+      cellPadding: { top: 3, bottom: 3, left: 5, right: 5 },
       lineColor: COLORS.border,
       lineWidth: 0.2,
     },
-    headStyles: {
-      fillColor: COLORS.navy,
-      textColor: COLORS.white,
-      fontStyle: 'bold',
-      fontSize: 8,
-    },
-    bodyStyles: {
-      textColor: COLORS.textPrimary,
-    },
-    alternateRowStyles: {
-      fillColor: COLORS.rowAlt,
-    },
     columnStyles: {
-      0: { cellWidth: 20, halign: 'center', fontStyle: 'bold' },
-      1: { cellWidth: 36 },
-      2: { cellWidth: 'auto' },
-      3: { cellWidth: 28, halign: 'center' },
+      0: {
+        cellWidth: 45,
+        fontStyle: 'bold',
+        textColor: COLORS.textMuted,
+        fillColor: COLORS.rowAlt,
+      },
+      1: {
+        textColor: COLORS.textPrimary,
+      },
     },
-    didParseCell: (hookData) => {
-      // Color the status column
-      if (hookData.section === 'body' && hookData.column.index === 3) {
-        const val = hookData.cell.raw as string
-        if (val === 'Completed') {
-          hookData.cell.styles.textColor = COLORS.success
-          hookData.cell.styles.fontStyle = 'bold'
-        } else {
-          hookData.cell.styles.textColor = COLORS.error
-        }
-      }
-    },
+    tableLineColor: COLORS.border,
+    tableLineWidth: 0.2,
     margin: { left: margin, right: margin },
   })
 
-  // Get Y after table
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   curY = (doc as any).lastAutoTable.finalY + 10
 
   // =========================================================================
-  // SECTION 4 — Quiz Performance Table
+  // SECTION 2 — Session Information (h3)
+  // Data source: training_sessions columns
   // =========================================================================
 
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(11)
-  doc.setTextColor(...COLORS.teal)
-  doc.text('Quiz Performance', margin, curY + 1)
-  curY += 4
+  doc.setFontSize(13)
+  doc.setTextColor(...COLORS.navy)
+  doc.text('Session Information', margin, curY)
+  curY += 2
 
-  // Build quiz rows from questionData
-  const quizRows: string[][] = []
-  let totalAttempts = 0
+  const phasesDisplay = `${data.session.phases_completed} / ${TOTAL_PHASES}`
+  const timeDisplay = formatSeconds(data.session.total_time_spent)
+  const progressDisplay = `${Number(data.session.overall_progress).toFixed(0)}%`
+
+  autoTable(doc, {
+    body: [
+      ['Phases Completed', phasesDisplay],
+      ['Total Time Spent', timeDisplay],
+      ['Progress', progressDisplay],
+    ],
+    startY: curY,
+    theme: 'plain',
+    styles: {
+      fontSize: 9,
+      cellPadding: { top: 3, bottom: 3, left: 5, right: 5 },
+      lineColor: COLORS.border,
+      lineWidth: 0.2,
+    },
+    columnStyles: {
+      0: {
+        cellWidth: 45,
+        fontStyle: 'bold',
+        textColor: COLORS.textMuted,
+        fillColor: COLORS.rowAlt,
+      },
+      1: {
+        textColor: COLORS.textPrimary,
+      },
+    },
+    tableLineColor: COLORS.border,
+    tableLineWidth: 0.2,
+    margin: { left: margin, right: margin },
+  })
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  curY = (doc as any).lastAutoTable.finalY + 10
+
+  // =========================================================================
+  // SECTION 3 — Quiz Results (h3)
+  // Data source: quiz_responses.question_data JSONB column
+  // =========================================================================
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(13)
+  doc.setTextColor(...COLORS.navy)
+  doc.text('Quiz Results', margin, curY)
+  curY += 2
+
+  // Build rows by mapping over question_data entries
+  // Sort by question key to ensure consistent ordering (Q1, Q2, Q4, Q5, Q6)
+  const sortedEntries = Object.entries(data.questionData)
+    .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
+
   let totalCorrect = 0
-  let totalQuizTimeMs = 0
 
-  QUESTION_IDS.forEach((qId) => {
-    const qConfig = QUESTION_DATABASE[qId]
-    // Find matching entry in questionData
-    let entry = null
-    for (const [key, val] of Object.entries(data.questionData)) {
-      const resolvedId = keyToQuestionId(key)
-      if (resolvedId === qId) {
-        entry = val
-        break
-      }
-    }
+  const quizRows = sortedEntries.map(([, entry], index) => {
+    const score = entry.correct ? 1 : 0
+    totalCorrect += score
 
-    if (entry) {
-      totalAttempts += entry.attempts
-      totalQuizTimeMs += entry.time
-      if (entry.correct) totalCorrect++
-
-      quizRows.push([
-        qId,
-        qConfig?.name || qId,
-        entry.correct ? 'Correct' : 'Incorrect',
-        `${entry.attempts}`,
-        formatMs(entry.time),
-      ])
-    } else {
-      quizRows.push([
-        qId,
-        qConfig?.name || qId,
-        'Not Answered',
-        '-',
-        '-',
-      ])
-    }
+    return [
+      `${index + 1}`,                         // Sr
+      entry.answer,                            // Answer (A, B, C, D)
+      entry.correct ? 'Yes' : 'No',           // Correct
+      formatMs(entry.time),                    // Time
+      `${entry.attempts}`,                     // Total Attempts
+      `${score}`,                              // Score (1 or 0)
+    ]
   })
 
   autoTable(doc, {
-    head: [['Quiz', 'Topic', 'Result', 'Attempts', 'Time Spent']],
+    head: [['Sr', 'Answer', 'Correct', 'Time', 'Total Attempts', 'Score']],
     body: quizRows,
     startY: curY,
     styles: {
-      fontSize: 8,
-      cellPadding: 3,
+      fontSize: 9,
+      cellPadding: { top: 3, bottom: 3, left: 4, right: 4 },
       lineColor: COLORS.border,
       lineWidth: 0.2,
+      halign: 'center',
     },
     headStyles: {
       fillColor: COLORS.navy,
       textColor: COLORS.white,
       fontStyle: 'bold',
-      fontSize: 8,
+      fontSize: 9,
     },
     bodyStyles: {
       textColor: COLORS.textPrimary,
@@ -437,24 +302,27 @@ export async function generateResultPDF(data: StudentResultData): Promise<void> 
     alternateRowStyles: {
       fillColor: COLORS.rowAlt,
     },
-    columnStyles: {
-      0: { cellWidth: 16, halign: 'center', fontStyle: 'bold' },
-      1: { cellWidth: 36 },
-      2: { cellWidth: 28, halign: 'center' },
-      3: { cellWidth: 22, halign: 'center' },
-      4: { cellWidth: 26, halign: 'center' },
-    },
     didParseCell: (hookData) => {
+      // Color the Correct column
       if (hookData.section === 'body' && hookData.column.index === 2) {
         const val = hookData.cell.raw as string
-        if (val === 'Correct') {
+        if (val === 'Yes') {
           hookData.cell.styles.textColor = COLORS.success
           hookData.cell.styles.fontStyle = 'bold'
-        } else if (val === 'Incorrect') {
+        } else {
           hookData.cell.styles.textColor = COLORS.error
           hookData.cell.styles.fontStyle = 'bold'
+        }
+      }
+      // Color the Score column
+      if (hookData.section === 'body' && hookData.column.index === 5) {
+        const val = hookData.cell.raw as string
+        if (val === '1') {
+          hookData.cell.styles.textColor = COLORS.success
+          hookData.cell.styles.fontStyle = 'bold'
         } else {
-          hookData.cell.styles.textColor = COLORS.textMuted
+          hookData.cell.styles.textColor = COLORS.error
+          hookData.cell.styles.fontStyle = 'bold'
         }
       }
     },
@@ -462,36 +330,14 @@ export async function generateResultPDF(data: StudentResultData): Promise<void> 
   })
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  curY = (doc as any).lastAutoTable.finalY + 8
+  curY = (doc as any).lastAutoTable.finalY + 6
 
-  // =========================================================================
-  // SECTION 5 — Quiz Summary Bar
-  // =========================================================================
-
-  const summaryH = 16
-  drawRoundedRect(doc, margin, curY, contentW, summaryH, 3, COLORS.navy)
-
-  const summaryItems = [
-    { label: 'Score', value: `${totalCorrect} / ${QUESTION_IDS.length}` },
-    { label: 'Accuracy', value: `${QUESTION_IDS.length > 0 ? Math.round((totalCorrect / QUESTION_IDS.length) * 100) : 0}%` },
-    { label: 'Total Attempts', value: `${totalAttempts}` },
-    { label: 'Total Quiz Time', value: formatMs(totalQuizTimeMs) },
-  ]
-
-  const summaryColW = contentW / summaryItems.length
-  summaryItems.forEach((item, i) => {
-    const sx = margin + i * summaryColW + summaryColW / 2
-
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(7)
-    doc.setTextColor(...COLORS.tealLight)
-    doc.text(item.label, sx, curY + 6, { align: 'center' })
-
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(11)
-    doc.setTextColor(...COLORS.white)
-    doc.text(item.value, sx, curY + 13, { align: 'center' })
-  })
+  // Total score summary line
+  const totalQuestions = sortedEntries.length
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(10)
+  doc.setTextColor(...COLORS.navy)
+  doc.text(`Total Score: ${totalCorrect} / ${totalQuestions}`, pageW - margin, curY, { align: 'right' })
 
   // =========================================================================
   // FOOTER — Page number + logo + accent line
@@ -519,7 +365,6 @@ export async function generateResultPDF(data: StudentResultData): Promise<void> 
   // Save
   // =========================================================================
 
-  const filename = `${data.firstName}_${data.lastName}_Training_Results.pdf`
-    .replace(/\s+/g, '_')
-  doc.save(filename)
+  const safeName = data.student.full_name.replace(/\s+/g, '_') || 'Student'
+  doc.save(`${safeName}_Training_Report.pdf`)
 }

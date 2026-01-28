@@ -4,14 +4,18 @@
  * TrainingCompleteModal Component
  *
  * Displays when student completes all training phases.
+ * Allows student to export their training report as PDF.
  * Redirects to session-complete page for proper cleanup.
  */
 
+import { useState } from 'react'
 import Image from 'next/image'
-import { CheckCircle } from "lucide-react"
+import { CheckCircle, Download } from "lucide-react"
 import { BaseModal, ModalMessage, ModalFooter } from '@/app/components/shared'
 import { Button } from '@/app/components/shared'
 import { redirectToSessionComplete } from '@/app/lib/sessionCompleteRedirect'
+import { generateResultPDF } from '@/app/components/ResultExportPDF'
+import type { ResultPDFData } from '@/app/components/ResultExportPDF'
 
 // =============================================================================
 // Props Interface
@@ -40,6 +44,7 @@ export function TrainingCompleteModal({
   role = 'student',
   onClose
 }: TrainingCompleteModalProps) {
+  const [isExporting, setIsExporting] = useState(false)
 
   const handleContinue = () => {
     // Redirect to session-complete page for proper cleanup
@@ -52,6 +57,44 @@ export function TrainingCompleteModal({
       returnUrl,
       isLti,
     })
+  }
+
+  const handleExportReport = async () => {
+    setIsExporting(true)
+    try {
+      const response = await fetch('/api/training/export', {
+        method: 'GET',
+        credentials: 'include',
+      })
+
+      const result = await response.json()
+
+      if (!result.success || !result.data) {
+        console.warn('Failed to fetch export data:', result.error)
+        return
+      }
+
+      const pdfData: ResultPDFData = {
+        student: {
+          full_name: result.data.student?.full_name || 'N/A',
+          email: result.data.student?.email || 'N/A',
+          course_name: result.data.student?.course_name || 'OP-Skillsim Plumbing Training',
+          institution: result.data.student?.institution || 'Open Polytechnic Kuratini Tuwhera',
+        },
+        session: {
+          phases_completed: result.data.session?.phases_completed || 0,
+          total_time_spent: result.data.session?.total_time_spent || 0,
+          overall_progress: result.data.session?.overall_progress || 0,
+        },
+        questionData: result.data.questionData || {},
+      }
+
+      await generateResultPDF(pdfData)
+    } catch (error) {
+      console.error('Failed to export report:', error)
+    } finally {
+      setIsExporting(false)
+    }
   }
 
   const getButtonText = () => {
@@ -102,8 +145,16 @@ export function TrainingCompleteModal({
         </div>
       </div>
 
-      {/* Action Button */}
+      {/* Action Buttons */}
       <ModalFooter>
+        <Button
+          variant="secondary"
+          onClick={handleExportReport}
+          disabled={isExporting}
+          leftIcon={<Download size={16} />}
+        >
+          {isExporting ? 'Exporting...' : 'Export Report'}
+        </Button>
         <Button
           variant="primary"
           onClick={handleContinue}
