@@ -988,17 +988,8 @@ export default function StreamingApp() {
    * Handle starting a brand new training session
    * This shows cinematic mode first, session created when user clicks "Skip to Training"
    */
-  const handleStartNewSession = useCallback( async() => {
+  const handleStartNewSession = useCallback(() => {
     console.log('🆕 Starting new training session - cinematic mode first')
-    try {
-      // Create a new session in the database (link to current login session)
-      const result = await trainingSessionService.createNewSession()
-      if (!result.success) {
-        console.error('Failed to start new session:', result.error)
-      }
-    } catch (error) {
-      console.error('Error starting new session:', error)
-    }
 
     // Clear any selected session and proceed with cinematic mode
     // Session will be created when user clicks "Skip to Training"
