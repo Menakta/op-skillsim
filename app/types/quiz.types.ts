@@ -160,8 +160,9 @@ export function keyToQuestionId(key: string): string {
 export function buildQuestionDataMap(answers: QuizAnswerState[]): QuestionDataMap {
   const map: QuestionDataMap = {}
   for (const answer of answers) {
-    const key = questionIdToKey(answer.questionId)
-    map[key] = {
+    // Use questionId directly (e.g., "Q1") to match the key format
+    // used by quizService.saveAnswer() and the questionnaires table
+    map[answer.questionId] = {
       answer: indexToAnswer(answer.selectedAnswer),
       attempts: answer.attemptCount,
       time: answer.timeToAnswer,

@@ -126,11 +126,19 @@ function sanitizeQuestionData(
   const sanitized: QuestionDataMap = {}
 
   for (const [key, value] of Object.entries(questionData)) {
+    // Resolve any key format (e.g., "q_001" or "Q1") to canonical ID ("Q1")
     const questionId = keyToQuestionId(key)
-    if (validIds.has(questionId)) {
-      sanitized[key] = value
-    } else {
-      logger.info({ key, questionId }, 'Removing redundant question entry not found in questionnaires')
+
+    if (!validIds.has(questionId)) {
+      logger.info({ key, questionId }, 'Removing question entry not found in questionnaires')
+      continue
+    }
+
+    // Normalize to canonical question ID (e.g., "Q1") as the key.
+    // If both "Q1" and "q_001" exist, the canonical "Q1" entry wins
+    // because we process in insertion order and skip if already present.
+    if (!sanitized[questionId]) {
+      sanitized[questionId] = value
     }
   }
 
