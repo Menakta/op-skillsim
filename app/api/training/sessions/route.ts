@@ -196,7 +196,7 @@ export async function POST(request: NextRequest) {
       email: session.email,
       full_name: ltiContext.full_name || 'Unknown Student',
       course_name: ltiContext.courseName || 'OP-Skillsim Pipe Training',
-      institution: ltiContext.institution || 'Unknown Institution',
+      institution: ltiContext.institution || 'Open Polytechnic of Kuratini Tuwhera',
       lti_role: ltiContext.lti_role || 'student',
       enrolled_at: new Date().toISOString(),
     }
