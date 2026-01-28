@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Layers, Navigation, X, Camera, Video, Home, Eye, EyeOff, ChevronDown, ChevronRight, Maximize, Minimize } from 'lucide-react'
+import { Layers, Navigation, X, Camera, Video, Home, Eye, EyeOff, ChevronDown, ChevronRight, Maximize, Minimize, PanelLeftOpen, Sun, Moon } from 'lucide-react'
 import { ExplosionControls } from './ExplosionControls'
 import { WaypointControls } from './WaypointControls'
 import { CameraControls } from './CameraControls'
@@ -125,8 +125,9 @@ export function CinematicMobileControls({
   const [showLayerPanel, setShowLayerPanel] = useState(false)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  const { theme } = useTheme()
+  const { theme, toggleTheme } = useTheme()
   const isDark = theme === 'dark'
   const isOrbitActive = cameraMode === 'Orbit'
 
@@ -205,25 +206,49 @@ export function CinematicMobileControls({
 
   return (
     <>
-      {/* Desktop: Dropdown panels on left side */}
-      <div className="hidden sm:block">
-        <div className={`fixed left-4 top-20 z-30 w-56 backdrop-blur-md rounded-xl border overflow-hidden ${
-          isDark ? 'bg-black/80 border-white/10' : 'bg-white/90 border-gray-200 shadow-lg'
+      {/* Desktop: Sidebar toggle button — placed where ThemeToggle normally sits */}
+      <button
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        className={`${sidebarOpen ? 'hidden' : 'sm:flex'} fixed top-4 left-4 z-50 w-10 h-10 rounded-xl items-center justify-center backdrop-blur-md border transition-all duration-200 ${
+           isDark
+              ? 'bg-black/70 hover:bg-black/80 text-white/80 hover:text-white border-white/10'
+              : 'bg-white/90 hover:bg-white text-gray-700 hover:text-gray-900 border-gray-200 shadow-lg'
+        }`}
+        title={sidebarOpen ? 'Close Controls' : 'Open Controls'}
+      >
+        {!sidebarOpen && <PanelLeftOpen className="w-5 h-5" />}
+      </button>
+
+      {/* Desktop: Full-height sidebar */}
+      <div className={`hidden sm:flex fixed top-0 left-0 bottom-0 z-40 w-64 flex-col backdrop-blur-md border-r transition-transform duration-300 ease-in-out ${
+        sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+      } ${isDark ? 'bg-black/90 border-white/10' : 'bg-white/95 border-gray-200 shadow-xl'}`}>
+
+        {/* Sidebar Header */}
+        <div className={`px-4 py-4 border-b flex items-center justify-between flex-shrink-0 ${
+          isDark ? 'border-white/10' : 'border-gray-200'
         }`}>
+          <span className={`font-semibold text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>Controls</span>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className={`p-1.5 rounded-lg transition-colors ${
+              isDark ? 'text-gray-400 hover:text-white hover:bg-white/10' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
+            }`}
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Scrollable accordion content */}
+        <div className="flex-1 overflow-y-auto">
           {/* Explosion Dropdown */}
           <div>
             <button
-              onClick={() => {
-                setShowExplosionPanel(!showExplosionPanel)
-                if (!showExplosionPanel) {
-                  setShowWaypointPanel(false)
-                  setShowLayerPanel(false)
-                }
-              }}
+              onClick={() => setShowExplosionPanel(!showExplosionPanel)}
               className={`w-full flex items-center justify-between px-3 py-2.5 transition-colors ${
                 isDark
-                  ? 'bg-gradient-to-r from-[#39BEAE]/20 to-transparent hover:from-[#39BEAE]/30'
-                  : 'bg-gradient-to-r from-[#39BEAE]/10 to-transparent hover:from-[#39BEAE]/20'
+                  ? showExplosionPanel ? 'bg-[#39BEAE]/10' : 'hover:bg-white/5'
+                  : showExplosionPanel ? 'bg-[#39BEAE]/5' : 'hover:bg-gray-50'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -263,15 +288,11 @@ export function CinematicMobileControls({
           {/* Waypoint Dropdown */}
           <div className={`border-t ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
             <button
-              onClick={() => {
-                setShowWaypointPanel(!showWaypointPanel)
-                if (!showWaypointPanel) {
-                  setShowExplosionPanel(false)
-                  setShowLayerPanel(false)
-                }
-              }}
+              onClick={() => setShowWaypointPanel(!showWaypointPanel)}
               className={`w-full flex items-center justify-between px-3 py-2.5 transition-colors ${
-                isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'
+                isDark
+                  ? showWaypointPanel ? 'bg-[#39BEAE]/10' : 'hover:bg-white/5'
+                  : showWaypointPanel ? 'bg-[#39BEAE]/5' : 'hover:bg-gray-50'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -320,15 +341,11 @@ export function CinematicMobileControls({
           {/* Layers Dropdown */}
           <div className={`border-t ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
             <button
-              onClick={() => {
-                setShowLayerPanel(!showLayerPanel)
-                if (!showLayerPanel) {
-                  setShowExplosionPanel(false)
-                  setShowWaypointPanel(false)
-                }
-              }}
+              onClick={() => setShowLayerPanel(!showLayerPanel)}
               className={`w-full flex items-center justify-between px-3 py-2.5 transition-colors ${
-                isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'
+                isDark
+                  ? showLayerPanel ? 'bg-[#39BEAE]/10' : 'hover:bg-white/5'
+                  : showLayerPanel ? 'bg-[#39BEAE]/5' : 'hover:bg-gray-50'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -397,34 +414,106 @@ export function CinematicMobileControls({
               </div>
             )}
           </div>
+
+          {/* Camera Dropdown */}
+          <div className={`border-t ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
+            <button
+              onClick={() => setShowCameraPanel(!showCameraPanel)}
+              className={`w-full flex items-center justify-between px-3 py-2.5 transition-colors ${
+                isDark
+                  ? showCameraPanel ? 'bg-[#39BEAE]/10' : 'hover:bg-white/5'
+                  : showCameraPanel ? 'bg-[#39BEAE]/5' : 'hover:bg-gray-50'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Camera className="w-4 h-4 text-[#39BEAE]" />
+                <span className={`font-semibold text-xs ${isDark ? 'text-white' : 'text-gray-900'}`}>Camera</span>
+              </div>
+              <ChevronDown className={`w-4 h-4 transition-transform ${showCameraPanel ? 'rotate-180' : ''} ${isDark ? 'text-gray-400' : 'text-gray-500'}`} />
+            </button>
+            {showCameraPanel && (
+              <div className={`p-3 space-y-3 border-t ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
+                <div>
+                  <label className={`text-xs mb-2 block ${isDark ? 'text-white/70' : 'text-gray-600'}`}>Camera View</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {CAMERA_PERSPECTIVES.map((cam) => (
+                      <button
+                        key={cam.id}
+                        onClick={() => onSetCameraPerspective(cam.id)}
+                        className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                          cameraPerspective === cam.id
+                            ? 'bg-[#39BEAE] text-white'
+                            : isDark
+                              ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50 hover:text-white'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+                        }`}
+                      >
+                        {cam.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={onToggleAutoOrbit}
+                    className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                      isOrbitActive
+                        ? 'bg-[#39BEAE] text-white'
+                        : isDark
+                          ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50 hover:text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+                    }`}
+                  >
+                    <Video className="w-3.5 h-3.5" />
+                    {isOrbitActive ? 'Stop Orbit' : 'Auto Orbit'}
+                  </button>
+                  <button
+                    onClick={onResetCamera}
+                    className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                      isDark
+                        ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50 hover:text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+                    }`}
+                  >
+                    <Home className="w-3.5 h-3.5" />
+                    Reset
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Sidebar Footer — Theme Toggle + Fullscreen */}
+        <div className={`px-3 py-3 border-t flex items-center gap-2 flex-shrink-0 ${
+          isDark ? 'border-white/10' : 'border-gray-200'
+        }`}>
+          <button
+            onClick={toggleTheme}
+            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+              isDark
+                ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50 hover:text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+            }`}
+            title={isDark ? 'Light Mode' : 'Dark Mode'}
+          >
+            {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            {isDark ? 'Light Mode' : 'Dark Mode'}
+          </button>
+          <button
+            onClick={toggleFullscreen}
+            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+              isDark
+                ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50 hover:text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+            }`}
+            title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+          >
+            {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+            {isFullscreen ? 'Exit' : 'Fullscreen'}
+          </button>
         </div>
       </div>
-
-      {/* Desktop: Camera Controls at bottom center */}
-      <div className="hidden sm:block">
-        <CameraControls
-          currentPerspective={cameraPerspective}
-          cameraMode={cameraMode}
-          onSetPerspective={onSetCameraPerspective}
-          onToggleAutoOrbit={onToggleAutoOrbit}
-          onResetCamera={onResetCamera}
-          isVisible={true}
-        />
-      </div>
-
-      {/* Desktop: Fullscreen Button - Top Right */}
-      <button
-        onClick={toggleFullscreen}
-        className={`hidden sm:flex fixed top-4 right-4 z-40 items-center gap-2 px-4 py-2 backdrop-blur-md rounded-xl border transition-all duration-200 text-sm font-medium ${
-          isDark
-            ? 'bg-black/70 hover:bg-black/80 text-white/80 hover:text-white border-white/10'
-            : 'bg-white/90 hover:bg-white text-gray-700 hover:text-gray-900 border-gray-200 shadow-lg'
-        }`}
-        title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
-      >
-        {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
-        {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-      </button>
 
       {/* Mobile: Fullscreen Button - Top Right */}
       <button

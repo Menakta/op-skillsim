@@ -27,6 +27,11 @@ const ThemeToggle = dynamic(() => import('../components/ThemeToggle'), {
   loading: () => null,
 })
 
+const TrainingSidebar = dynamic(() => import('../components/ControlPanel/TrainingSidebar'), {
+  ssr: false,
+  loading: () => null,
+})
+
 const MessageLog = dynamic(() => import('../components/MessageLog'), {
   ssr: false,
   loading: () => null,
@@ -1259,8 +1264,19 @@ export default function StreamingApp() {
 
   return (
     <div className={`h-screen w-screen relative overflow-hidden ${forcesDarkBg ? 'bg-[#1E1E1E]' : isDark ? 'bg-[#1E1E1E]' : 'bg-gray-100'}`}>
-      {/* Theme Toggle - Show when stream is connected (both cinematic and training modes) */}
-      {isConnected && <ThemeToggle />}
+      {/* Theme Toggle - Hidden when connected (both cinematic and training sidebars have their own toggle) */}
+      {/* ThemeToggle is only shown when NOT connected yet, as a standalone button */}
+
+      {/* Training Sidebar - Slim left sidebar with theme/pause/quit buttons (desktop only) */}
+      {isConnected && !isCinematicMode && (
+        <TrainingSidebar
+          isPaused={isTrainingPaused}
+          isVisible={training.state.trainingStarted || training.state.isActive || training.state.mode === 'training'}
+          onPause={handlePauseTraining}
+          onResume={handleResumeTraining}
+          onQuit={handleQuitTrainingClick}
+        />
+      )}
 
       {/* Cinematic Mode Timer - Show when connected and in cinematic mode */}
       {isConnected && isCinematicMode && (
@@ -1316,14 +1332,16 @@ export default function StreamingApp() {
         />
       )}
 
-      {/* Training Action Buttons (Pause/Resume, Quit) - Show during training mode */}
-      <TrainingActionButtons
-        isPaused={isTrainingPaused}
-        isVisible={isConnected && !isCinematicMode && (training.state.trainingStarted || training.state.isActive || training.state.mode === 'training')}
-        onPause={handlePauseTraining}
-        onResume={handleResumeTraining}
-        onQuit={handleQuitTrainingClick}
-      />
+      {/* Training Action Buttons (Pause/Resume, Quit) - Mobile only (desktop uses TrainingSidebar) */}
+      <div className="sm:hidden">
+        <TrainingActionButtons
+          isPaused={isTrainingPaused}
+          isVisible={isConnected && !isCinematicMode && (training.state.trainingStarted || training.state.isActive || training.state.mode === 'training')}
+          onPause={handlePauseTraining}
+          onResume={handleResumeTraining}
+          onQuit={handleQuitTrainingClick}
+        />
+      </div>
 
       {/* Message Log - Only show when stream is connected and NOT in cinematic mode */}
       {isConnected && !isCinematicMode && (

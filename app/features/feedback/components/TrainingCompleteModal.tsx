@@ -158,7 +158,8 @@ export function TrainingCompleteModal({
 
       {/* Action Buttons */}
       <ModalFooter>
-        <Button
+        {isLti && role === 'student' && (
+          <Button
           variant="secondary"
           onClick={handleExportReport}
           disabled={isExporting}
@@ -166,6 +167,9 @@ export function TrainingCompleteModal({
         >
           {isExporting ? 'Exporting...' : 'Export Report'}
         </Button>
+          
+        )}
+       
         <Button
           variant="primary"
           onClick={handleContinue}
