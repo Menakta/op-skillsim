@@ -6,8 +6,8 @@ import type { ToolName } from '@/app/lib/messageTypes'
 import { useAppSelector } from '@/app/store/hooks'
 import { selectTrainingState } from '@/app/store/slices/trainingSlice'
 
-// Import components - Only ToolBar and TaskTools remain here
-import { TaskTools } from './TaskTools'
+// Import components - Only ToolBar remains here
+// TaskTools is now integrated into TrainingSidebar
 import { ToolBar } from './ToolBar'
 
 // =============================================================================
@@ -38,18 +38,11 @@ export function ControlPanel({
   const state = useAppSelector(selectTrainingState)
 
   // ==========================================================================
-  // Render - Only ToolBar and TaskTools
+  // Render - Only ToolBar (TaskTools moved to TrainingSidebar)
   // ==========================================================================
 
   return (
     <>
-      {/* Left Side - Task Tools (shows only for pipe/pressure test selection) */}
-      <TaskTools
-        state={state}
-        onSelectPipe={onSelectPipe}
-        onSelectPressureTest={onSelectPressureTest}
-      />
-
       {/* Tool Bar - Always visible at bottom */}
       <ToolBar
         state={state}

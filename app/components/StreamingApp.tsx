@@ -1252,6 +1252,7 @@ export default function StreamingApp() {
       {/* ThemeToggle is only shown when NOT connected yet, as a standalone button */}
 
       {/* Training Sidebar - Slim left sidebar with theme/pause/quit buttons (desktop only) */}
+      {/* Also includes TaskTools that auto-opens when PipeConnection or PressureTester is selected */}
       {isConnected && !isCinematicMode && (
         <TrainingSidebar
           isPaused={isTrainingPaused}
@@ -1259,6 +1260,9 @@ export default function StreamingApp() {
           onPause={handlePauseTraining}
           onResume={handleResumeTraining}
           onQuit={handleQuitTrainingClick}
+          trainingState={training.state}
+          onSelectPipe={training.selectPipe}
+          onSelectPressureTest={training.selectPressureTest}
         />
       )}
 
