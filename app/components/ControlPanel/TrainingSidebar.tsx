@@ -227,7 +227,7 @@ export function TrainingSidebar({
                   }`}
                   title={trainingState?.airPlugSelected ? 'Conduct Test' : 'Select Air Plug First'}
                 >
-                  <Play className={isDark ? 'text-white' : 'text-gray-800'} />
+                  <Play className={isDark ? 'text-gray-700' : 'text-gray-800'} />
                 </button>
               </>
             )}
