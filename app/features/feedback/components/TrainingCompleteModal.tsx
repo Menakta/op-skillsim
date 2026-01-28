@@ -46,8 +46,16 @@ export function TrainingCompleteModal({
 }: TrainingCompleteModalProps) {
   const [isExporting, setIsExporting] = useState(false)
 
+  const isStaff = role === 'admin' || role === 'teacher'
+
   const handleContinue = () => {
-    // Redirect to session-complete page for proper cleanup
+    if (isStaff) {
+      // Staff: redirect back to admin panel without clearing session
+      window.location.href = '/admin'
+      return
+    }
+
+    // Students: redirect to session-complete page for proper cleanup
     redirectToSessionComplete({
       reason: 'completed',
       role,
@@ -98,6 +106,9 @@ export function TrainingCompleteModal({
   }
 
   const getButtonText = () => {
+    if (isStaff) {
+      return 'Back to Dashboard'
+    }
     if (isLti && returnUrl) {
       return 'Return to Course'
     } else if (!isLti) {
