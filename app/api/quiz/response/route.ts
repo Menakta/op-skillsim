@@ -13,6 +13,7 @@ import { jwtVerify } from 'jose'
 import { getSupabaseAdmin } from '@/app/lib/supabase/admin'
 import { logger } from '@/app/lib/logger'
 import type { QuestionDataMap } from '@/app/types'
+import { keyToQuestionId } from '@/app/types'
 
 const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'your-super-secret-jwt-key-min-32-chars'
@@ -97,6 +98,46 @@ function isValidQuestionDataMap(data: unknown): data is QuestionDataMap {
 }
 
 // =============================================================================
+// Helper: Get valid question IDs from questionnaires table
+// =============================================================================
+
+async function getValidQuestionIds(): Promise<Set<string>> {
+  const supabase = getSupabaseAdmin()
+  const { data, error } = await supabase
+    .from('questionnaires')
+    .select('question_id')
+
+  if (error || !data) {
+    logger.warn({ error: error?.message }, 'Failed to fetch valid question IDs')
+    return new Set()
+  }
+
+  return new Set(data.map((q: { question_id: string }) => q.question_id))
+}
+
+// =============================================================================
+// Helper: Remove entries whose keys don't map to valid questionnaire IDs
+// =============================================================================
+
+function sanitizeQuestionData(
+  questionData: QuestionDataMap,
+  validIds: Set<string>
+): QuestionDataMap {
+  const sanitized: QuestionDataMap = {}
+
+  for (const [key, value] of Object.entries(questionData)) {
+    const questionId = keyToQuestionId(key)
+    if (validIds.has(questionId)) {
+      sanitized[key] = value
+    } else {
+      logger.info({ key, questionId }, 'Removing redundant question entry not found in questionnaires')
+    }
+  }
+
+  return sanitized
+}
+
+// =============================================================================
 // POST - Save quiz response (upsert - incremental save after each question)
 // =============================================================================
 
@@ -157,6 +198,12 @@ export async function POST(request: NextRequest) {
     const supabase = getSupabaseAdmin()
     const trainingSessionId = await getTrainingSessionId(session.sessionId)
 
+    // 4b. Fetch valid question IDs and sanitize incoming data
+    const validIds = await getValidQuestionIds()
+    const sanitizedQuestionData = validIds.size > 0
+      ? sanitizeQuestionData(questionData, validIds)
+      : questionData // Fallback: keep original if lookup fails
+
     if (!trainingSessionId) {
       // No training session exists - this shouldn't happen in normal flow
       // Training session should be created when training starts, not here
@@ -167,13 +214,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 5. Calculate correct count and score from question data
-    // Ensure correctCount doesn't exceed totalQuestions
-    const rawCorrectCount = Object.values(questionData).filter(q => q.correct).length
-    const correctCount = Math.min(rawCorrectCount, totalQuestions)
-    const answeredCount = Object.keys(questionData).length
-    const scorePercentage = finalScorePercentage ??
-      (totalQuestions > 0 ? Math.min(Math.round((correctCount / totalQuestions) * 100), 100) : 0)
+    // 5. Use the actual valid question count as the authoritative totalQuestions
+    // This prevents the client from inflating the count with DB questions
+    // that the stream never requested
+    const actualTotalQuestions = validIds.size > 0 ? validIds.size : totalQuestions
+
+    // Calculate correct count and score from sanitized question data
+    const rawCorrectCount = Object.values(sanitizedQuestionData).filter(q => q.correct).length
+    const correctCount = Math.min(rawCorrectCount, actualTotalQuestions)
+    const answeredCount = Object.keys(sanitizedQuestionData).length
+    const scorePercentage = actualTotalQuestions > 0
+      ? Math.min(Math.round((correctCount / actualTotalQuestions) * 100), 100)
+      : 0
 
     // 6. Check if a quiz response already exists for this session
     const { data: existingResponse, error: fetchError } = await supabase
@@ -188,32 +240,38 @@ export async function POST(request: NextRequest) {
     let insertError
 
     if (existingResponse && !fetchError) {
-      // Update existing response - merge question data
+      // Update existing response - merge question data then sanitize
       const existingQuestionData = existingResponse.question_data || {}
-      const mergedQuestionData = { ...existingQuestionData, ...questionData }
+      const rawMerged = { ...existingQuestionData, ...sanitizedQuestionData }
 
-      // Count correct answers from merged data (ensure we don't exceed totalQuestions)
+      // Sanitize the merged result to strip any redundant entries
+      // that may have been stored previously
+      const mergedQuestionData = validIds.size > 0
+        ? sanitizeQuestionData(rawMerged as QuestionDataMap, validIds)
+        : rawMerged
+
+      // Count correct answers from merged data
       const mergedCorrectCount = Math.min(
         Object.values(mergedQuestionData as Record<string, { correct: boolean }>).filter((q) => q.correct).length,
-        totalQuestions
+        actualTotalQuestions
       )
-      // Cap score at 100%
-      const mergedScorePercentage = totalQuestions > 0
-        ? Math.min(Math.round((mergedCorrectCount / totalQuestions) * 100), 100)
+      const mergedScorePercentage = actualTotalQuestions > 0
+        ? Math.min(Math.round((mergedCorrectCount / actualTotalQuestions) * 100), 100)
         : 0
 
       logger.info({
         existingId: existingResponse.id,
         existingQuestions: Object.keys(existingQuestionData).length,
-        newQuestions: Object.keys(questionData).length,
-        mergedQuestions: Object.keys(mergedQuestionData).length
-      }, 'Updating existing quiz response')
+        newQuestions: Object.keys(sanitizedQuestionData).length,
+        mergedQuestions: Object.keys(mergedQuestionData).length,
+        strippedRedundant: Object.keys(rawMerged).length - Object.keys(mergedQuestionData).length,
+      }, 'Updating existing quiz response (sanitized)')
 
       const { data, error } = await supabase
         .from('quiz_responses')
         .update({
           question_data: mergedQuestionData,
-          total_questions: totalQuestions,
+          total_questions: actualTotalQuestions,
           correct_count: mergedCorrectCount,
           score_percentage: mergedScorePercentage,
           answered_at: new Date().toISOString(),
@@ -229,15 +287,15 @@ export async function POST(request: NextRequest) {
       logger.info({
         trainingSessionId,
         answeredCount,
-        totalQuestions
+        actualTotalQuestions
       }, 'Creating new quiz response')
 
       const { data, error } = await supabase
         .from('quiz_responses')
         .insert({
           session_id: trainingSessionId,
-          question_data: questionData,
-          total_questions: totalQuestions,
+          question_data: sanitizedQuestionData,
+          total_questions: actualTotalQuestions,
           correct_count: correctCount,
           score_percentage: scorePercentage,
         })
@@ -257,7 +315,7 @@ export async function POST(request: NextRequest) {
     }
 
     logger.info({
-      totalQuestions,
+      totalQuestions: actualTotalQuestions,
       scorePercentage,
       sessionId: trainingSessionId,
       questionsAnswered: answeredCount
