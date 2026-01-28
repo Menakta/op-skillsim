@@ -201,28 +201,6 @@ export async function POST(request: NextRequest) {
       enrolled_at: new Date().toISOString(),
     }
 
-    // ==========================================================================
-    // IMPORTANT: Mark existing active sessions as 'abandoned' before creating new
-    // This prevents duplicate active sessions for the same student
-    // ==========================================================================
-    if (session.email && session.email !== 'unknown@unknown.local') {
-      const { error: updateError } = await supabase
-        .from('training_sessions')
-        .update({
-          status: 'abandoned',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('student->>email', session.email)
-        .eq('status', 'active')
-
-      if (updateError) {
-        logger.warn({ error: updateError.message }, 'Failed to mark existing sessions as abandoned')
-        // Continue anyway - we still want to create the new session
-      } else {
-        logger.info({ email: session.email }, 'Marked existing active sessions as abandoned')
-      }
-    }
-
     // Force create a NEW training session
     // This is used when student explicitly wants to start fresh
     // Use courseId and courseName from LTI context
