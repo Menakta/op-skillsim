@@ -107,8 +107,8 @@ export function CinematicTimer({
   return (
     <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-40 flex flex-col sm:flex-row items-center gap-2 sm:gap-4 px-4 sm:px-6 py-2 sm:py-3 backdrop-blur-md rounded-2xl sm:rounded-full border max-w-[calc(100%-2rem)] sm:max-w-none ${
       isDark
-        ? 'bg-black/70 border-white/10'
-        : 'bg-white/90 border-gray-200 shadow-lg'
+        ? 'bg-[#000000]/55 hover:bg-[#000000]/70 border-white/10'
+        : 'bg-white/88 hover:bg-white/95 border-gray-200 shadow-lg'
     }`}>
       {/* Top row on mobile: Icon + Timer */}
       <div className="flex items-center gap-2 sm:gap-4">

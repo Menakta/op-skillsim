@@ -382,6 +382,83 @@
   background: var(--color-text-muted);
 }
 
+/* Hide scrollbar completely */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* =============================================================================
+   Sidebar Tab Scrollbar - Modern thin scrollbar
+   ============================================================================= */
+
+.sidebar-tabs-scroll {
+  scrollbar-width: thin;
+  padding-bottom: 6px;
+}
+
+/* Dark theme scrollbar */
+.sidebar-tabs-scroll-dark {
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.sidebar-tabs-scroll-dark::-webkit-scrollbar {
+  height: 4px;
+}
+
+.sidebar-tabs-scroll-dark::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 4px;
+  margin: 0 4px;
+}
+
+.sidebar-tabs-scroll-dark::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.sidebar-tabs-scroll-dark::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.sidebar-tabs-scroll-dark::-webkit-scrollbar-thumb:active {
+  background: rgba(57, 190, 174, 0.5);
+}
+
+/* Light theme scrollbar */
+.sidebar-tabs-scroll-light {
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
+
+.sidebar-tabs-scroll-light::-webkit-scrollbar {
+  height: 4px;
+}
+
+.sidebar-tabs-scroll-light::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 4px;
+  margin: 0 4px;
+}
+
+.sidebar-tabs-scroll-light::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.sidebar-tabs-scroll-light::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.sidebar-tabs-scroll-light::-webkit-scrollbar-thumb:active {
+  background: rgba(57, 190, 174, 0.6);
+}
+
 /* =============================================================================
    Transition utilities
    ============================================================================= */

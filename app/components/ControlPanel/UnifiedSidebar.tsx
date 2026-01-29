@@ -416,38 +416,36 @@ export function UnifiedSidebar({
         {/* ================================================================
             TAB NAVIGATION
             ================================================================ */}
-        <div className={`px-2 py-2 border-b flex gap-1 flex-shrink-0 overflow-x-auto ${
+        <div className={`px-2 pt-2 pb-1 border-b flex-shrink-0 ${
           isDark ? 'border-white/10' : 'border-gray-200'
         }`}>
-          {visibleTabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
-                activeTab === tab.id
-                  ? 'bg-[#39BEAE] text-white'
-                  : isDark
-                    ? 'text-gray-400 hover:text-white hover:bg-white/5'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-              }`}
-            >
-              {tab.icon}
-              {tab.label}
-            </button>
-          ))}
+          <div className={`flex gap-1 overflow-x-auto sidebar-tabs-scroll ${
+            isDark ? 'sidebar-tabs-scroll-dark' : 'sidebar-tabs-scroll-light'
+          }`}>
+            {visibleTabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
+                  activeTab === tab.id
+                    ? 'bg-[#39BEAE] text-white'
+                    : isDark
+                      ? 'text-gray-400 hover:text-white hover:bg-white/5'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
+              >
+                {tab.icon}
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* ================================================================
             CONTENT AREA
             ================================================================ */}
         <div className="flex-1 overflow-y-auto">
-          {/* ============================================================
-              INVENTORY TAB (Training Mode Only)
-              ============================================================ */}
-          {activeTab === 'inventory' && isTrainingMode && (
-            <div className="p-3 space-y-4">
-              {/* Session Controls */}
-              <div className={`p-3 rounded-lg ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
+          <div className='p-2 space-y-4'>  <div className={`p-3 rounded-lg ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
                 <div className="flex items-center gap-2 mb-3">
                   <span className={`text-xs font-medium ${isDark ? 'text-white/70' : 'text-gray-600'}`}>
                     Session
@@ -482,6 +480,15 @@ export function UnifiedSidebar({
                   </button>
                 </div>
               </div>
+              </div>
+        
+          {/* ============================================================
+              INVENTORY TAB (Training Mode Only)
+              ============================================================ */}
+          {activeTab === 'inventory' && isTrainingMode && (
+            <div className="p-3 space-y-4">
+              {/* Session Controls */}
+             
 
               {/* Pipe Selection */}
               <div>
@@ -844,6 +851,7 @@ export function UnifiedSidebar({
               ============================================================ */}
           {activeTab === 'settings' && (
             <div className="p-3 space-y-4">
+
               {/* Theme */}
               <div className={`p-3 rounded-lg ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
                 <h3 className={`text-xs font-medium mb-3 ${isDark ? 'text-white/70' : 'text-gray-600'}`}>Appearance</h3>
