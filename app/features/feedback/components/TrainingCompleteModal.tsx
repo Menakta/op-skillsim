@@ -64,6 +64,11 @@ export function TrainingCompleteModal({
       setIsRedirecting(true)
 
       try {
+        // Wait for background persistence saves to complete
+        // useTrainingPersistence triggers quiz/session saves when modal opens
+        // This delay ensures those async operations finish before we fetch & cleanup
+        await new Promise(resolve => setTimeout(resolve, 1500))
+
         // Fetch training data before clearing session
         const response = await fetch('/api/training/export', {
           method: 'GET',

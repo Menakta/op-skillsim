@@ -212,7 +212,7 @@ function TrainingResultsContent() {
   // Error state
   if (error || !data) {
     return (
-      <div className={`min-h-screen flex items-center justify-center p-4 ${isDark ? 'bg-[#1a2525]' : 'bg-[#dee5e6]'}`}>
+      <div className={`min-h-screen flex items-center justify-center p-4 ${isDark ? 'bg-[#000000]/80' : 'bg-[#dee5e6]'}`}>
         <div className={`max-w-md w-full p-6 rounded-2xl ${isDark ? 'bg-[#0A0A0A] border-gray-800' : 'bg-white border-gray-200'} border`}>
           <div className="flex justify-center mb-4">
             <AlertCircle className="w-12 h-12 text-red-500" />
@@ -235,7 +235,7 @@ function TrainingResultsContent() {
   }
 
   return (
-    <div className={`min-h-screen ${isDark ? 'bg-[#1a2525]' : 'bg-[#dee5e6]'}`}>
+    <div className={`min-h-screen ${isDark ? 'bg-[#000000]/80' : 'bg-[#dee5e6]'}`}>
       {/* Header */}
       <header className={`sticky top-0 z-10 border-b ${isDark ? 'bg-[#0A0A0A] border-gray-800' : 'bg-white border-gray-200'}`}>
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -481,27 +481,6 @@ function TrainingResultsContent() {
             <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
               Your training has been completed and recorded. You can export your results as a PDF for your records.
             </p>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleExportPDF}
-                disabled={isExporting}
-                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-colors ${
-                  isDark
-                    ? 'bg-gray-800 hover:bg-gray-700 text-white'
-                    : 'bg-gray-100 hover:bg-gray-200 text-gray-800'
-                } ${isExporting ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                <Download className="w-5 h-5" />
-                {isExporting ? 'Exporting...' : 'Download PDF Report'}
-              </button>
-              <button
-                onClick={handleReturnToCourse}
-                className="flex items-center gap-2 px-6 py-3 bg-[#39BEAE] hover:bg-[#2da89a] text-white rounded-xl font-medium transition-colors"
-              >
-                <ExternalLink className="w-5 h-5" />
-                Return to Course
-              </button>
-            </div>
           </div>
         </div>
       </main>
