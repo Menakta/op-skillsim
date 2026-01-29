@@ -8,6 +8,7 @@
  */
 
 import { Play, RotateCcw } from 'lucide-react'
+import { useTheme } from '@/app/context/ThemeContext'
 import { BaseModal, ModalMessage, ModalFooter } from '@/app/components/shared'
 import { Button } from '@/app/components/shared'
 import { TASK_SEQUENCE } from '@/app/config'
@@ -48,6 +49,8 @@ export function ResumeConfirmationModal({
   onStartTraining,
   loading = false,
 }: ResumeConfirmationModalProps) {
+  const { theme } = useTheme()
+  const isDark = theme === 'dark'
   const phaseInfo = getPhaseInfo(phaseIndex)
   const isFromStart = phaseIndex === 0
   const progress = Math.round((phaseIndex / TASK_SEQUENCE.length) * 100)
@@ -79,7 +82,7 @@ export function ResumeConfirmationModal({
       {/* Progress Bar (only for resume) */}
       {!isFromStart && (
         <div className="px-5 pb-4">
-          <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+          <div className={`h-2 rounded-full overflow-hidden ${isDark ? 'bg-white/10' : 'bg-gray-200'}`}>
             <div
               className="h-full bg-gradient-to-r from-[#39BEAE] to-[#44CF8A] rounded-full transition-all duration-500"
               style={{ width: `${progress}%` }}

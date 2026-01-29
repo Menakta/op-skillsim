@@ -41,7 +41,7 @@ export function ToolBar({ state, onSelectTool }: ToolBarProps) {
 
   return (
     <div
-      className="fixed bottom-0 left-1/2 -translate-x-1/2 bg-[#000000]/40 shadow-xl rounded-2xl transition-all duration-300 max-w-[540px] py-3 mb-2"
+      className="fixed bottom-0 left-1/2 -translate-x-1/2 shadow-xl rounded-2xl transition-all duration-300 max-w-[540px] py-3 mb-2"
       style={{ zIndex: 2147483646 }}
     >
       {/* Header */}
@@ -82,7 +82,7 @@ export function ToolBar({ state, onSelectTool }: ToolBarProps) {
               <button
                 onClick={() => onSelectTool(tool.id)}
                 disabled={isTrainingComplete}
-                className={`w-12 md:w-15 h-10 md:h-15 rounded-lg flex items-center justify-center transition-all duration-200 ${
+                className={`w-12 md:w-15 h-10 md:h-15 bg-[#000000]/40 rounded-lg flex items-center justify-center transition-all duration-200 ${
                   isSelected
                     ? 'bg-[#43CF89] shadow-lg scale-110'
                     : isRequired

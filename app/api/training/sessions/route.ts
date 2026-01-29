@@ -177,11 +177,19 @@ export async function POST(request: NextRequest) {
     const supabase = getSupabaseAdmin()
 
     // Get the user session to retrieve LTI context (courseId, courseName, full_name, institution)
-    const { data: userSession } = await supabase
+    const { data: userSession, error: userSessionError } = await supabase
       .from('user_sessions')
       .select('lti_context')
       .eq('session_id', session.sessionId)
       .single()
+
+    if (userSessionError) {
+      logger.warn({
+        sessionId: session.sessionId,
+        error: userSessionError.message,
+        code: userSessionError.code,
+      }, 'Failed to get user session for LTI context - full_name may be missing')
+    }
 
     // Parse LTI context
     const ltiContext = userSession?.lti_context
@@ -189,6 +197,13 @@ export async function POST(request: NextRequest) {
           ? JSON.parse(userSession.lti_context)
           : userSession.lti_context)
       : {}
+
+    logger.info({
+      sessionId: session.sessionId,
+      hasUserSession: !!userSession,
+      hasLtiContext: !!userSession?.lti_context,
+      fullName: ltiContext.full_name || 'NOT FOUND',
+    }, 'LTI context lookup for training session creation')
 
     // Build student details for JSONB column using LTI context
     const student = {

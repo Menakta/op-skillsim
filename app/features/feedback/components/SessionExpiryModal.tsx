@@ -10,6 +10,7 @@
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import { Clock } from "lucide-react"
+import { useTheme } from '@/app/context/ThemeContext'
 import { BaseModal, ModalFooter } from '@/app/components/shared'
 import { Button } from '@/app/components/shared'
 import { redirectToSessionComplete } from '@/app/lib/sessionCompleteRedirect'
@@ -56,6 +57,8 @@ export function SessionExpiryModal({
   onSessionEnd
 }: SessionExpiryModalProps) {
   const [remainingSeconds, setRemainingSeconds] = useState(0)
+  const { theme } = useTheme()
+  const isDark = theme === 'dark'
 
   // Update countdown every second
   useEffect(() => {
@@ -125,7 +128,7 @@ export function SessionExpiryModal({
 
         {/* Countdown Display */}
         <div className="text-center">
-          <p className="text-gray-400 text-sm mb-2">Time Remaining</p>
+          <p className={`text-sm mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Time Remaining</p>
           <div className="flex items-center justify-center gap-2">
             <Clock size={24} className="text-orange-400" />
             <span className={`text-4xl font-bold ${
@@ -138,7 +141,11 @@ export function SessionExpiryModal({
       </div>
 
       {/* Warning Message */}
-      <div className="p-3 rounded-xl mb-4 mx-5 bg-orange-500/20 border border-orange-500/40 text-orange-300">
+      <div className={`p-3 rounded-xl mb-4 mx-5 border ${
+        isDark
+          ? 'bg-orange-500/20 border-orange-500/40 text-orange-300'
+          : 'bg-orange-50 border-orange-300 text-orange-700'
+      }`}>
         <p className="text-sm text-center">
           {isLti
             ? 'Your session is about to expire. You will be redirected back to your course.'

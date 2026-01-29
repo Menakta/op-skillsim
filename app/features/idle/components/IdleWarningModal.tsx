@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { AlertTriangle, MousePointer } from 'lucide-react'
+import { useTheme } from '@/app/context/ThemeContext'
 import { BaseModal, ModalContent, ModalFooter } from '@/app/components/shared/BaseModal'
 import { Button } from '@/app/components/shared/Button'
 
@@ -31,6 +32,8 @@ export function IdleWarningModal({
   onTimeout
 }: IdleWarningModalProps) {
   const [timeRemaining, setTimeRemaining] = useState(countdownDuration)
+  const { theme } = useTheme()
+  const isDark = theme === 'dark'
 
   // Reset timer when modal opens
   useEffect(() => {
@@ -75,7 +78,7 @@ export function IdleWarningModal({
       size="md"
     >
       {/* Progress bar at top */}
-      <div className="h-1 bg-gray-800 rounded-t-2xl overflow-hidden">
+      <div className={`h-1 rounded-t-2xl overflow-hidden ${isDark ? 'bg-gray-800' : 'bg-gray-200'}`}>
         <div
           className="h-full bg-gradient-to-r from-yellow-500 to-red-500 transition-all duration-1000 ease-linear"
           style={{ width: `${progressPercentage}%` }}
@@ -89,17 +92,17 @@ export function IdleWarningModal({
         </div>
 
         {/* Title */}
-        <h2 className="text-xl font-bold text-white mb-2">Session Idle Warning</h2>
-        <p className="text-gray-400 text-sm mb-6">
+        <h2 className={`text-xl font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>Session Idle Warning</h2>
+        <p className={`text-sm mb-6 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
           You have been inactive for a while. Your session will automatically end if no action is taken.
         </p>
 
         {/* Countdown Timer */}
-        <div className="py-4 px-6 bg-black/30 rounded-xl mb-4">
-          <div className="text-5xl font-mono font-bold text-white mb-2">
+        <div className={`py-4 px-6 rounded-xl mb-4 ${isDark ? 'bg-black/30' : 'bg-gray-100'}`}>
+          <div className={`text-5xl font-mono font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
             {formatTime(timeRemaining)}
           </div>
-          <p className="text-gray-500 text-sm">Time remaining before session ends</p>
+          <p className={`text-sm ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>Time remaining before session ends</p>
 
           {/* Circular progress indicator */}
           <div className="flex justify-center mt-4">
@@ -111,7 +114,7 @@ export function IdleWarningModal({
                   cy="40"
                   r="36"
                   fill="none"
-                  stroke="#374151"
+                  stroke={isDark ? '#374151' : '#E5E7EB'}
                   strokeWidth="5"
                 />
                 {/* Progress circle */}
@@ -150,7 +153,7 @@ export function IdleWarningModal({
         </Button>
       </ModalFooter>
 
-      <p className="text-center text-gray-500 text-xs pb-4 px-5">
+      <p className={`text-center text-xs pb-4 px-5 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
         Click the button above to continue your session
       </p>
     </BaseModal>

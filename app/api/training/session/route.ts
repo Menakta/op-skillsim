@@ -112,6 +112,29 @@ export async function POST(request: NextRequest) {
     const supabase = getSupabaseAdmin()
 
     // ==========================================================================
+    // Get LTI context from user_sessions for full_name and other details
+    // ==========================================================================
+    const { data: userSession, error: userSessionError } = await supabase
+      .from('user_sessions')
+      .select('lti_context')
+      .eq('session_id', session.sessionId)
+      .single()
+
+    if (userSessionError) {
+      logger.warn({
+        sessionId: session.sessionId,
+        error: userSessionError.message,
+      }, 'Failed to get user session for LTI context')
+    }
+
+    // Parse LTI context
+    const ltiContext = userSession?.lti_context
+      ? (typeof userSession.lti_context === 'string'
+          ? JSON.parse(userSession.lti_context)
+          : userSession.lti_context)
+      : {}
+
+    // ==========================================================================
     // IMPORTANT: Query by student EMAIL, not session_id
     // Each LTI login creates a new session_id, but we want to find existing
     // training sessions for this student (identified by email)
@@ -160,14 +183,23 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Build student details for JSONB column
+    // Build student details for JSONB column using LTI context
     const student = {
       user_id: session.userId,
       email: session.email,
-      full_name: 'Unknown Student',
-      institution: 'Open Polytechnic Kuratini Tuwhera',
+      full_name: ltiContext.full_name || 'Unknown Student',
+      course_name: ltiContext.courseName || courseName || 'OP-Skillsim Plumbing Training',
+      institution: ltiContext.institution || 'Open Polytechnic Kuratini Tuwhera',
+      lti_role: ltiContext.rawLtiRole || 'student',
       enrolled_at: new Date().toISOString(),
     }
+
+    logger.info({
+      sessionId: session.sessionId,
+      email: session.email,
+      fullName: student.full_name,
+      hasLtiContext: !!userSession?.lti_context,
+    }, 'Creating new training session with student details')
 
     // Create new training session (only if none exists for this session_id)
     // Store phase as index string ("0", "1", "2"...) instead of phase name
@@ -175,8 +207,8 @@ export async function POST(request: NextRequest) {
       .from('training_sessions')
       .insert({
         session_id: session.sessionId,
-        course_id: courseId || 'default',
-        course_name: courseName || 'OP-Skillsim Plumbing Training',
+        course_id: ltiContext.courseId || courseId || 'default',
+        course_name: ltiContext.courseName || courseName || 'OP-Skillsim Plumbing Training',
         current_training_phase: initialPhase || '0', // Phase index as string (0-7)
         overall_progress: 0,
         status: 'active',

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
+import { useTheme } from '@/app/context/ThemeContext'
 import type { QuestionData } from '@/app/lib/messageTypes'
 
 // =============================================================================
@@ -27,6 +28,9 @@ export function QuestionModal({
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
   const [wrongAnswer, setWrongAnswer] = useState<number | null>(null)
   const [answerFeedback, setAnswerFeedback] = useState<{ correct: boolean; message: string } | null>(null)
+
+  const { theme } = useTheme()
+  const isDark = theme === 'dark'
 
   // Reset state when question changes
   useEffect(() => {
@@ -79,18 +83,28 @@ export function QuestionModal({
   if (!question) return null
 
   return (
-    <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/20 backdrop-blur-sm">
+    <div className={`absolute inset-0 z-30 flex items-center justify-center ${
+      isDark ? 'bg-black/20' : 'bg-black/30'
+    } backdrop-blur-sm`}>
       <div
-        className="bg-[#000000]/40 backdrop-blur-md rounded-2xl max-w-[660px] w-full mx-4 shadow-2xl border border-gray-700/50"
+        className={`backdrop-blur-md rounded-2xl max-w-[660px] w-full mx-4 shadow-2xl border ${
+          isDark
+            ? 'bg-[#000000]/40 border-gray-700/50'
+            : 'bg-white/95 border-gray-200'
+        }`}
         style={{
           animation: 'modalFadeIn 0.3s ease-out'
         }}
       >
         {/* Question Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-gray-400 px-2 py-4">
+        <div className={`flex items-center justify-between pb-4 border-b px-2 py-4 ${
+          isDark ? 'border-gray-400' : 'border-gray-200'
+        }`}>
           <div className="flex items-center gap-3">
             <div>
-              <h3 className="text-white font-small text-base">{question.name}</h3>
+              <h3 className={`font-small text-base ${
+                isDark ? 'text-white' : 'text-gray-900'
+              }`}>{question.name}</h3>
             </div>
           </div>
         </div>
@@ -99,7 +113,9 @@ export function QuestionModal({
         <div className="flex gap-5 px-2.5 py-5">
           {/* Left Side - Image Placeholder */}
           <div
-            className="flex-shrink-0 bg-white rounded-xl hidden md:flex items-center justify-center"
+            className={`flex-shrink-0 rounded-xl hidden md:flex items-center justify-center ${
+              isDark ? 'bg-white' : 'bg-gray-100'
+            }`}
             style={{ width: '256px', height: '294px' }}
           >
             <span className="text-gray-400 text-sm">Image</span>
@@ -108,7 +124,9 @@ export function QuestionModal({
           {/* Right Side - Question and Answers */}
           <div className="flex-1">
             {/* Question Text */}
-            <p className="text-gray-300 text-sm text-base mb-5 leading-relaxed">{question.text}</p>
+            <p className={`text-sm text-base mb-5 leading-relaxed ${
+              isDark ? 'text-gray-300' : 'text-gray-700'
+            }`}>{question.text}</p>
 
             {/* Answer Options */}
             <div className="space-y-2">
@@ -124,12 +142,14 @@ export function QuestionModal({
                     disabled={answerFeedback?.correct}
                     className={`w-full p-3 text-left rounded-xl transition-all duration-200 flex items-center gap-3 ${
                       isCorrectAnswer
-                        ? 'text-green-300'
+                        ? 'text-green-500'
                         : isWrongAnswer
-                        ? 'bg-red-500/20 border border-red-500/50 text-red-300'
+                        ? 'bg-red-500/20 border border-red-500/50 text-red-400'
                         : isSelected
-                        ? 'text-white'
-                        : 'text-gray-200 hover:bg-[#000000]/30 hover:border-[#39BEAE]/50'
+                        ? isDark ? 'text-white' : 'text-gray-900'
+                        : isDark
+                          ? 'text-gray-200 hover:bg-[#000000]/30 hover:border-[#39BEAE]/50'
+                          : 'text-gray-700 hover:bg-gray-100 hover:border-[#39BEAE]/50'
                     }`}
                   >
                     {/* Radio Button */}
@@ -140,12 +160,14 @@ export function QuestionModal({
                           : isWrongAnswer
                           ? 'border-red-400 bg-red-400'
                           : isSelected
-                          ? 'border-gray-300'
-                          : 'border-gray-500'
+                          ? isDark ? 'border-gray-300' : 'border-gray-600'
+                          : isDark ? 'border-gray-500' : 'border-gray-400'
                       }`}
                     >
                       {(isSelected || isWrongAnswer) && (
-                        <div className="w-2 h-2 rounded-full bg-white transition-all duration-200" />
+                        <div className={`w-2 h-2 rounded-full transition-all duration-200 ${
+                          isDark ? 'bg-white' : 'bg-gray-800'
+                        }`} />
                       )}
                     </div>
                     <span>{option}</span>
@@ -160,8 +182,8 @@ export function QuestionModal({
         {answerFeedback && (
           <div className={`p-3 rounded-xl mb-4 mx-2.5 ${
             answerFeedback.correct
-              ? 'bg-green-500/20 border border-green-500/40 text-green-300'
-              : 'bg-red-500/20 border border-red-500/40 text-red-300'
+              ? 'bg-green-500/20 border border-green-500/40 text-green-400'
+              : 'bg-red-500/20 border border-red-500/40 text-red-400'
           }`}>
             <div className="flex items-center gap-2">
               <span className="text-sm">{answerFeedback.message}</span>
@@ -171,13 +193,17 @@ export function QuestionModal({
 
         {/* Q6 Special Notice - Full Width */}
         {question.id === 'Q6' && answerFeedback?.correct && (
-          <div className="text-white p-3 rounded-xl mb-4 mx-2.5">
+          <div className={`p-3 rounded-xl mb-4 mx-2.5 ${
+            isDark ? 'text-white' : 'text-gray-700'
+          }`}>
             <div className="text-xs opacity-80">Note: This is the last question.</div>
           </div>
         )}
 
         {/* Action Buttons */}
-        <div className="flex items-center justify-center gap-3 px-5 pb-6 border-t border-gray-400 py-4">
+        <div className={`flex items-center justify-center gap-3 px-5 pb-6 border-t py-4 ${
+          isDark ? 'border-gray-400' : 'border-gray-200'
+        }`}>
           {!answerFeedback?.correct ? (
             <button
               onClick={handleAnswerSubmit}
@@ -185,7 +211,9 @@ export function QuestionModal({
               className={`py-2 px-4 rounded-full font-medium transition-all duration-200 ${
                 selectedAnswer !== null
                   ? 'bg-[#44CF8A] text-white hover:bg-[#2ea89a] cursor-pointer shadow-lg shadow-[#39BEAE]/20'
-                  : 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
+                  : isDark
+                    ? 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
               }`}
             >
               Submit Answer
