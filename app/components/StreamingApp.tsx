@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import {PlatformNext,ModelDefinition, UndefinedModelDefinition,DefaultStreamerOptions,StreamerStatus} from '@pureweb/platform-sdk'
 import {useStreamer,useLaunchRequest,VideoStream} from '@pureweb/platform-sdk-react'
@@ -386,9 +386,9 @@ export default function StreamingApp() {
 
   // Handler for starting the stream - checks for active sessions first (students only)
   const handleStartStream = useCallback(async () => {
-    // For non-LTI or non-student users, skip session selection
+    // For non-LTI or non-student users, skip session selection but still show cinematic mode
     if (!isLtiSession || userRole !== 'student') {
-      screenFlow.goToLoadingForTraining()
+      screenFlow.goToLoadingForCinematic()
       return
     }
 
@@ -409,8 +409,8 @@ export default function StreamingApp() {
       }
     } catch (error) {
       console.error('Failed to check active sessions:', error)
-      // On error, proceed normally
-      screenFlow.goToLoadingForTraining()
+      // On error, proceed to cinematic mode
+      screenFlow.goToLoadingForCinematic()
     }
     setSessionsLoading(false)
   }, [isLtiSession, userRole, screenFlow])
@@ -889,146 +889,6 @@ export default function StreamingApp() {
   }, [isTrainingComplete, training.quizAnswers.length, questionCount, training, sessionStartTime, userRole])
 
   // ==========================================================================
-  // Question Handlers
-  // ==========================================================================
-
-  const handleSubmitAnswer = useCallback((selectedAnswer: number) => {
-    return training.submitQuestionAnswer(selectedAnswer)
-  }, [training])
-
-  const handleCloseQuestion = useCallback(() => {
-    training.closeQuestion()
-    modals.closeModal('question')
-  }, [training, modals])
-
-  // ==========================================================================
-  // Message Log Handlers
-  // ==========================================================================
-
-  const handleSendTestMessage = useCallback((message: string) => {
-    training.sendRawMessage(message)
-  }, [training])
-
-  // ==========================================================================
-  // Phase Success Handlers
-  // ==========================================================================
-
-  const handlePhaseContinue = useCallback(() => {
-    // Auto-advance to next task if available
-    const completedPhase = modals.completedPhase
-    if (completedPhase && completedPhase.nextTaskIndex < TASK_SEQUENCE.length) {
-      const nextTask = TASK_SEQUENCE[completedPhase.nextTaskIndex]
-      training.selectTool(nextTask.tool)
-    }
-    modals.closeModal('phaseSuccess')
-  }, [modals, training])
-
-  const handlePhaseRetry = useCallback(() => {
-    // Re-select the same tool to retry the phase
-    const completedPhase = modals.completedPhase
-    if (completedPhase) {
-      const currentTaskDef = TASK_SEQUENCE.find(t => t.taskId === completedPhase.taskId)
-      if (currentTaskDef) {
-        training.selectTool(currentTaskDef.tool)
-      }
-    }
-    modals.closeModal('phaseSuccess')
-  }, [modals, training])
-
-  // ==========================================================================
-  // Session Selection Handlers
-  // ==========================================================================
-
-  /**
-   * Handle resuming an existing training session
-   * This skips cinematic mode and goes directly to training at the saved phase
-   */
-  const handleResumeSession = useCallback(async (session: ActiveSession) => {
-    console.log('📂 Resuming session:', session.id, 'at phase:', session.current_training_phase)
-    setSessionsLoading(true)
-
-    try {
-      // Resume the session in the database (link to current login session)
-      const result = await trainingSessionService.resumeSession(session.id)
-      if (!result.success) {
-        console.error('Failed to resume session:', result.error)
-      }
-    } catch (error) {
-      console.error('Error resuming session:', error)
-    }
-
-    // Store the selected session to use after stream connects
-    setSelectedSession(session)
-    screenFlow.goToLoadingForTraining() // Skip cinematic mode for resumed sessions
-    setSessionsLoading(false)
-  }, [screenFlow])
-
-  /**
-   * Handle starting a brand new training session
-   * This shows cinematic mode first, session created when user clicks "Skip to Training"
-   */
-  const handleStartNewSession = useCallback(() => {
-    console.log('🆕 Starting new training session - cinematic mode first')
-
-    // Clear any selected session and proceed with cinematic mode
-    // Session will be created when user clicks "Skip to Training"
-    setSelectedSession(null)
-    setStartNewSessionAfterStream(true)
-    screenFlow.goToLoadingForCinematic() // Show cinematic mode for new sessions
-  }, [screenFlow])
-
-  // ==========================================================================
-  // Resume Confirmation Handler
-  // ==========================================================================
-
-  /**
-   * Handle clicking the resume/start button in the confirmation modal
-   * This sends the start_from_task command to UE5
-   */
-  const handleResumeConfirmation = useCallback(() => {
-    const phaseIndex = modals.resumePhaseIndex
-    console.log(`🚀 User clicked resume - sending start_from_task:${phaseIndex} to UE5`)
-    modals.closeModal('resumeConfirmation')
-
-    if (phaseIndex > 0) {
-      training.startFromTask(phaseIndex)
-    } else {
-      training.startTraining()
-    }
-  }, [training, modals])
-
-  // ==========================================================================
-  // Cinematic Mode Handlers
-  // ==========================================================================
-
-  /**
-   * Handle skipping to training from cinematic mode
-   * For new sessions: create session in DB and start from phase 0
-   */
-  const handleSkipToTraining = useCallback(async () => {
-    console.log('⏭️ Skipping to training mode - starting from phase 0')
-    screenFlow.goToTraining()
-    setShowExplosionControls(false)
-
-    // For LTI students starting a new session, create the training session now
-    if (isLtiSession && userRole === 'student' && startNewSessionAfterStream) {
-      console.log('🆕 Creating new training session before starting training')
-      try {
-        const result = await trainingSessionService.createNewSession()
-        if (result.success) {
-          console.log('✅ Training session created:', result.data?.id)
-        } else {
-          console.error('Failed to create training session:', result.error)
-        }
-      } catch (error) {
-        console.error('Error creating training session:', error)
-      }
-    }
-
-    training.startTraining()
-  }, [training, isLtiSession, userRole, startNewSessionAfterStream, screenFlow])
-
-  // ==========================================================================
   // Derived State
   // ==========================================================================
 
@@ -1041,142 +901,158 @@ export default function StreamingApp() {
   })
 
   // ==========================================================================
-  // Manual Retry Handler
+  // Consolidated Action Handlers
+  // Groups related handlers to reduce declaration overhead
   // ==========================================================================
 
-  const handleManualRetry = useCallback(() => {
-    modals.closeModal('error')
-    setRetryCount(0)
-    setAvailableModels(undefined)
-    setModelDefinition(new UndefinedModelDefinition())
-    setLoading(false)
-    setConnectionStatus('initializing')
-    initializePlatform(1)
-  }, [initializePlatform, modals])
+  // Question handlers
+  const questionActions = useMemo(() => ({
+    submit: (selectedAnswer: number) => training.submitQuestionAnswer(selectedAnswer),
+    close: () => { training.closeQuestion(); modals.closeModal('question') },
+  }), [training, modals])
 
-  // ==========================================================================
-  // Error State Handler (for refresh page action)
-  // ==========================================================================
+  // Phase success handlers
+  const phaseActions = useMemo(() => ({
+    continue: () => {
+      const completedPhase = modals.completedPhase
+      if (completedPhase && completedPhase.nextTaskIndex < TASK_SEQUENCE.length) {
+        const nextTask = TASK_SEQUENCE[completedPhase.nextTaskIndex]
+        training.selectTool(nextTask.tool)
+      }
+      modals.closeModal('phaseSuccess')
+    },
+    retry: () => {
+      const completedPhase = modals.completedPhase
+      if (completedPhase) {
+        const currentTaskDef = TASK_SEQUENCE.find(t => t.taskId === completedPhase.taskId)
+        if (currentTaskDef) training.selectTool(currentTaskDef.tool)
+      }
+      modals.closeModal('phaseSuccess')
+    },
+  }), [modals, training])
 
-  const handleRefreshPage = useCallback(() => {
-    window.location.reload()
-  }, [])
-
-  // ==========================================================================
-  // Session End Handler - Redirect to Login (only for test users)
-  // ==========================================================================
-
-  const handleSessionEndLogin = useCallback(() => {
-    modals.closeModal('sessionEnd')
-    // Redirect to session-complete page for proper cleanup
-    redirectToSessionComplete({
-      reason: 'logged_out',
-      role: userRole,
-      progress: training.state.progress,
-      phasesCompleted: training.state.currentTaskIndex,
-      totalPhases: training.state.totalTasks,
-      returnUrl: sessionReturnUrl,
-      isLti: isLtiSession,
-    })
-  }, [userRole, training.state.progress, training.state.currentTaskIndex, training.state.totalTasks, sessionReturnUrl, isLtiSession, modals])
-
-  // ==========================================================================
-  // Session Expiry Handler - Called when session expires from countdown modal
-  // ==========================================================================
-
-  const handleSessionExpiry = useCallback(() => {
-    modals.closeModal('sessionExpiry')
-    // The modal itself handles redirection based on isLti and returnUrl
-  }, [modals])
-
-  // ==========================================================================
-  // Idle Timeout Handler - Called when user doesn't respond to idle warning
-  // ==========================================================================
-
-  const handleIdleTimeout = useCallback(() => {
-    console.log('⏰ [StreamingApp] Idle timeout - ending session due to inactivity')
-
-    // Complete training session due to idle timeout
-    import('@/app/services').then(({ trainingSessionService }) => {
-      trainingSessionService.completeTraining({
-        totalTimeMs: Date.now() - (sessionStartTime || Date.now()),
-        phasesCompleted: training.state.totalTasks
-      }).then(result => {
-        if (result.success) {
-          console.log('✅ [StreamingApp] Training session ended due to idle timeout')
+  // Session selection handlers
+  const sessionActions = useMemo(() => ({
+    resume: async (session: ActiveSession) => {
+      console.log('📂 Resuming session:', session.id, 'at phase:', session.current_training_phase)
+      setSessionsLoading(true)
+      try {
+        const result = await trainingSessionService.resumeSession(session.id)
+        if (!result.success) console.error('Failed to resume session:', result.error)
+      } catch (error) {
+        console.error('Error resuming session:', error)
+      }
+      setSelectedSession(session)
+      screenFlow.goToLoadingForTraining()
+      setSessionsLoading(false)
+    },
+    startNew: () => {
+      console.log('🆕 Starting new training session - cinematic mode first')
+      setSelectedSession(null)
+      setStartNewSessionAfterStream(true)
+      screenFlow.goToLoadingForCinematic()
+    },
+    confirmResume: () => {
+      const phaseIndex = modals.resumePhaseIndex
+      console.log(`🚀 User clicked resume - sending start_from_task:${phaseIndex} to UE5`)
+      modals.closeModal('resumeConfirmation')
+      phaseIndex > 0 ? training.startFromTask(phaseIndex) : training.startTraining()
+    },
+    skipToTraining: async () => {
+      console.log('⏭️ Skipping to training mode - starting from phase 0')
+      screenFlow.goToTraining()
+      setShowExplosionControls(false)
+      if (isLtiSession && userRole === 'student' && startNewSessionAfterStream) {
+        console.log('🆕 Creating new training session before starting training')
+        try {
+          const result = await trainingSessionService.createNewSession()
+          if (result.success) console.log('✅ Training session created:', result.data?.id)
+          else console.error('Failed to create training session:', result.error)
+        } catch (error) {
+          console.error('Error creating training session:', error)
         }
+      }
+      training.startTraining()
+    },
+  }), [modals, training, screenFlow, isLtiSession, userRole, startNewSessionAfterStream])
+
+  // Connection/error handlers
+  const connectionActions = useMemo(() => ({
+    retry: () => {
+      modals.closeModal('error')
+      setRetryCount(0)
+      setAvailableModels(undefined)
+      setModelDefinition(new UndefinedModelDefinition())
+      setLoading(false)
+      setConnectionStatus('initializing')
+      initializePlatform(1)
+    },
+    refresh: () => window.location.reload(),
+    sendTestMessage: (message: string) => training.sendRawMessage(message),
+  }), [initializePlatform, modals, training])
+
+  // Session end/expiry handlers
+  const sessionEndActions = useMemo(() => ({
+    login: () => {
+      modals.closeModal('sessionEnd')
+      redirectToSessionComplete({
+        reason: 'logged_out',
+        role: userRole,
+        progress: training.state.progress,
+        phasesCompleted: training.state.currentTaskIndex,
+        totalPhases: training.state.totalTasks,
+        returnUrl: sessionReturnUrl,
+        isLti: isLtiSession,
       })
-    })
+    },
+    expiry: () => modals.closeModal('sessionExpiry'),
+    idle: () => {
+      console.log('⏰ [StreamingApp] Idle timeout - ending session due to inactivity')
+      import('@/app/services').then(({ trainingSessionService }) => {
+        trainingSessionService.completeTraining({
+          totalTimeMs: Date.now() - (sessionStartTime || Date.now()),
+          phasesCompleted: training.state.totalTasks
+        }).then(result => {
+          if (result.success) console.log('✅ [StreamingApp] Training session ended due to idle timeout')
+        })
+      })
+      redirectToSessionComplete({
+        reason: 'idle',
+        role: userRole,
+        progress: training.state.progress,
+        phasesCompleted: training.state.currentTaskIndex,
+        totalPhases: training.state.totalTasks,
+        returnUrl: sessionReturnUrl,
+        isLti: isLtiSession,
+      })
+    },
+    trainingComplete: () => modals.closeModal('trainingComplete'),
+  }), [modals, userRole, training.state, sessionReturnUrl, isLtiSession, sessionStartTime])
 
-    // Redirect to session-complete page for proper cleanup
-    redirectToSessionComplete({
-      reason: 'idle',
-      role: userRole,
-      progress: training.state.progress,
-      phasesCompleted: training.state.currentTaskIndex,
-      totalPhases: training.state.totalTasks,
-      returnUrl: sessionReturnUrl,
-      isLti: isLtiSession,
-    })
-  }, [sessionStartTime, training.state.totalTasks, training.state.progress, training.state.currentTaskIndex, isLtiSession, sessionReturnUrl, userRole])
-
-  // ==========================================================================
-  // Training Complete Handler - Close modal and redirect appropriately
-  // ==========================================================================
-
-  const handleTrainingCompleteClose = useCallback(() => {
-    modals.closeModal('trainingComplete')
-    // TrainingCompleteModal handles redirect based on isLti and returnUrl
-  }, [modals])
-
-  // ==========================================================================
-  // Training Pause/Resume/Quit Handlers
-  // ==========================================================================
-
-  const handlePauseTraining = useCallback(() => {
-    console.log('⏸️ Pausing training')
-    training.pauseTraining()
-    setIsTrainingPaused(true)
-  }, [training])
-
-  const handleResumeTraining = useCallback(() => {
-    console.log('▶️ Resuming training')
-    training.resumeTraining()
-    setIsTrainingPaused(false)
-  }, [training])
-
-  const handleQuitTrainingClick = useCallback(() => {
-    modals.openQuitTraining()
-  }, [modals])
-
-  const handleQuitTrainingConfirm = useCallback(async () => {
-    console.log('🚪 Quitting training - saving progress')
-    modals.closeModal('quitTraining')
-
-    // Save current progress before quitting
-    if (sessionStartTime) {
-      const timeSpentMs = Date.now() - sessionStartTime
-      await trainingSessionService.recordTimeSpent(timeSpentMs)
-    }
-
-    // Update session status (keep as active so user can resume)
-    // Progress is already saved via auto-save
-
-    // Redirect to session-complete page for proper cleanup
-    redirectToSessionComplete({
-      reason: 'quit',
-      role: userRole,
-      progress: training.state.progress,
-      phasesCompleted: training.state.currentTaskIndex,
-      totalPhases: training.state.totalTasks,
-      returnUrl: sessionReturnUrl,
-      isLti: isLtiSession,
-    })
-  }, [sessionStartTime, isLtiSession, sessionReturnUrl, userRole, training.state.progress, training.state.currentTaskIndex, training.state.totalTasks, modals])
-
-  const handleQuitTrainingCancel = useCallback(() => {
-    modals.closeModal('quitTraining')
-  }, [modals])
+  // Training control handlers (pause/resume/quit)
+  const trainingControlActions = useMemo(() => ({
+    pause: () => { console.log('⏸️ Pausing training'); training.pauseTraining(); setIsTrainingPaused(true) },
+    resume: () => { console.log('▶️ Resuming training'); training.resumeTraining(); setIsTrainingPaused(false) },
+    quitClick: () => modals.openQuitTraining(),
+    quitConfirm: async () => {
+      console.log('🚪 Quitting training - saving progress')
+      modals.closeModal('quitTraining')
+      if (sessionStartTime) {
+        const timeSpentMs = Date.now() - sessionStartTime
+        await trainingSessionService.recordTimeSpent(timeSpentMs)
+      }
+      redirectToSessionComplete({
+        reason: 'quit',
+        role: userRole,
+        progress: training.state.progress,
+        phasesCompleted: training.state.currentTaskIndex,
+        totalPhases: training.state.totalTasks,
+        returnUrl: sessionReturnUrl,
+        isLti: isLtiSession,
+      })
+    },
+    quitCancel: () => modals.closeModal('quitTraining'),
+  }), [training, modals, sessionStartTime, userRole, sessionReturnUrl, isLtiSession])
 
   // ==========================================================================
   // Loading Status (computed from pure function)
@@ -1208,9 +1084,9 @@ export default function StreamingApp() {
         <TrainingSidebar
           isPaused={isTrainingPaused}
           isVisible={training.state.trainingStarted || training.state.isActive || training.state.mode === 'training'}
-          onPause={handlePauseTraining}
-          onResume={handleResumeTraining}
-          onQuit={handleQuitTrainingClick}
+          onPause={trainingControlActions.pause}
+          onResume={trainingControlActions.resume}
+          onQuit={trainingControlActions.quitClick}
           trainingState={training.state}
           onSelectPipe={training.selectPipe}
           onSelectPressureTest={training.selectPressureTest}
@@ -1222,7 +1098,7 @@ export default function StreamingApp() {
         <CinematicTimer
           duration={7200} // 2 hours
           initialTimeRemaining={cinematicTimeRemaining}
-          onSkipToTraining={handleSkipToTraining}
+          onSkipToTraining={sessionActions.skipToTraining}
           onTimeChange={setCinematicTimeRemaining}
           isActive={screenFlow.isCinematicMode}
         />
@@ -1276,9 +1152,9 @@ export default function StreamingApp() {
         <TrainingActionButtons
           isPaused={isTrainingPaused}
           isVisible={isConnected && !screenFlow.isCinematicMode && (training.state.trainingStarted || training.state.isActive || training.state.mode === 'training')}
-          onPause={handlePauseTraining}
-          onResume={handleResumeTraining}
-          onQuit={handleQuitTrainingClick}
+          onPause={trainingControlActions.pause}
+          onResume={trainingControlActions.resume}
+          onQuit={trainingControlActions.quitClick}
         />
       </div>
 
@@ -1288,7 +1164,7 @@ export default function StreamingApp() {
           messages={training.messageLog}
           lastMessage={training.lastMessage}
           onClear={training.clearLog}
-          onSendTest={handleSendTestMessage}
+          onSendTest={connectionActions.sendTestMessage}
           isConnected={training.isConnected || isConnected}
           connectionStatus={training.isConnected ? 'connected' : isConnected ? 'connected' : 'connecting'}
           isDark={isDark}
@@ -1312,8 +1188,8 @@ export default function StreamingApp() {
       <QuestionModal
         question={modals.showingQuestion}
         tryCount={training.state.questionTryCount}
-        onSubmitAnswer={handleSubmitAnswer}
-        onClose={handleCloseQuestion}
+        onSubmitAnswer={questionActions.submit}
+        onClose={questionActions.close}
       />
 
       {/* Training Complete Modal - Shows when all phases are completed */}
@@ -1324,7 +1200,7 @@ export default function StreamingApp() {
         isLti={isLtiSession}
         returnUrl={sessionReturnUrl}
         role={userRole}
-        onClose={handleTrainingCompleteClose}
+        onClose={sessionEndActions.trainingComplete}
       />
 
       {/* Phase Success Modal */}
@@ -1333,8 +1209,8 @@ export default function StreamingApp() {
         title={modals.completedPhase ? modals.completedPhase.taskName + ' Task Completed' : 'Task Completed'}
         message={modals.completedPhase ? `Success!` : ''}
         successText={modals.completedPhase ? `${modals.completedPhase.taskName} Task completed successfully!` : 'Phase completed successfully!'}
-        onContinue={handlePhaseContinue}
-        onRetry={handlePhaseRetry}
+        onContinue={phaseActions.continue}
+        onRetry={phaseActions.retry}
         continueButtonText="Continue"
         retryButtonText="Retry"
         showRetryButton={true}
@@ -1346,8 +1222,8 @@ export default function StreamingApp() {
         title="Connection Failed"
         message="Error!"
         errorText={modals.initError || `Unable to connect to stream. Attempted ${RETRY_CONFIG.maxRetries} automatic retries.`}
-        onRetry={handleManualRetry}
-        onClose={handleRefreshPage}
+        onRetry={connectionActions.retry}
+        onClose={connectionActions.refresh}
         retryButtonText="Try Again"
         closeButtonText="Refresh Page"
         showCloseButton={true}
@@ -1373,8 +1249,8 @@ export default function StreamingApp() {
       <SessionSelectionScreen
         isOpen={screenFlow.showSessionSelection}
         sessions={activeSessions}
-        onResumeSession={handleResumeSession}
-        onStartNewSession={handleStartNewSession}
+        onResumeSession={sessionActions.resume}
+        onStartNewSession={sessionActions.startNew}
         loading={sessionsLoading}
       />
 
@@ -1394,7 +1270,7 @@ export default function StreamingApp() {
       <ResumeConfirmationModal
         isOpen={modals.isOpen('resumeConfirmation')}
         phaseIndex={modals.resumePhaseIndex}
-        onStartTraining={handleResumeConfirmation}
+        onStartTraining={sessionActions.confirmResume}
         loading={sessionsLoading}
       />
 
@@ -1402,7 +1278,7 @@ export default function StreamingApp() {
       <SessionModal
         isOpen={modals.isOpen('sessionEnd')}
         reason={modals.sessionEndReason}
-        onLogin={handleSessionEndLogin}
+        onLogin={sessionEndActions.login}
         loginButtonText={isTestUser ? "Back to Login" : "Close"}
       />
 
@@ -1416,7 +1292,7 @@ export default function StreamingApp() {
         progress={training.state.progress}
         phasesCompleted={training.state.currentTaskIndex}
         totalPhases={training.state.totalTasks}
-        onSessionEnd={handleSessionExpiry}
+        onSessionEnd={sessionEndActions.expiry}
       />
 
       {/* Idle Warning Modal - Shows when user is inactive for 5 minutes */}
@@ -1424,14 +1300,14 @@ export default function StreamingApp() {
         isOpen={isIdle}
         countdownDuration={300}
         onStayActive={resetIdle}
-        onTimeout={handleIdleTimeout}
+        onTimeout={sessionEndActions.idle}
       />
 
       {/* Quit Training Modal - Confirmation when user clicks quit */}
       <QuitTrainingModal
         isOpen={modals.isOpen('quitTraining')}
-        onConfirm={handleQuitTrainingConfirm}
-        onCancel={handleQuitTrainingCancel}
+        onConfirm={trainingControlActions.quitConfirm}
+        onCancel={trainingControlActions.quitCancel}
         currentPhase={training.state.currentTaskIndex}
         totalPhases={training.state.totalTasks}
         isLti={isLtiSession}
