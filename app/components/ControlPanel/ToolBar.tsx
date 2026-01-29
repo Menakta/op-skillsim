@@ -35,21 +35,20 @@ interface ToolBarProps {
 
 export function ToolBar({ state, onSelectTool }: ToolBarProps) {
   const [isExpanded, setIsExpanded] = useState(false)
-
   const currentTaskDef = TASK_SEQUENCE[state.currentTaskIndex]
   const isTrainingComplete = state.currentTaskIndex >= TASK_SEQUENCE.length
 
   return (
     <div
-      className="fixed bottom-0 left-1/2 -translate-x-1/2 shadow-xl rounded-2xl transition-all duration-300 max-w-[540px] py-3 mb-2"
+      className="fixed bottom-0 left-1/2 -translate-x-1/2 bg-[#000000]/05 rounded-2xl transition-all duration-300 max-w-[540px] py-3 mb-2"
       style={{ zIndex: 2147483646 }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-4 border-b max-w-[540px] border-gray-600">
+      <div className="flex items-center justify-between px-4 py-2 border-b max-w-[540px]">
         <span className="text-white font-medium text-sm">Tools</span>
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="w-6 h-6 bg-[#000000]/70 hover:bg-[#2ea89a] rounded-full flex items-center justify-center transition-all duration-300"
+          className="w-6 h-6 bg-[#000000]/55 hover:bg-[#2ea89a] rounded-full flex items-center justify-center transition-all duration-300"
         >
           <ChevronUp
             className={`w-4 h-4 text-white transition-transform duration-300 ease-out ${
@@ -61,7 +60,7 @@ export function ToolBar({ state, onSelectTool }: ToolBarProps) {
 
       {/* Tools */}
       <div
-        className="flex items-center gap-2 px-4 pt-2 overflow-hidden transition-all duration-300 ease-out"
+        className="flex items-center gap-2 px-3 pt-2 overflow-hidden transition-all duration-300 ease-out"
         style={{
           paddingBottom: isExpanded ? '2rem' : '0.25rem',
         }}
@@ -82,7 +81,7 @@ export function ToolBar({ state, onSelectTool }: ToolBarProps) {
               <button
                 onClick={() => onSelectTool(tool.id)}
                 disabled={isTrainingComplete}
-                className={`w-12 md:w-15 h-10 md:h-15 bg-[#000000]/40 rounded-lg flex items-center justify-center transition-all duration-200 ${
+                className={`w-12 md:w-15 h-10 md:h-15 bg-[#000000]/55 rounded-lg flex items-center justify-center transition-all duration-200 ${
                   isSelected
                     ? 'bg-[#43CF89] shadow-lg scale-110'
                     : isRequired
