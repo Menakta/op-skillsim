@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback, lazy, Suspense } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import {PlatformNext,ModelDefinition, UndefinedModelDefinition,DefaultStreamerOptions,StreamerStatus} from '@pureweb/platform-sdk'
 import {useStreamer,useLaunchRequest,VideoStream} from '@pureweb/platform-sdk-react'
@@ -12,79 +12,35 @@ import { IdleWarningModal, useIdleDetection } from '../features/idle'
 import { useStatePersistence } from '../features/training'
 import type { QuestionData } from '../lib/messageTypes'
 import type { PersistedTrainingState, TrainingSession } from '../types'
-import { TASK_SEQUENCE } from '../config'
+import { TASK_SEQUENCE, RETRY_CONFIG } from '../config'
 import { useTheme } from '../context/ThemeContext'
 import { trainingSessionService } from '../services'
 
-// Lazy load heavy components - only loaded when stream connects
-const ControlPanel = dynamic(() => import('../components/ControlPanel'), {
-  ssr: false,
-  loading: () => null,
-})
+// =============================================================================
+// Dynamic Imports - Lazy loaded when stream connects
+// =============================================================================
 
-const ThemeToggle = dynamic(() => import('../components/ThemeToggle'), {
-  ssr: false,
-  loading: () => null,
-})
+// Component imports
+const ControlPanel = dynamic(() => import('../components/ControlPanel'), { ssr: false, loading: () => null })
+const ThemeToggle = dynamic(() => import('../components/ThemeToggle'), { ssr: false, loading: () => null })
+const TrainingSidebar = dynamic(() => import('../components/ControlPanel/TrainingSidebar'), { ssr: false, loading: () => null })
+const MessageLog = dynamic(() => import('../components/MessageLog'), { ssr: false, loading: () => null })
+const TrainingActionButtons = dynamic(() => import('../components/ControlPanel/TrainingActionButtons'), { ssr: false, loading: () => null })
 
-const TrainingSidebar = dynamic(() => import('../components/ControlPanel/TrainingSidebar'), {
-  ssr: false,
-  loading: () => null,
-})
-
-const MessageLog = dynamic(() => import('../components/MessageLog'), {
-  ssr: false,
-  loading: () => null,
-})
-
-const QuestionModal = dynamic(
-  () => import('../features/questions').then(mod => ({ default: mod.QuestionModal })),
-  { ssr: false, loading: () => null }
-)
-
-
-const NavigationWalkthrough = dynamic(
-  () => import('../features').then(mod => ({ default: mod.NavigationWalkthrough })),
-  { ssr: false, loading: () => null }
-)
-
-const SuccessModal = dynamic(
-  () => import('../features').then(mod => ({ default: mod.SuccessModal })),
-  { ssr: false, loading: () => null }
-)
-
-const ErrorModal = dynamic(
-  () => import('../features').then(mod => ({ default: mod.ErrorModal })),
-  { ssr: false, loading: () => null }
-)
-
-const SessionModal = dynamic(
-  () => import('../features').then(mod => ({ default: mod.SessionModal })),
-  { ssr: false, loading: () => null }
-)
-
-const TrainingCompleteModal = dynamic(
-  () => import('../features').then(mod => ({ default: mod.TrainingCompleteModal })),
-  { ssr: false, loading: () => null }
-)
-
-const SessionExpiryModal = dynamic(
-  () => import('../features').then(mod => ({ default: mod.SessionExpiryModal })),
-  { ssr: false, loading: () => null }
-)
-
-const QuitTrainingModal = dynamic(
-  () => import('../features').then(mod => ({ default: mod.QuitTrainingModal })),
-  { ssr: false, loading: () => null }
-)
-
-const TrainingActionButtons = dynamic(
-  () => import('../components/ControlPanel/TrainingActionButtons'),
-  { ssr: false, loading: () => null }
-)
+// Feature modal imports (from barrel export)
+const QuestionModal = dynamic(() => import('../features/questions').then(mod => ({ default: mod.QuestionModal })), { ssr: false, loading: () => null })
+const NavigationWalkthrough = dynamic(() => import('../features').then(mod => ({ default: mod.NavigationWalkthrough })), { ssr: false, loading: () => null })
+const SuccessModal = dynamic(() => import('../features').then(mod => ({ default: mod.SuccessModal })), { ssr: false, loading: () => null })
+const ErrorModal = dynamic(() => import('../features').then(mod => ({ default: mod.ErrorModal })), { ssr: false, loading: () => null })
+const SessionModal = dynamic(() => import('../features').then(mod => ({ default: mod.SessionModal })), { ssr: false, loading: () => null })
+const TrainingCompleteModal = dynamic(() => import('../features').then(mod => ({ default: mod.TrainingCompleteModal })), { ssr: false, loading: () => null })
+const SessionExpiryModal = dynamic(() => import('../features').then(mod => ({ default: mod.SessionExpiryModal })), { ssr: false, loading: () => null })
+const QuitTrainingModal = dynamic(() => import('../features').then(mod => ({ default: mod.QuitTrainingModal })), { ssr: false, loading: () => null })
 
 // Lazy load hooks - deferred until needed
 import { useTrainingMessagesComposite } from '../hooks/useTrainingMessagesComposite'
+import { useModalManager } from '../hooks/useModalManager'
+import { useScreenFlow } from '../hooks/useScreenFlow'
 
 // Redux sync - bridges hook state to Redux store
 import { useReduxSync } from '../store/useReduxSync'
@@ -104,12 +60,55 @@ if (!projectId || !modelId) {
   console.error('❌ Missing PureWeb environment variables:', { projectId, modelId })
 }
 
-// Retry configuration
-const MAX_RETRIES = 3
-const RETRY_DELAY = 2000 // 2 seconds between retries
-
 // Streamer options
 const streamerOptions = DefaultStreamerOptions
+
+// =============================================================================
+// Helper Functions
+// =============================================================================
+
+type ConnectionStatus = 'initializing' | 'connecting' | 'connected' | 'failed' | 'retrying'
+
+interface LoadingStatusParams {
+  isRetrying: boolean
+  streamerStatus: StreamerStatus
+  connectionStatus: ConnectionStatus
+  availableModels: ModelDefinition[] | undefined
+  loading: boolean
+}
+
+/**
+ * Determines the loading status message and step based on connection state.
+ * Pure function extracted for testability and clarity.
+ */
+function getLoadingStatus(params: LoadingStatusParams): { message: string; step: LoadingStep } {
+  const { isRetrying, streamerStatus, connectionStatus, availableModels, loading } = params
+
+  if (isRetrying) {
+    return { message: 'Reconnecting to stream', step: 'connecting' }
+  }
+
+  if (streamerStatus === StreamerStatus.Connected) {
+    return { message: 'Establishing video stream', step: 'streaming' }
+  }
+
+  switch (connectionStatus) {
+    case 'initializing':
+      return { message: 'Initializing platform', step: 'initializing' }
+    case 'connecting':
+      if (availableModels) {
+        return { message: 'Launching', step: 'launching' }
+      }
+      return { message: 'Connecting to server', step: 'connecting' }
+    case 'retrying':
+      return { message: 'Retrying connection', step: 'connecting' }
+    default:
+      if (loading) {
+        return { message: 'Starting stream', step: 'launching' }
+      }
+      return { message: 'Loading session', step: 'initializing' }
+  }
+}
 
 // =============================================================================
 // Main Streaming App Component - Using New Modular Architecture
@@ -189,55 +188,44 @@ export default function StreamingApp() {
   const [modelDefinition, setModelDefinition] = useState<ModelDefinition>(new UndefinedModelDefinition())
   const [availableModels, setAvailableModels] = useState<ModelDefinition[]>()
   const [loading, setLoading] = useState(false)
-  const [initError, setInitError] = useState<string | null>(null)
 
   // Retry state
   const [retryCount, setRetryCount] = useState(0)
   const [isRetrying, setIsRetrying] = useState(false)
-  const [connectionStatus, setConnectionStatus] = useState<'initializing' | 'connecting' | 'connected' | 'failed' | 'retrying'>('initializing')
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('initializing')
+
+  // ==========================================================================
+  // Modal Manager - Centralized modal state
+  // ==========================================================================
+  const modals = useModalManager()
+
+  // ==========================================================================
+  // Screen Flow - State machine for screen transitions
+  // ==========================================================================
+  const screenFlow = useScreenFlow()
 
   // UI state
-  const [showingQuestion, setShowingQuestion] = useState<QuestionData | null>(null)
-  const [showCompletionPopup, setShowCompletionPopup] = useState(false)
-  const [sessionStartTime] = useState<number>(() => Date.now()) // Track when session started
-  const [showPhaseSuccess, setShowPhaseSuccess] = useState(false)
-  const [completedPhase, setCompletedPhase] = useState<{ taskId: string; taskName: string; nextTaskIndex: number } | null>(null)
-  const [showErrorModal, setShowErrorModal] = useState(false)
-  const [showStarterScreen, setShowStarterScreen] = useState(true)
-  const [showNavigationWalkthrough, setShowNavigationWalkthrough] = useState(false)
-  const [streamStarted, setStreamStarted] = useState(false)
+  const [sessionStartTime] = useState<number>(() => Date.now())
 
   // Session selection state
-  const [showSessionSelection, setShowSessionSelection] = useState(false)
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([])
   const [sessionsLoading, setSessionsLoading] = useState(false)
   const [selectedSession, setSelectedSession] = useState<ActiveSession | null>(null)
   const [startNewSessionAfterStream, setStartNewSessionAfterStream] = useState(false)
 
-  // Resume confirmation modal state - shown after stream connects
-  const [showResumeConfirmation, setShowResumeConfirmation] = useState(false)
-  const [resumePhaseIndex, setResumePhaseIndex] = useState(0)
-
-  // Session end state
-  const [showSessionEndModal, setShowSessionEndModal] = useState(false)
-  const [sessionEndReason, setSessionEndReason] = useState<'expired' | 'logged_out' | 'inactive' | 'kicked' | 'other'>('other')
-  const wasConnectedRef = useRef(false) // Track if we were ever connected
-  const [isTestUser, setIsTestUser] = useState(false) // Track if user is a test user (non-LTI)
-
   // Session tracking state
+  const wasConnectedRef = useRef(false)
+  const [isTestUser, setIsTestUser] = useState(false)
   const [sessionExpiresAt, setSessionExpiresAt] = useState<number | null>(null)
   const [sessionReturnUrl, setSessionReturnUrl] = useState<string | null>(null)
-  const [isLtiSession, setIsLtiSession] = useState(true) // Default to true for backward compatibility
-  const [showSessionExpiryModal, setShowSessionExpiryModal] = useState(false)
+  const [isLtiSession, setIsLtiSession] = useState(true)
   const [userRole, setUserRole] = useState<'student' | 'teacher' | 'admin'>('student')
 
-  // Cinematic mode state
-  const [isCinematicMode, setIsCinematicMode] = useState(true) // Start in cinematic mode
-  const [showExplosionControls, setShowExplosionControls] = useState(true) // Show explosion controls in cinematic mode
+  // Explosion controls visibility (cinematic mode feature)
+  const [showExplosionControls, setShowExplosionControls] = useState(true)
 
-  // Training pause/quit state
+  // Training pause state
   const [isTrainingPaused, setIsTrainingPaused] = useState(false)
-  const [showQuitModal, setShowQuitModal] = useState(false)
 
   // State persistence - for session resume
   const [restoredState, setRestoredState] = useState<PersistedTrainingState | null>(null)
@@ -297,9 +285,9 @@ export default function StreamingApp() {
 
       // Show warning modal when 5 minutes or less remain
       if (timeRemaining <= SESSION_WARNING_THRESHOLD && timeRemaining > 0) {
-        if (!showSessionExpiryModal) {
+        if (!modals.isOpen('sessionExpiry')) {
           console.log('⏰ Session expiring soon, showing warning modal')
-          setShowSessionExpiryModal(true)
+          modals.openSessionExpiry()
         }
       }
     }
@@ -311,7 +299,7 @@ export default function StreamingApp() {
     const interval = setInterval(checkExpiry, 30000)
 
     return () => clearInterval(interval)
-  }, [sessionExpiresAt, showSessionExpiryModal])
+  }, [sessionExpiresAt, modals])
 
   // ==========================================================================
   // Platform Initialization with Retry Logic
@@ -319,7 +307,7 @@ export default function StreamingApp() {
 
   const initializePlatform = useCallback(async (attempt: number = 1) => {
     try {
-      console.log(`🚀 Initializing with project (attempt ${attempt}/${MAX_RETRIES}):`, projectId)
+      console.log(`🚀 Initializing with project (attempt ${attempt}/${RETRY_CONFIG.maxRetries}):`, projectId)
       setConnectionStatus(attempt > 1 ? 'retrying' : 'initializing')
       setIsRetrying(attempt > 1)
 
@@ -370,39 +358,37 @@ export default function StreamingApp() {
     } catch (err) {
       console.error(`❌ Init error (attempt ${attempt}):`, err)
 
-      if (attempt < MAX_RETRIES) {
-        console.log(`⏳ Retrying in ${RETRY_DELAY / 1000} seconds...`)
+      if (attempt < RETRY_CONFIG.maxRetries) {
+        console.log(`⏳ Retrying in ${RETRY_CONFIG.retryDelay / 1000} seconds...`)
         setRetryCount(attempt)
         setTimeout(() => {
           initializePlatform(attempt + 1)
-        }, RETRY_DELAY)
+        }, RETRY_CONFIG.retryDelay)
       } else {
-        setInitError(String(err))
         setConnectionStatus('failed')
         setIsRetrying(false)
-        setShowErrorModal(true)
+        modals.openError(String(err))
       }
     }
   }, [availableModels])
 
   // Only initialize platform when stream is started by user
   useEffect(() => {
-    if (streamStarted) {
+    if (screenFlow.streamStarted) {
       initializePlatform(1)
     }
-  }, [streamStarted, initializePlatform])
+  }, [screenFlow.streamStarted, initializePlatform])
 
   // Handler for closing navigation walkthrough
   const handleCloseNavigationWalkthrough = useCallback(() => {
-    setShowNavigationWalkthrough(false)
-  }, [])
+    modals.closeModal('navigationWalkthrough')
+  }, [modals])
 
   // Handler for starting the stream - checks for active sessions first (students only)
   const handleStartStream = useCallback(async () => {
     // For non-LTI or non-student users, skip session selection
     if (!isLtiSession || userRole !== 'student') {
-      setShowStarterScreen(false)
-      setStreamStarted(true)
+      screenFlow.goToLoadingForTraining()
       return
     }
 
@@ -413,25 +399,21 @@ export default function StreamingApp() {
       if (result.success && result.data.length > 0) {
         // Has active sessions - show session selection screen
         setActiveSessions(result.data as ActiveSession[])
-        setShowStarterScreen(false)
-        setShowSessionSelection(true)
+        screenFlow.goToSessionSelection()
       } else {
         // No active sessions - proceed to cinematic mode
         // Session will be created when user clicks "Skip to Training"
         console.log('🆕 No active sessions found - proceeding to cinematic mode')
-        setShowStarterScreen(false)
         setStartNewSessionAfterStream(true)
-        setIsCinematicMode(true)
-        setStreamStarted(true)
+        screenFlow.goToLoadingForCinematic()
       }
     } catch (error) {
       console.error('Failed to check active sessions:', error)
       // On error, proceed normally
-      setShowStarterScreen(false)
-      setStreamStarted(true)
+      screenFlow.goToLoadingForTraining()
     }
     setSessionsLoading(false)
-  }, [isLtiSession, userRole])
+  }, [isLtiSession, userRole, screenFlow])
 
   // Prefetch heavy components when user hovers on Start button
   const prefetchedRef = useRef(false)
@@ -490,14 +472,14 @@ export default function StreamingApp() {
   const training = useTrainingMessagesComposite(emitter, messageSubject, {
     onQuestionRequest: (questionId, question) => {
       console.log('❓ Question requested:', questionId)
-      setShowingQuestion(question)
+      modals.openQuestion(question)
     },
     onTrainingProgress: (data) => {
       console.log('📊 Progress:', data.progress + '%', data.taskName, data.phase)
     },
     onTrainingComplete: (progress, currentTask, totalTasks) => {
       console.log('🎉 Training Complete!', { progress, currentTask, totalTasks })
-      setShowCompletionPopup(true)
+      modals.openTrainingComplete()
     },
     onTaskCompleted: (taskId, nextTaskIndex) => {
       console.log('✅ Task completed:', taskId, 'Next task index:', nextTaskIndex)
@@ -515,12 +497,11 @@ export default function StreamingApp() {
       // Show modal if we found the task and there are more tasks
       if (completedTaskDef && nextTaskIndex < TASK_SEQUENCE.length) {
         console.log('🎉 Showing phase success modal for:', completedTaskDef.name)
-        setCompletedPhase({
+        modals.openPhaseSuccess({
           taskId: completedTaskDef.taskId,
           taskName: completedTaskDef.name,
           nextTaskIndex
         })
-        setShowPhaseSuccess(true)
       } else {
         console.log('⚠️ Not showing modal - completedTaskDef:', completedTaskDef, 'nextTaskIndex:', nextTaskIndex, 'total:', TASK_SEQUENCE.length)
       }
@@ -566,9 +547,9 @@ export default function StreamingApp() {
       await queueLaunchRequest()
     } catch (err) {
       console.error('❌ Launch failed:', err)
-      setInitError(String(err))
+      modals.openError(String(err))
     }
-  }, [queueLaunchRequest])
+  }, [queueLaunchRequest, modals])
 
   // Auto-launch when model is ready
   useEffect(() => {
@@ -589,9 +570,10 @@ export default function StreamingApp() {
     if (streamerStatus === StreamerStatus.Connected) {
       setConnectionStatus('connected')
       setRetryCount(0)
+      screenFlow.setConnected(true)
       // Show navigation walkthrough only on FIRST connection, not on reconnection
       if (!wasConnectedRef.current) {
-        setShowNavigationWalkthrough(true)
+        modals.openNavigationWalkthrough()
       }
       wasConnectedRef.current = true // Mark that we were connected
     } else if (streamerStatus === StreamerStatus.Failed) {
@@ -605,16 +587,15 @@ export default function StreamingApp() {
       }
 
       // Auto-retry on stream failure if we haven't exceeded retries
-      if (retryCount < MAX_RETRIES) {
+      if (retryCount < RETRY_CONFIG.maxRetries) {
         setTimeout(() => {
-          console.log(`🔄 Auto-retry after stream failure (${retryCount + 1}/${MAX_RETRIES})`)
+          console.log(`🔄 Auto-retry after stream failure (${retryCount + 1}/${RETRY_CONFIG.maxRetries})`)
           setRetryCount(prev => prev + 1)
           setAvailableModels(undefined)
           setModelDefinition(new UndefinedModelDefinition())
           setLoading(false)
-          setInitError(null)
           initializePlatform(retryCount + 1)
-        }, RETRY_DELAY)
+        }, RETRY_CONFIG.retryDelay)
       }
     } else if (
       // Session ended - show modal only if we were previously connected
@@ -636,10 +617,9 @@ export default function StreamingApp() {
         reason = 'logged_out'
       }
 
-      setSessionEndReason(reason)
-      setShowSessionEndModal(true)
+      modals.openSessionEnd(reason)
     }
-  }, [streamerStatus, retryCount, initializePlatform])
+  }, [streamerStatus, retryCount, initializePlatform, modals])
 
   // ==========================================================================
   // Initial Data Request (after connection)
@@ -704,15 +684,14 @@ export default function StreamingApp() {
       // Set training state
       training.hooks.trainingState.setPhase(selectedSession.current_training_phase)
       training.hooks.trainingState.setCurrentTaskIndex(phaseIndex)
-      setIsCinematicMode(false)
+      screenFlow.goToTraining()
       setShowExplosionControls(false)
 
       // Show the resume confirmation modal
-      setResumePhaseIndex(phaseIndex)
-      setShowResumeConfirmation(true)
+      modals.openResumeConfirmation(phaseIndex)
 
       // Skip navigation walkthrough for resumed sessions
-      setShowNavigationWalkthrough(false)
+      modals.closeModal('navigationWalkthrough')
       return
     }
 
@@ -721,7 +700,7 @@ export default function StreamingApp() {
     if (startNewSessionAfterStream) {
       console.log('🆕 New session - cinematic mode active, waiting for user to skip to training')
       hasRestoredStateRef.current = true
-      setShowNavigationWalkthrough(false)
+      modals.closeModal('navigationWalkthrough')
       return
     }
 
@@ -758,7 +737,7 @@ export default function StreamingApp() {
           (overallProgress && overallProgress > 0)
 
         if (shouldResumeTraining) {
-          setIsCinematicMode(false)
+          screenFlow.goToTraining()
           setShowExplosionControls(false)
 
           const phaseIndex = parseInt(phaseToRestore || '0', 10)
@@ -784,7 +763,7 @@ export default function StreamingApp() {
             progress: overallProgress
           })
         } else if (trainingState?.mode === 'cinematic') {
-          setIsCinematicMode(true)
+          screenFlow.goToCinematic()
           setShowExplosionControls(true)
           // Restore cinematic timer if available
           if (trainingState.cinematicTimeRemaining !== null) {
@@ -793,14 +772,14 @@ export default function StreamingApp() {
         }
 
         // Skip navigation walkthrough on session resume
-        setShowNavigationWalkthrough(false)
+        modals.closeModal('navigationWalkthrough')
       }
     }
 
     // Give a small delay for connection to stabilize
     const timer = setTimeout(restoreSession, 2000)
     return () => clearTimeout(timer)
-  }, [streamerStatus, isLtiSession, userRole, statePersistence, training, selectedSession, startNewSessionAfterStream])
+  }, [streamerStatus, isLtiSession, userRole, statePersistence, training, selectedSession, startNewSessionAfterStream, modals, screenFlow])
 
   // ==========================================================================
   // Auto-Save State on Changes
@@ -816,7 +795,7 @@ export default function StreamingApp() {
 
     // Save current state
     statePersistence.saveState({
-      mode: isCinematicMode ? 'cinematic' : 'training',
+      mode: screenFlow.isCinematicMode ? 'cinematic' : 'training',
       uiMode: training.state.uiMode,
       currentTaskIndex: training.state.currentTaskIndex,
       taskName: training.state.taskName,
@@ -834,7 +813,7 @@ export default function StreamingApp() {
     streamerStatus,
     isLtiSession,
     userRole,
-    isCinematicMode,
+    screenFlow.isCinematicMode,
     training.state.uiMode,
     training.state.currentTaskIndex,
     training.state.taskName,
@@ -854,23 +833,25 @@ export default function StreamingApp() {
   // Submit Quiz Results when training completes (students only)
   // ==========================================================================
 
+  const isTrainingComplete = modals.isOpen('trainingComplete')
+
   useEffect(() => {
     // Skip saving progress for admin/teacher - they are just testing
     if (userRole !== 'student') {
-      if (showCompletionPopup) {
+      if (isTrainingComplete) {
         console.log('📝 [StreamingApp] Skipping progress save for', userRole, '(test mode)')
       }
       return
     }
 
     console.log('📝 [StreamingApp] Quiz submit effect triggered:', {
-      showCompletionPopup,
+      isTrainingComplete,
       quizAnswersLength: training.quizAnswers.length,
       quizAnswers: training.quizAnswers,
       questionCount
     })
 
-    if (showCompletionPopup) {
+    if (isTrainingComplete) {
       // Submit quiz results to quiz_responses table
       if (training.quizAnswers.length > 0) {
         console.log('📝 [StreamingApp] Submitting quiz results...')
@@ -905,7 +886,7 @@ export default function StreamingApp() {
         })
       })
     }
-  }, [showCompletionPopup, training.quizAnswers.length, questionCount, training, sessionStartTime, userRole])
+  }, [isTrainingComplete, training.quizAnswers.length, questionCount, training, sessionStartTime, userRole])
 
   // ==========================================================================
   // Question Handlers
@@ -917,8 +898,8 @@ export default function StreamingApp() {
 
   const handleCloseQuestion = useCallback(() => {
     training.closeQuestion()
-    setShowingQuestion(null)
-  }, [training])
+    modals.closeModal('question')
+  }, [training, modals])
 
   // ==========================================================================
   // Message Log Handlers
@@ -933,26 +914,26 @@ export default function StreamingApp() {
   // ==========================================================================
 
   const handlePhaseContinue = useCallback(() => {
-    setShowPhaseSuccess(false)
     // Auto-advance to next task if available
+    const completedPhase = modals.completedPhase
     if (completedPhase && completedPhase.nextTaskIndex < TASK_SEQUENCE.length) {
       const nextTask = TASK_SEQUENCE[completedPhase.nextTaskIndex]
       training.selectTool(nextTask.tool)
     }
-    setCompletedPhase(null)
-  }, [completedPhase, training])
+    modals.closeModal('phaseSuccess')
+  }, [modals, training])
 
   const handlePhaseRetry = useCallback(() => {
-    setShowPhaseSuccess(false)
     // Re-select the same tool to retry the phase
+    const completedPhase = modals.completedPhase
     if (completedPhase) {
       const currentTaskDef = TASK_SEQUENCE.find(t => t.taskId === completedPhase.taskId)
       if (currentTaskDef) {
         training.selectTool(currentTaskDef.tool)
       }
     }
-    setCompletedPhase(null)
-  }, [completedPhase, training])
+    modals.closeModal('phaseSuccess')
+  }, [modals, training])
 
   // ==========================================================================
   // Session Selection Handlers
@@ -978,11 +959,9 @@ export default function StreamingApp() {
 
     // Store the selected session to use after stream connects
     setSelectedSession(session)
-    setShowSessionSelection(false)
-    setIsCinematicMode(false) // Skip cinematic mode for resumed sessions
-    setStreamStarted(true)
+    screenFlow.goToLoadingForTraining() // Skip cinematic mode for resumed sessions
     setSessionsLoading(false)
-  }, [])
+  }, [screenFlow])
 
   /**
    * Handle starting a brand new training session
@@ -994,11 +973,9 @@ export default function StreamingApp() {
     // Clear any selected session and proceed with cinematic mode
     // Session will be created when user clicks "Skip to Training"
     setSelectedSession(null)
-    setShowSessionSelection(false)
     setStartNewSessionAfterStream(true)
-    setIsCinematicMode(true) // Show cinematic mode for new sessions
-    setStreamStarted(true)
-  }, [])
+    screenFlow.goToLoadingForCinematic() // Show cinematic mode for new sessions
+  }, [screenFlow])
 
   // ==========================================================================
   // Resume Confirmation Handler
@@ -1009,15 +986,16 @@ export default function StreamingApp() {
    * This sends the start_from_task command to UE5
    */
   const handleResumeConfirmation = useCallback(() => {
-    console.log(`🚀 User clicked resume - sending start_from_task:${resumePhaseIndex} to UE5`)
-    setShowResumeConfirmation(false)
+    const phaseIndex = modals.resumePhaseIndex
+    console.log(`🚀 User clicked resume - sending start_from_task:${phaseIndex} to UE5`)
+    modals.closeModal('resumeConfirmation')
 
-    if (resumePhaseIndex > 0) {
-      training.startFromTask(resumePhaseIndex)
+    if (phaseIndex > 0) {
+      training.startFromTask(phaseIndex)
     } else {
       training.startTraining()
     }
-  }, [training, resumePhaseIndex])
+  }, [training, modals])
 
   // ==========================================================================
   // Cinematic Mode Handlers
@@ -1029,7 +1007,7 @@ export default function StreamingApp() {
    */
   const handleSkipToTraining = useCallback(async () => {
     console.log('⏭️ Skipping to training mode - starting from phase 0')
-    setIsCinematicMode(false)
+    screenFlow.goToTraining()
     setShowExplosionControls(false)
 
     // For LTI students starting a new session, create the training session now
@@ -1048,7 +1026,7 @@ export default function StreamingApp() {
     }
 
     training.startTraining()
-  }, [training, isLtiSession, userRole, startNewSessionAfterStream])
+  }, [training, isLtiSession, userRole, startNewSessionAfterStream, screenFlow])
 
   // ==========================================================================
   // Derived State
@@ -1067,15 +1045,14 @@ export default function StreamingApp() {
   // ==========================================================================
 
   const handleManualRetry = useCallback(() => {
-    setShowErrorModal(false)
-    setInitError(null)
+    modals.closeModal('error')
     setRetryCount(0)
     setAvailableModels(undefined)
     setModelDefinition(new UndefinedModelDefinition())
     setLoading(false)
     setConnectionStatus('initializing')
     initializePlatform(1)
-  }, [initializePlatform])
+  }, [initializePlatform, modals])
 
   // ==========================================================================
   // Error State Handler (for refresh page action)
@@ -1090,7 +1067,7 @@ export default function StreamingApp() {
   // ==========================================================================
 
   const handleSessionEndLogin = useCallback(() => {
-    setShowSessionEndModal(false)
+    modals.closeModal('sessionEnd')
     // Redirect to session-complete page for proper cleanup
     redirectToSessionComplete({
       reason: 'logged_out',
@@ -1101,16 +1078,16 @@ export default function StreamingApp() {
       returnUrl: sessionReturnUrl,
       isLti: isLtiSession,
     })
-  }, [userRole, training.state.progress, training.state.currentTaskIndex, training.state.totalTasks, sessionReturnUrl, isLtiSession])
+  }, [userRole, training.state.progress, training.state.currentTaskIndex, training.state.totalTasks, sessionReturnUrl, isLtiSession, modals])
 
   // ==========================================================================
   // Session Expiry Handler - Called when session expires from countdown modal
   // ==========================================================================
 
   const handleSessionExpiry = useCallback(() => {
-    setShowSessionExpiryModal(false)
+    modals.closeModal('sessionExpiry')
     // The modal itself handles redirection based on isLti and returnUrl
-  }, [])
+  }, [modals])
 
   // ==========================================================================
   // Idle Timeout Handler - Called when user doesn't respond to idle warning
@@ -1148,9 +1125,9 @@ export default function StreamingApp() {
   // ==========================================================================
 
   const handleTrainingCompleteClose = useCallback(() => {
-    setShowCompletionPopup(false)
+    modals.closeModal('trainingComplete')
     // TrainingCompleteModal handles redirect based on isLti and returnUrl
-  }, [])
+  }, [modals])
 
   // ==========================================================================
   // Training Pause/Resume/Quit Handlers
@@ -1169,13 +1146,12 @@ export default function StreamingApp() {
   }, [training])
 
   const handleQuitTrainingClick = useCallback(() => {
-    // Show confirmation modal
-    setShowQuitModal(true)
-  }, [])
+    modals.openQuitTraining()
+  }, [modals])
 
   const handleQuitTrainingConfirm = useCallback(async () => {
     console.log('🚪 Quitting training - saving progress')
-    setShowQuitModal(false)
+    modals.closeModal('quitTraining')
 
     // Save current progress before quitting
     if (sessionStartTime) {
@@ -1196,51 +1172,26 @@ export default function StreamingApp() {
       returnUrl: sessionReturnUrl,
       isLti: isLtiSession,
     })
-  }, [sessionStartTime, isLtiSession, sessionReturnUrl, userRole, training.state.progress, training.state.currentTaskIndex, training.state.totalTasks])
+  }, [sessionStartTime, isLtiSession, sessionReturnUrl, userRole, training.state.progress, training.state.currentTaskIndex, training.state.totalTasks, modals])
 
   const handleQuitTrainingCancel = useCallback(() => {
-    setShowQuitModal(false)
-  }, [])
+    modals.closeModal('quitTraining')
+  }, [modals])
 
   // ==========================================================================
-  // Loading Status Message & Step
+  // Loading Status (computed from pure function)
   // ==========================================================================
 
-  const getLoadingStatus = (): { message: string; step: LoadingStep } => {
-    if (isRetrying) {
-      return { message: 'Reconnecting to stream', step: 'connecting' }
-    }
-
-    // Check streamer status first for more accurate messages
-    if (streamerStatus === StreamerStatus.Connected) {
-      return { message: 'Establishing video stream', step: 'streaming' }
-    }
-
-    switch (connectionStatus) {
-      case 'initializing':
-        return { message: 'Initializing platform', step: 'initializing' }
-      case 'connecting':
-        if (availableModels) {
-          return { message: 'Launching', step: 'launching' }
-        }
-        return { message: 'Connecting to server', step: 'connecting' }
-      case 'retrying':
-        return { message: 'Retrying connection', step: 'connecting' }
-      default:
-        if (loading) {
-          return { message: 'Starting stream', step: 'launching' }
-        }
-        return { message: 'Loading session', step: 'initializing' }
-    }
-  }
-
-  const loadingStatus = getLoadingStatus()
-
-  // Show loading screen after user starts stream and until fully connected
-  const showLoadingScreen = streamStarted && !isConnected && !showErrorModal
+  const loadingStatus = getLoadingStatus({
+    isRetrying,
+    streamerStatus,
+    connectionStatus,
+    availableModels,
+    loading
+  })
 
   // Force dark background when starter or loading screen is visible
-  const forcesDarkBg = showStarterScreen || showLoadingScreen || showSessionSelection
+  const forcesDarkBg = screenFlow.showStarterScreen || screenFlow.showLoadingScreen || screenFlow.showSessionSelection
 
   // ==========================================================================
   // Main Render - Using New Modular Components
@@ -1253,7 +1204,7 @@ export default function StreamingApp() {
 
       {/* Training Sidebar - Slim left sidebar with theme/pause/quit buttons (desktop only) */}
       {/* Also includes TaskTools that auto-opens when PipeConnection or PressureTester is selected */}
-      {isConnected && !isCinematicMode && (
+      {isConnected && !screenFlow.isCinematicMode && (
         <TrainingSidebar
           isPaused={isTrainingPaused}
           isVisible={training.state.trainingStarted || training.state.isActive || training.state.mode === 'training'}
@@ -1267,18 +1218,18 @@ export default function StreamingApp() {
       )}
 
       {/* Cinematic Mode Timer - Show when connected and in cinematic mode */}
-      {isConnected && isCinematicMode && (
+      {isConnected && screenFlow.isCinematicMode && (
         <CinematicTimer
           duration={7200} // 2 hours
           initialTimeRemaining={cinematicTimeRemaining}
           onSkipToTraining={handleSkipToTraining}
           onTimeChange={setCinematicTimeRemaining}
-          isActive={isCinematicMode}
+          isActive={screenFlow.isCinematicMode}
         />
       )}
 
       {/* Cinematic Controls - Mobile toggle buttons + Desktop panels */}
-      {isConnected && isCinematicMode && (
+      {isConnected && screenFlow.isCinematicMode && (
         <CinematicMobileControls
           // Explosion Controls Props
           explosionValue={training.state.explosionValue}
@@ -1311,7 +1262,7 @@ export default function StreamingApp() {
       )}
 
       {/* Control Panel (ToolBar) - Only show when stream is connected and NOT in cinematic mode */}
-      {isConnected && !isCinematicMode && (
+      {isConnected && !screenFlow.isCinematicMode && (
         <ControlPanel
           isDark={isDark}
           onSelectTool={training.selectTool}
@@ -1324,7 +1275,7 @@ export default function StreamingApp() {
       <div className="sm:hidden">
         <TrainingActionButtons
           isPaused={isTrainingPaused}
-          isVisible={isConnected && !isCinematicMode && (training.state.trainingStarted || training.state.isActive || training.state.mode === 'training')}
+          isVisible={isConnected && !screenFlow.isCinematicMode && (training.state.trainingStarted || training.state.isActive || training.state.mode === 'training')}
           onPause={handlePauseTraining}
           onResume={handleResumeTraining}
           onQuit={handleQuitTrainingClick}
@@ -1332,7 +1283,7 @@ export default function StreamingApp() {
       </div>
 
       {/* Message Log - Only show when stream is connected and NOT in cinematic mode */}
-      {isConnected && !isCinematicMode && (
+      {isConnected && !screenFlow.isCinematicMode && (
         <MessageLog
           messages={training.messageLog}
           lastMessage={training.lastMessage}
@@ -1357,9 +1308,9 @@ export default function StreamingApp() {
         />
       </div>
 
-      {/* Question Modal - New Component */}
+      {/* Question Modal */}
       <QuestionModal
-        question={showingQuestion}
+        question={modals.showingQuestion}
         tryCount={training.state.questionTryCount}
         onSubmitAnswer={handleSubmitAnswer}
         onClose={handleCloseQuestion}
@@ -1367,7 +1318,7 @@ export default function StreamingApp() {
 
       {/* Training Complete Modal - Shows when all phases are completed */}
       <TrainingCompleteModal
-        isOpen={showCompletionPopup}
+        isOpen={modals.isOpen('trainingComplete')}
         totalTasks={training.state.totalTasks}
         progress={training.state.progress}
         isLti={isLtiSession}
@@ -1378,10 +1329,10 @@ export default function StreamingApp() {
 
       {/* Phase Success Modal */}
       <SuccessModal
-        isOpen={showPhaseSuccess}
-        title={completedPhase ? completedPhase.taskName + ' Task Completed' : 'Task Completed'}
-        message={completedPhase ? `Success!` : ''}
-        successText={completedPhase ? `${completedPhase.taskName} Task completed successfully!` : 'Phase completed successfully!'}
+        isOpen={modals.isOpen('phaseSuccess')}
+        title={modals.completedPhase ? modals.completedPhase.taskName + ' Task Completed' : 'Task Completed'}
+        message={modals.completedPhase ? `Success!` : ''}
+        successText={modals.completedPhase ? `${modals.completedPhase.taskName} Task completed successfully!` : 'Phase completed successfully!'}
         onContinue={handlePhaseContinue}
         onRetry={handlePhaseRetry}
         continueButtonText="Continue"
@@ -1391,10 +1342,10 @@ export default function StreamingApp() {
 
       {/* Stream Error Modal */}
       <ErrorModal
-        isOpen={showErrorModal}
+        isOpen={modals.isOpen('error')}
         title="Connection Failed"
         message="Error!"
-        errorText={initError || `Unable to connect to stream. Attempted ${MAX_RETRIES} automatic retries.`}
+        errorText={modals.initError || `Unable to connect to stream. Attempted ${RETRY_CONFIG.maxRetries} automatic retries.`}
         onRetry={handleManualRetry}
         onClose={handleRefreshPage}
         retryButtonText="Try Again"
@@ -1404,13 +1355,13 @@ export default function StreamingApp() {
 
       {/* Navigation Walkthrough - Show first when app opens */}
       <NavigationWalkthrough
-        isOpen={showNavigationWalkthrough}
+        isOpen={modals.isOpen('navigationWalkthrough')}
         onClose={handleCloseNavigationWalkthrough}
       />
 
       {/* Starter Screen - Show after navigation walkthrough is closed */}
       <StarterScreen
-        isOpen={showStarterScreen}
+        isOpen={screenFlow.showStarterScreen}
         title="Start Streaming"
         subtitle="Click the button below to begin your training session"
         onStart={handleStartStream}
@@ -1420,7 +1371,7 @@ export default function StreamingApp() {
 
       {/* Session Selection Screen - Show when student has active sessions */}
       <SessionSelectionScreen
-        isOpen={showSessionSelection}
+        isOpen={screenFlow.showSessionSelection}
         sessions={activeSessions}
         onResumeSession={handleResumeSession}
         onStartNewSession={handleStartNewSession}
@@ -1429,35 +1380,35 @@ export default function StreamingApp() {
 
       {/* Loading Screen - Show after user clicks start until stream is connected */}
       <LoadingScreen
-        isOpen={showLoadingScreen}
+        isOpen={screenFlow.showLoadingScreen && !modals.isOpen('error')}
         title="Please Wait!"
         subtitle="Session is loading"
         statusMessage={loadingStatus.message}
         currentStep={loadingStatus.step}
         retryCount={retryCount}
-        maxRetries={MAX_RETRIES}
+        maxRetries={RETRY_CONFIG.maxRetries}
         showRetryInfo={retryCount > 0}
       />
 
       {/* Resume Confirmation Modal - Show after stream connects when resuming */}
       <ResumeConfirmationModal
-        isOpen={showResumeConfirmation}
-        phaseIndex={resumePhaseIndex}
+        isOpen={modals.isOpen('resumeConfirmation')}
+        phaseIndex={modals.resumePhaseIndex}
         onStartTraining={handleResumeConfirmation}
         loading={sessionsLoading}
       />
 
       {/* Session End Modal - Show when session is disconnected/closed */}
       <SessionModal
-        isOpen={showSessionEndModal}
-        reason={sessionEndReason}
+        isOpen={modals.isOpen('sessionEnd')}
+        reason={modals.sessionEndReason}
         onLogin={handleSessionEndLogin}
         loginButtonText={isTestUser ? "Back to Login" : "Close"}
       />
 
       {/* Session Expiry Modal - Shows countdown when session is about to expire */}
       <SessionExpiryModal
-        isOpen={showSessionExpiryModal}
+        isOpen={modals.isOpen('sessionExpiry')}
         expiresAt={sessionExpiresAt || Date.now()}
         isLti={isLtiSession}
         returnUrl={sessionReturnUrl}
@@ -1478,7 +1429,7 @@ export default function StreamingApp() {
 
       {/* Quit Training Modal - Confirmation when user clicks quit */}
       <QuitTrainingModal
-        isOpen={showQuitModal}
+        isOpen={modals.isOpen('quitTraining')}
         onConfirm={handleQuitTrainingConfirm}
         onCancel={handleQuitTrainingCancel}
         currentPhase={training.state.currentTaskIndex}
