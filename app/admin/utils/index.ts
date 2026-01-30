@@ -318,7 +318,7 @@ export async function exportChartToPDF(
   let logoBase64: string | null = null
   try {
     // Use Dark_logo for light backgrounds, Main_Logo for dark backgrounds
-    const logoPath = isDarkTheme ? '/logos/Main_Logo.png' : '/logos/Dark_logo.png'
+    const logoPath = '/logos/Dark_logo.png'
     logoBase64 = await loadImageAsBase64(logoPath)
   } catch (error) {
     console.warn('Could not load logo for PDF:', error)
