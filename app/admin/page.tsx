@@ -175,7 +175,7 @@ export default function TeacherDashboardPage() {
   return (
     <DashboardLayout title="Dashboard" subtitle="Welcome back! Here's your overview.">
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-2 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-2 mb-4">
         <Link href="/admin/sessions" className="block transition-all hover:scale-[1.02] hover:shadow-lg">
           <StatCard
             label="Total Sessions"
