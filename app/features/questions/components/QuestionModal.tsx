@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useTheme } from '@/app/context/ThemeContext'
 import type { QuestionData } from '@/app/lib/messageTypes'
 
@@ -29,15 +29,34 @@ export function QuestionModal({
   const [wrongAnswer, setWrongAnswer] = useState<number | null>(null)
   const [answerFeedback, setAnswerFeedback] = useState<{ correct: boolean; message: string } | null>(null)
 
+  // Ref to track auto-close timeout so we can cancel it
+  const autoCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
   const { theme } = useTheme()
   const isDark = theme === 'dark'
 
-  // Reset state when question changes
+  // Reset state when question changes and cancel any pending auto-close
   useEffect(() => {
+    // Cancel pending auto-close from previous question
+    if (autoCloseTimeoutRef.current) {
+      console.log('🔒 [QuestionModal] Cancelling auto-close timeout for previous question')
+      clearTimeout(autoCloseTimeoutRef.current)
+      autoCloseTimeoutRef.current = null
+    }
+
     setSelectedAnswer(null)
     setWrongAnswer(null)
     setAnswerFeedback(null)
   }, [question?.id])
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (autoCloseTimeoutRef.current) {
+        clearTimeout(autoCloseTimeoutRef.current)
+      }
+    }
+  }, [])
 
   // When user selects a new answer, clear the wrong state
   const handleSelectAnswer = useCallback((index: number) => {
@@ -66,7 +85,9 @@ export function QuestionModal({
 
       // For Q6, don't auto-close - user must click Close button
       if (question.id !== 'Q6') {
-        setTimeout(() => {
+        // Store timeout ref so we can cancel if a new question arrives
+        autoCloseTimeoutRef.current = setTimeout(() => {
+          autoCloseTimeoutRef.current = null
           handleClose()
         }, 2500)
       }
@@ -80,7 +101,10 @@ export function QuestionModal({
   }, [selectedAnswer, question, onSubmitAnswer, handleClose])
 
   // Don't render if no question
-  if (!question) return null
+  if (!question) {
+    console.log('🔒 [QuestionModal] Not rendering - question is null')
+    return null
+  }
 
   return (
     <div className={`absolute inset-0 z-30 flex items-start sm:items-center justify-center overflow-y-auto py-4 sm:py-8 ${

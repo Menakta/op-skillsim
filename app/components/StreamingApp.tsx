@@ -415,6 +415,7 @@ export default function StreamingApp() {
       submit: (selectedAnswer: number) =>
         training.submitQuestionAnswer(selectedAnswer),
       close: () => {
+        console.log("🔒 [StreamingApp] questionActions.close() called - user clicked Continue/Close");
         training.closeQuestion();
         modals.closeModal("question");
 

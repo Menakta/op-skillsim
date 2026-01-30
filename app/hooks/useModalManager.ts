@@ -13,7 +13,7 @@
  * - Prevents multiple modals from conflicting
  */
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import type { QuestionData } from '@/app/lib/messageTypes'
 
 // =============================================================================
@@ -114,6 +114,15 @@ const initialState: ModalState = {
 export function useModalManager(): UseModalManagerReturn {
   const [state, setState] = useState<ModalState>(initialState)
 
+  // Debug: Log when questionData changes
+  useEffect(() => {
+    console.log('🔍 [useModalManager] State changed:', {
+      activeModal: state.activeModal,
+      hasQuestionData: !!state.questionData,
+      questionId: state.questionData?.id
+    })
+  }, [state.activeModal, state.questionData])
+
   // ==========================================================================
   // Query Helpers
   // ==========================================================================
@@ -141,10 +150,18 @@ export function useModalManager(): UseModalManagerReturn {
   }, [])
 
   const openTrainingComplete = useCallback(() => {
-    setState(prev => ({
-      ...prev,
-      activeModal: 'trainingComplete',
-    }))
+    setState(prev => {
+      // Don't open training complete if a question modal is currently open
+      // This prevents overriding the quiz modal which must be answered
+      if (prev.activeModal === 'question') {
+        console.log('⚠️ [useModalManager] Question modal is open - skipping TrainingComplete modal')
+        return prev
+      }
+      return {
+        ...prev,
+        activeModal: 'trainingComplete',
+      }
+    })
   }, [])
 
   const openPhaseSuccess = useCallback((data: PhaseSuccessData) => {
@@ -172,10 +189,17 @@ export function useModalManager(): UseModalManagerReturn {
   }, [])
 
   const openNavigationWalkthrough = useCallback(() => {
-    setState(prev => ({
-      ...prev,
-      activeModal: 'navigationWalkthrough',
-    }))
+    setState(prev => {
+      // Don't open walkthrough if a question modal is currently open
+      if (prev.activeModal === 'question') {
+        console.log('⚠️ [useModalManager] Question modal is open - skipping NavigationWalkthrough modal')
+        return prev
+      }
+      return {
+        ...prev,
+        activeModal: 'navigationWalkthrough',
+      }
+    })
   }, [])
 
   const openResumeConfirmation = useCallback((phaseIndex: number) => {
@@ -187,18 +211,32 @@ export function useModalManager(): UseModalManagerReturn {
   }, [])
 
   const openSessionEnd = useCallback((reason: SessionEndData['reason']) => {
-    setState(prev => ({
-      ...prev,
-      activeModal: 'sessionEnd',
-      sessionEndData: { reason },
-    }))
+    setState(prev => {
+      // Don't open session end if a question modal is currently open
+      if (prev.activeModal === 'question') {
+        console.log('⚠️ [useModalManager] Question modal is open - skipping SessionEnd modal')
+        return prev
+      }
+      return {
+        ...prev,
+        activeModal: 'sessionEnd',
+        sessionEndData: { reason },
+      }
+    })
   }, [])
 
   const openSessionExpiry = useCallback(() => {
-    setState(prev => ({
-      ...prev,
-      activeModal: 'sessionExpiry',
-    }))
+    setState(prev => {
+      // Don't open session expiry if a question modal is currently open
+      if (prev.activeModal === 'question') {
+        console.log('⚠️ [useModalManager] Question modal is open - skipping SessionExpiry modal')
+        return prev
+      }
+      return {
+        ...prev,
+        activeModal: 'sessionExpiry',
+      }
+    })
   }, [])
 
   const openQuitTraining = useCallback(() => {
@@ -213,17 +251,26 @@ export function useModalManager(): UseModalManagerReturn {
   // ==========================================================================
 
   const close = useCallback(() => {
-    setState(prev => ({
-      ...prev,
-      activeModal: null,
-      // Clear question data when closing question modal
-      questionData: prev.activeModal === 'question' ? null : prev.questionData,
-    }))
+    console.log('🔒 [useModalManager] close() called - closing current modal')
+    setState(prev => {
+      console.log('🔒 [useModalManager] Closing modal:', prev.activeModal)
+      return {
+        ...prev,
+        activeModal: null,
+        // Clear question data when closing question modal
+        questionData: prev.activeModal === 'question' ? null : prev.questionData,
+      }
+    })
   }, [])
 
   const closeModal = useCallback((modal: ModalType) => {
+    console.log('🔒 [useModalManager] closeModal() called for:', modal)
     setState(prev => {
-      if (prev.activeModal !== modal) return prev
+      if (prev.activeModal !== modal) {
+        console.log(`🔒 [useModalManager] Cannot close ${modal} - current modal is ${prev.activeModal}`)
+        return prev
+      }
+      console.log(`🔒 [useModalManager] Closing modal: ${modal}`)
       return {
         ...prev,
         activeModal: null,

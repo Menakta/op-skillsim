@@ -258,6 +258,12 @@ export function useQuestionFlow(
   const closeQuestion = useCallback(() => {
     const question = state.currentQuestion
 
+    console.log('🔒 [useQuestionFlow] closeQuestion called:', {
+      questionId: question?.id,
+      wasAnsweredCorrectly: state.questionAnsweredCorrectly,
+      caller: new Error().stack?.split('\n')[2]?.trim()
+    })
+
     // Check if this is Q6 being closed and if it was answered correctly
     if (question && question.id === 'Q6' && state.questionAnsweredCorrectly) {
       console.log('🔧 Q6 CLOSE DETECTED! Triggering pressure testing sequence...')
