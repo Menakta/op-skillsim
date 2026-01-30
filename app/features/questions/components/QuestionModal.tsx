@@ -89,8 +89,8 @@ export function QuestionModal({
       <div
         className={`backdrop-blur-md rounded-2xl max-w-[660px] w-full mx-4 shadow-2xl border ${
           isDark
-            ? 'bg-[#000000]/40 border-gray-700/50'
-            : 'bg-white/95 border-gray-200'
+            ? 'bg-[#000000]/55 border-gray-700/50'
+            : 'bg-white/88 border-gray-200'
         }`}
         style={{
           animation: 'modalFadeIn 0.3s ease-out'
@@ -98,7 +98,7 @@ export function QuestionModal({
       >
         {/* Question Header */}
         <div className={`flex items-center justify-between pb-4 border-b px-2 py-4 ${
-          isDark ? 'border-gray-400' : 'border-gray-200'
+          isDark ? 'border-gray-400' : 'border-gray-900'
         }`}>
           <div className="flex items-center gap-3">
             <div>
@@ -110,11 +110,11 @@ export function QuestionModal({
         </div>
 
         {/* Content Area - Image on left, Question/Answers on right */}
-        <div className="flex gap-5 px-2.5 py-5">
+        <div className="flex gap-2 px-2 py-3">
           {/* Left Side - Image Placeholder */}
           <div
             className={`flex-shrink-0 rounded-xl hidden md:flex items-center justify-center ${
-              isDark ? 'bg-white' : 'bg-gray-100'
+              isDark ? 'bg-white' : 'bg-[#000000]/55'
             }`}
             style={{ width: '256px', height: '294px' }}
           >
@@ -124,8 +124,8 @@ export function QuestionModal({
           {/* Right Side - Question and Answers */}
           <div className="flex-1">
             {/* Question Text */}
-            <p className={`text-sm text-base mb-5 leading-relaxed ${
-              isDark ? 'text-gray-300' : 'text-gray-700'
+            <p className={`text-sm text-base lg:mb-3 mb-2 leading-relaxed ${
+              isDark ? 'text-gray-200' : 'text-gray-900'
             }`}>{question.text}</p>
 
             {/* Answer Options */}
@@ -140,7 +140,7 @@ export function QuestionModal({
                     key={index}
                     onClick={() => handleSelectAnswer(index)}
                     disabled={answerFeedback?.correct}
-                    className={`w-full p-3 text-left rounded-xl transition-all duration-200 flex items-center gap-3 ${
+                    className={`w-full lg:p-3 p-2 text-left rounded-xl transition-all duration-200 flex items-center lg:gap-3 gap-2 ${
                       isCorrectAnswer
                         ? 'text-green-500'
                         : isWrongAnswer
@@ -180,7 +180,7 @@ export function QuestionModal({
 
         {/* Feedback Message - Full Width */}
         {answerFeedback && (
-          <div className={`p-3 rounded-xl mb-4 mx-2.5 ${
+          <div className={`p-1 rounded-xl mb-1 mx-1 ${
             answerFeedback.correct
               ? 'bg-green-500/20 border border-green-500/40 text-green-400'
               : 'bg-red-500/20 border border-red-500/40 text-red-400'
@@ -191,18 +191,10 @@ export function QuestionModal({
           </div>
         )}
 
-        {/* Q6 Special Notice - Full Width */}
-        {question.id === 'Q6' && answerFeedback?.correct && (
-          <div className={`p-3 rounded-xl mb-4 mx-2.5 ${
-            isDark ? 'text-white' : 'text-gray-700'
-          }`}>
-            <div className="text-xs opacity-80">Note: This is the last question.</div>
-          </div>
-        )}
-
+        
         {/* Action Buttons */}
-        <div className={`flex items-center justify-center gap-3 px-5 pb-6 border-t py-4 ${
-          isDark ? 'border-gray-400' : 'border-gray-200'
+        <div className={`flex items-center justify-center gap-1 px-5 pb-3 border-t py-2 ${
+          isDark ? 'border-gray-400' : 'border-gray-900'
         }`}>
           {!answerFeedback?.correct ? (
             <button
@@ -221,7 +213,7 @@ export function QuestionModal({
           ) : (
             <button
               onClick={handleClose}
-              className="py-2 px-4 rounded-full font-medium bg-[#39BEAE] text-white hover:bg-[#2ea89a] transition-all duration-200 shadow-lg shadow-[#39BEAE]/20"
+              className="py-1 px-4 rounded-full font-medium bg-[#39BEAE] text-white hover:bg-[#2ea89a] transition-all duration-200 shadow-lg shadow-[#39BEAE]/20"
             >
               Continue
             </button>

@@ -48,19 +48,22 @@ export function CameraTab({
 
         {/* Perspective Buttons */}
         <div className="grid grid-cols-3 gap-2 mb-4">
-          {CAMERA_PERSPECTIVES.map((cam) => (
-            <button
-              key={cam.id}
-              onClick={() => onSetCameraPerspective(cam.id)}
-              className={`p-2 rounded text-xs font-medium transition-colors ${
-                cameraPerspective === cam.id
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-600 text-white hover:bg-gray-500'
-              }`}
-            >
-              {cam.label}
-            </button>
-          ))}
+          {CAMERA_PERSPECTIVES.map((cam) => {
+            const isActive = cameraPerspective === cam.id
+            return (
+              <button
+                key={cam.id}
+                onClick={() => onSetCameraPerspective(cam.id)}
+                className={`p-2 rounded text-xs font-medium transition-all ${
+                  isActive
+                    ? 'bg-blue-500 text-white ring-2 ring-blue-400/50 ring-offset-1 ring-offset-[#1e2a4a]'
+                    : 'bg-gray-600 text-white hover:bg-gray-500'
+                }`}
+              >
+                {cam.label}
+              </button>
+            )
+          })}
         </div>
 
         {/* Orbit and Reset */}

@@ -161,6 +161,10 @@ export function useStreamConnection(config: UseStreamConnectionConfig): UseStrea
   // Platform Initialization with Retry Logic
   // ==========================================================================
 
+  // Use ref to track available models to avoid dependency cycle
+  const availableModelsRef = useRef<ModelDefinition[] | undefined>(availableModels)
+  availableModelsRef.current = availableModels
+
   const initializePlatform = useCallback(async (attempt: number = 1) => {
     try {
       console.log(`🚀 Initializing with project (attempt ${attempt}/${RETRY_CONFIG.maxRetries}):`, projectId)
@@ -183,8 +187,8 @@ export function useStreamConnection(config: UseStreamConnectionConfig): UseStrea
         throw new Error('Platform not initialized')
       }
 
-      // Skip if already pre-warmed (models already fetched)
-      if (availableModels?.length && attempt === 1) {
+      // Skip if already pre-warmed (models already fetched) - use ref to avoid dependency
+      if (availableModelsRef.current?.length && attempt === 1) {
         console.log('⚡ Using pre-warmed connection, skipping initialization')
         if (platform.agent?.serviceCredentials?.iceServers) {
           streamerOptions.iceServers = platform.agent.serviceCredentials.iceServers as RTCIceServer[]
@@ -226,11 +230,15 @@ export function useStreamConnection(config: UseStreamConnectionConfig): UseStrea
         onError?.(String(err))
       }
     }
-  }, [availableModels, projectId, modelId, onError])
+  }, [projectId, modelId, onError])
+
+  // Track if initialization has been triggered to prevent double-init
+  const initTriggeredRef = useRef(false)
 
   // Initialize platform when stream is started by user
   useEffect(() => {
-    if (streamStarted) {
+    if (streamStarted && !initTriggeredRef.current) {
+      initTriggeredRef.current = true
       initializePlatform(1)
     }
   }, [streamStarted, initializePlatform])
@@ -301,6 +309,10 @@ export function useStreamConnection(config: UseStreamConnectionConfig): UseStrea
   // Handle Streamer Status Changes
   // ==========================================================================
 
+  // Use ref for initializePlatform to avoid dependency cycle in streamer status effect
+  const initializePlatformRef = useRef(initializePlatform)
+  initializePlatformRef.current = initializePlatform
+
   useEffect(() => {
     if (streamerStatus === StreamerStatus.Connected) {
       setConnectionStatus('connected')
@@ -326,7 +338,7 @@ export function useStreamConnection(config: UseStreamConnectionConfig): UseStrea
           setAvailableModels(undefined)
           setModelDefinition(new UndefinedModelDefinition())
           setLoading(false)
-          initializePlatform(retryCount + 1)
+          initializePlatformRef.current(retryCount + 1)
         }, RETRY_CONFIG.retryDelay)
       }
     } else if (
@@ -351,7 +363,7 @@ export function useStreamConnection(config: UseStreamConnectionConfig): UseStrea
 
       onSessionEnd?.(reason)
     }
-  }, [streamerStatus, retryCount, initializePlatform, onConnected, onSessionEnd])
+  }, [streamerStatus, retryCount, onConnected, onSessionEnd])
 
   // ==========================================================================
   // Return

@@ -221,6 +221,7 @@ export function UnifiedSidebar({
   const { pipeTypes, loading: fittingsLoading } = useFittingOptions()
 
   const isTrainingMode = mode === 'training'
+  const isCinematiceMode = mode === 'cinematic'
 
   // ==========================================================================
   // Fullscreen handlers
@@ -339,7 +340,7 @@ export function UnifiedSidebar({
 
   const menuTabs: { id: MenuTab; label: string; icon: React.ReactNode; showInMode?: SidebarMode }[] = [
     { id: 'inventory', label: 'Inventory', icon: <Package className="w-4 h-4" />, showInMode: 'training' },
-    { id: 'controls', label: 'Controls', icon: <Sliders className="w-4 h-4" /> },
+    { id: 'controls', label: 'Controls', icon: <Sliders className="w-4 h-4" />,showInMode: 'cinematic' }, 
     { id: 'settings', label: 'Settings', icon: <Settings className="w-4 h-4" /> },
     { id: 'system', label: 'System', icon: <Cpu className="w-4 h-4" /> },
   ]
@@ -350,10 +351,11 @@ export function UnifiedSidebar({
     <>
       {/* ====================================================================
           DRAWER TRIGGER - Edge handle/arrow
+          Hidden on mobile (< 640px), shown on tablet and desktop
           ==================================================================== */}
       <div
-        className={`fixed top-1/2 -translate-y-1/2 z-50 transition-all duration-300 ${
-          isOpen ? 'left-72' : 'left-0'
+        className={`hidden sm:block fixed top-1/4 -translate-y-1/2 z-50 transition-all duration-300 ${
+          isOpen ? 'left-48 md:left-50 lg:left-60' : 'left-0'
         }`}
       >
         <button
@@ -375,58 +377,62 @@ export function UnifiedSidebar({
 
       {/* ====================================================================
           DRAWER MENU
+          Responsive widths:
+          - Mobile (< 640px): w-64 (256px) compact
+          - Tablet (640px - 1024px): w-72 (288px)
+          - Desktop (>= 1024px): w-80 (320px) comfortable
           ==================================================================== */}
       <div
-        className={`fixed top-0 left-0 bottom-0 z-40 w-72 flex flex-col backdrop-blur-md border-r transition-transform duration-300 ease-in-out ${
+        className={`fixed top-0 left-0 bottom-0 z-40 w-48 md:w-50 lg:w-60 flex flex-col backdrop-blur-md border-r transition-transform duration-300 ease-in-out ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         } ${isDark ? 'bg-[#000000]/55 border-black/10' : 'bg-white/88 border-gray-100 shadow-2xl'}`}
       >
         {/* ================================================================
             HEADER
             ================================================================ */}
-        <div className={`px-4 py-3 border-b flex items-center justify-between flex-shrink-0 ${
+        <div className={`px-3 sm:px-4 py-2.5 sm:py-3 border-b flex items-center justify-between flex-shrink-0 ${
           isDark ? 'border-white/10' : 'border-gray-200'
         }`}>
-          <div className="flex items-center gap-2">
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center ${
               isDark ? 'bg-[#39BEAE]/20' : 'bg-[#39BEAE]/10'
             }`}>
-              <Sliders className="w-4 h-4 text-[#39BEAE]" />
+              <Sliders className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#39BEAE]" />
             </div>
             <div>
-              <h2 className={`font-semibold text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>
+              <h2 className={`font-semibold text-xs sm:text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>
                 Menu
               </h2>
-              <p className={`text-[10px] ${isDark ? 'text-white/50' : 'text-gray-500'}`}>
+              <p className={`text-[9px] sm:text-[10px] ${isDark ? 'text-white/50' : 'text-gray-500'}`}>
                 {isTrainingMode ? 'Training Mode' : 'Cinematic Mode'}
               </p>
             </div>
           </div>
           <button
             onClick={() => setIsOpen(false)}
-            className={`p-1.5 rounded-lg transition-colors ${
+            className={`p-1 sm:p-1.5 rounded-lg transition-colors ${
               isDark ? 'text-gray-400 hover:text-white hover:bg-white/10' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
             }`}
             title="Close (Esc)"
           >
-            <X className="w-4 h-4" />
+            <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
         </div>
 
         {/* ================================================================
             TAB NAVIGATION
             ================================================================ */}
-        <div className={`px-2 pt-2 pb-1 border-b flex-shrink-0 ${
+        <div className={`px-1.5 sm:px-2 pt-1.5 sm:pt-2 pb-1 border-b flex-shrink-0 ${
           isDark ? 'border-white/10' : 'border-gray-200'
         }`}>
-          <div className={`flex gap-1 overflow-x-auto sidebar-tabs-scroll ${
+          <div className={`flex gap-0.5 sm:gap-1 overflow-x-auto sidebar-tabs-scroll ${
             isDark ? 'sidebar-tabs-scroll-dark' : 'sidebar-tabs-scroll-light'
           }`}>
             {visibleTabs.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
+                className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-medium transition-all whitespace-nowrap ${
                   activeTab === tab.id
                     ? 'bg-[#39BEAE] text-white'
                     : isDark
@@ -435,7 +441,7 @@ export function UnifiedSidebar({
                 }`}
               >
                 {tab.icon}
-                {tab.label}
+                <span className="hidden xs:inline sm:inline">{tab.label}</span>
               </button>
             ))}
           </div>
@@ -445,61 +451,63 @@ export function UnifiedSidebar({
             CONTENT AREA
             ================================================================ */}
         <div className="flex-1 overflow-y-auto">
-          <div className='p-2 space-y-4'>  <div className={`p-3 rounded-lg ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
-                <div className="flex items-center gap-2 mb-3">
-                  <span className={`text-xs font-medium ${isDark ? 'text-white/70' : 'text-gray-600'}`}>
-                    Session
+          {/* Session Controls - Always visible */}
+          <div className='p-1.5 sm:p-2 space-y-3 sm:space-y-4'>
+            <div className={`p-2 sm:p-3 rounded-lg ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
+              <div className="flex items-center gap-1.5 sm:gap-2 mb-2 sm:mb-3">
+                <span className={`text-[11px] sm:text-xs font-medium ${isDark ? 'text-white/70' : 'text-gray-600'}`}>
+                  Session
+                </span>
+                {isPaused && (
+                  <span className="flex items-center gap-0.5 sm:gap-1 px-1 sm:px-1.5 py-0.5 bg-amber-500/20 rounded text-[9px] sm:text-[10px] text-amber-500 font-medium">
+                    <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 bg-amber-500 rounded-full animate-pulse" />
+                    Paused
                   </span>
-                  {isPaused && (
-                    <span className="flex items-center gap-1 px-1.5 py-0.5 bg-amber-500/20 rounded text-[10px] text-amber-500 font-medium">
-                      <div className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />
-                      Paused
-                    </span>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => isPaused ? onResume?.() : onPause?.()}
-                    className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                      isPaused
-                        ? 'bg-[#39BEAE] text-white hover:bg-[#2ea89a]'
-                        : isDark
-                          ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50'
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                    }`}
-                  >
-                    {isPaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
-                    {isPaused ? 'Resume' : 'Pause'}
-                  </button>
-                  <button
-                    onClick={onQuit}
-                    className="flex items-center justify-center gap-1.5 px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-medium transition-all"
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                    Quit
-                  </button>
-                </div>
+                )}
               </div>
+              <div className="flex gap-1.5 sm:gap-2">
+                <button
+                  onClick={() => isPaused ? onResume?.() : onPause?.()}
+                  className={`flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[11px] sm:text-xs font-medium transition-all ${
+                    isPaused
+                      ? 'bg-[#39BEAE] text-white hover:bg-[#2ea89a]'
+                      : isDark
+                        ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  {isPaused ? <Play className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> : <Pause className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
+                  {isPaused ? 'Resume' : 'Pause'}
+                </button>
+                <button
+                  onClick={onQuit}
+                  className="flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-[11px] sm:text-xs font-medium transition-all"
+                >
+                  <LogOut className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                  Quit
+                </button>
               </div>
+            </div>
+          </div>
         
           {/* ============================================================
               INVENTORY TAB (Training Mode Only)
               ============================================================ */}
           {activeTab === 'inventory' && isTrainingMode && (
-            <div className="p-3 space-y-4">
+            <div className="p-2 sm:p-3 space-y-3 sm:space-y-4">
               {/* Session Controls */}
-             
+
 
               {/* Pipe Selection */}
               <div>
-                <h3 className={`text-xs font-medium mb-2 flex items-center gap-2 ${isDark ? 'text-white/70' : 'text-gray-600'}`}>
-                  <Wrench className="w-3.5 h-3.5" />
+                <h3 className={`text-[11px] sm:text-xs font-medium mb-2 flex items-center gap-1.5 sm:gap-2 ${isDark ? 'text-white/70' : 'text-gray-600'}`}>
+                  <Wrench className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                   Pipes
                 </h3>
                 {fittingsLoading ? (
-                  <div className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Loading...</div>
+                  <div className={`text-[11px] sm:text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Loading...</div>
                 ) : (
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 sm:gap-2">
                     {pipeTypes.map((pipe) => {
                       const isSelected = trainingState?.selectedPipe === pipe.id
                       return (
@@ -520,6 +528,7 @@ export function UnifiedSidebar({
                             alt={pipe.label}
                             width={24}
                             height={24}
+                            className="w-5 h-5 sm:w-6 sm:h-6"
                           />
                         </button>
                       )
@@ -530,14 +539,14 @@ export function UnifiedSidebar({
 
               {/* Pressure Test */}
               <div>
-                <h3 className={`text-xs font-medium mb-2 flex items-center gap-2 ${isDark ? 'text-white/70' : 'text-gray-600'}`}>
-                  <Gauge className="w-3.5 h-3.5" />
+                <h3 className={`text-[11px] sm:text-xs font-medium mb-2 flex items-center gap-1.5 sm:gap-2 ${isDark ? 'text-white/70' : 'text-gray-600'}`}>
+                  <Gauge className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                   Pressure Test
                 </h3>
-                <div className="flex gap-2">
+                <div className="flex gap-1.5 sm:gap-2">
                   <button
                     onClick={() => handleActionWithAutoClose(() => onSelectPressureTest?.('air-plug'))}
-                    className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
+                    className={`flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-2.5 rounded-lg text-[11px] sm:text-xs font-medium transition-all ${
                       trainingState?.airPlugSelected
                         ? 'bg-[#39BEAE] text-white'
                         : isDark
@@ -545,13 +554,13 @@ export function UnifiedSidebar({
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
                   >
-                    <Plug className="w-3.5 h-3.5" />
+                    <Plug className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                     Air Plug
                   </button>
                   <button
                     onClick={() => trainingState?.airPlugSelected && handleActionWithAutoClose(() => onSelectPressureTest?.('conduct-test'))}
                     disabled={!trainingState?.airPlugSelected}
-                    className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
+                    className={`flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-2.5 rounded-lg text-[11px] sm:text-xs font-medium transition-all ${
                       trainingState?.airPlugSelected
                         ? isDark
                           ? 'bg-white/10 text-gray-300 hover:bg-[#39BEAE] hover:text-white'
@@ -559,7 +568,7 @@ export function UnifiedSidebar({
                         : 'bg-gray-700/30 opacity-50 cursor-not-allowed text-gray-500'
                     }`}
                   >
-                    <Play className="w-3.5 h-3.5" />
+                    <Play className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                     Conduct Test
                   </button>
                 </div>
@@ -570,7 +579,7 @@ export function UnifiedSidebar({
           {/* ============================================================
               CONTROLS TAB
               ============================================================ */}
-          {activeTab === 'controls' && (
+          {activeTab === 'controls' && isCinematiceMode && (
             <div className="p-2 space-y-1">
               {/* Explosion Section */}
               <AccordionSection
@@ -787,6 +796,7 @@ export function UnifiedSidebar({
               </AccordionSection>
 
               {/* Camera Section */}
+              {/* Camera Section */}
               <AccordionSection
                 title="Camera"
                 icon={<Camera className="w-4 h-4" />}
@@ -797,47 +807,51 @@ export function UnifiedSidebar({
                 <div className="space-y-3">
                   <div>
                     <label className={`text-xs mb-2 block ${isDark ? 'text-white/70' : 'text-gray-600'}`}>View</label>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {CAMERA_PERSPECTIVES.map((cam) => (
-                        <button
-                          key={cam.id}
-                          onClick={() => onSetCameraPerspective(cam.id)}
-                          className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                            cameraPerspective === cam.id
-                              ? 'bg-[#39BEAE] text-white'
-                              : isDark
-                                ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50'
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                          }`}
-                        >
-                          {cam.label}
-                        </button>
-                      ))}
+                    {/* Responsive grid: 2 cols on mobile, 3 cols on tablet+desktop */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 sm:gap-1.5">
+                      {CAMERA_PERSPECTIVES.map((cam) => {
+                        const isActive = cameraPerspective === cam.id
+                        return (
+                          <button
+                            key={cam.id}
+                            onClick={() => onSetCameraPerspective(cam.id)}
+                            className={`px-1.5 sm:px-2 py-1.5 rounded-lg text-[11px] sm:text-xs font-medium transition-all ${
+                              isActive
+                                ? 'bg-[#39BEAE] text-white ring-2 ring-[#39BEAE]/50 ring-offset-1 ring-offset-transparent'
+                                : isDark
+                                  ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50'
+                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                          >
+                            {cam.label}
+                          </button>
+                        )
+                      })}
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-1.5 sm:gap-2">
                     <button
                       onClick={onToggleAutoOrbit}
-                      className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                      className={`flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[11px] sm:text-xs font-medium transition-all ${
                         isOrbitActive
-                          ? 'bg-[#39BEAE] text-white'
+                          ? 'bg-[#df5e5e] text-white'
                           : isDark
                             ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50'
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                       }`}
                     >
-                      <Video className="w-3.5 h-3.5" />
+                      <Video className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                       {isOrbitActive ? 'Stop' : 'Orbit'}
                     </button>
                     <button
                       onClick={onResetCamera}
-                      className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                      className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[11px] sm:text-xs font-medium transition-all ${
                         isDark
                           ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50'
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                       }`}
                     >
-                      <Home className="w-3.5 h-3.5" />
+                      <Home className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                       Reset
                     </button>
                   </div>
@@ -850,56 +864,56 @@ export function UnifiedSidebar({
               SETTINGS TAB
               ============================================================ */}
           {activeTab === 'settings' && (
-            <div className="p-3 space-y-4">
+            <div className="p-2 sm:p-3 space-y-3 sm:space-y-4">
 
               {/* Theme */}
-              <div className={`p-3 rounded-lg ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
-                <h3 className={`text-xs font-medium mb-3 ${isDark ? 'text-white/70' : 'text-gray-600'}`}>Appearance</h3>
+              <div className={`p-2 sm:p-3 rounded-lg ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
+                <h3 className={`text-[11px] sm:text-xs font-medium mb-2 sm:mb-3 ${isDark ? 'text-white/70' : 'text-gray-600'}`}>Appearance</h3>
                 <button
                   onClick={toggleTheme}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all ${
+                  className={`w-full flex items-center justify-between px-2 sm:px-3 py-2 sm:py-2.5 rounded-lg transition-all ${
                     isDark
                       ? 'bg-gray-700/50 hover:bg-gray-600/50'
                       : 'bg-gray-100 hover:bg-gray-200'
                   }`}
                 >
-                  <div className="flex items-center gap-2">
-                    {isDark ? <Moon className="w-4 h-4 text-blue-400" /> : <Sun className="w-4 h-4 text-amber-500" />}
-                    <span className={`text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    {isDark ? <Moon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-400" /> : <Sun className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500" />}
+                    <span className={`text-xs sm:text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>
                       {isDark ? 'Dark Mode' : 'Light Mode'}
                     </span>
                   </div>
-                  <div className={`w-10 h-5 rounded-full relative transition-colors ${isDark ? 'bg-blue-500' : 'bg-gray-300'}`}>
-                    <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform shadow ${isDark ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                  <div className={`w-8 h-4 sm:w-10 sm:h-5 rounded-full relative transition-colors ${isDark ? 'bg-blue-500' : 'bg-gray-300'}`}>
+                    <div className={`absolute top-0.5 w-3 h-3 sm:w-4 sm:h-4 bg-white rounded-full transition-transform shadow ${isDark ? 'translate-x-4 sm:translate-x-5' : 'translate-x-0.5'}`} />
                   </div>
                 </button>
               </div>
 
               {/* Audio */}
-              <div className={`p-3 rounded-lg ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
-                <h3 className={`text-xs font-medium mb-3 ${isDark ? 'text-white/70' : 'text-gray-600'}`}>Audio</h3>
-                <div className="space-y-3">
+              <div className={`p-2 sm:p-3 rounded-lg ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
+                <h3 className={`text-[11px] sm:text-xs font-medium mb-2 sm:mb-3 ${isDark ? 'text-white/70' : 'text-gray-600'}`}>Audio</h3>
+                <div className="space-y-2 sm:space-y-3">
                   <button
                     onClick={() => setAudioEnabled(!audioEnabled)}
-                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all ${
+                    className={`w-full flex items-center justify-between px-2 sm:px-3 py-2 sm:py-2.5 rounded-lg transition-all ${
                       isDark
                         ? 'bg-gray-700/50 hover:bg-gray-600/50'
                         : 'bg-gray-100 hover:bg-gray-200'
                     }`}
                   >
-                    <div className="flex items-center gap-2">
-                      {audioEnabled ? <Volume2 className="w-4 h-4 text-[#39BEAE]" /> : <VolumeX className="w-4 h-4 text-gray-500" />}
-                      <span className={`text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>Sound</span>
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                      {audioEnabled ? <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#39BEAE]" /> : <VolumeX className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500" />}
+                      <span className={`text-xs sm:text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>Sound</span>
                     </div>
-                    <div className={`w-10 h-5 rounded-full relative transition-colors ${audioEnabled ? 'bg-[#39BEAE]' : 'bg-gray-400'}`}>
-                      <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform shadow ${audioEnabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                    <div className={`w-8 h-4 sm:w-10 sm:h-5 rounded-full relative transition-colors ${audioEnabled ? 'bg-[#39BEAE]' : 'bg-gray-400'}`}>
+                      <div className={`absolute top-0.5 w-3 h-3 sm:w-4 sm:h-4 bg-white rounded-full transition-transform shadow ${audioEnabled ? 'translate-x-4 sm:translate-x-5' : 'translate-x-0.5'}`} />
                     </div>
                   </button>
                   {audioEnabled && (
                     <div className="px-1">
                       <div className="flex items-center justify-between mb-1">
-                        <span className={`text-xs ${isDark ? 'text-white/50' : 'text-gray-500'}`}>Volume</span>
-                        <span className={`text-xs font-mono ${isDark ? 'text-white/70' : 'text-gray-600'}`}>{audioVolume}%</span>
+                        <span className={`text-[10px] sm:text-xs ${isDark ? 'text-white/50' : 'text-gray-500'}`}>Volume</span>
+                        <span className={`text-[10px] sm:text-xs font-mono ${isDark ? 'text-white/70' : 'text-gray-600'}`}>{audioVolume}%</span>
                       </div>
                       <input
                         type="range"
@@ -915,14 +929,14 @@ export function UnifiedSidebar({
               </div>
 
               {/* Graphics Quality */}
-              <div className={`p-3 rounded-lg ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
-                <h3 className={`text-xs font-medium mb-3 ${isDark ? 'text-white/70' : 'text-gray-600'}`}>Graphics Quality</h3>
-                <div className="grid grid-cols-4 gap-1.5">
+              <div className={`p-2 sm:p-3 rounded-lg ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
+                <h3 className={`text-[11px] sm:text-xs font-medium mb-2 sm:mb-3 ${isDark ? 'text-white/70' : 'text-gray-600'}`}>Graphics Quality</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-1.5">
                   {(['low', 'medium', 'high', 'ultra'] as const).map((quality) => (
                     <button
                       key={quality}
                       onClick={() => setGraphicsQuality(quality)}
-                      className={`px-2 py-2 rounded-lg text-xs font-medium capitalize transition-all ${
+                      className={`px-1.5 sm:px-2 py-1.5 sm:py-2 rounded-lg text-[11px] sm:text-xs font-medium capitalize transition-all ${
                         graphicsQuality === quality
                           ? 'bg-[#39BEAE] text-white'
                           : isDark
@@ -939,19 +953,19 @@ export function UnifiedSidebar({
               {/* Fullscreen */}
               <button
                 onClick={toggleFullscreen}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-lg transition-all ${
+                className={`w-full flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg transition-all ${
                   isDark
                     ? 'bg-white/5 hover:bg-white/10'
                     : 'bg-gray-50 hover:bg-gray-100'
                 }`}
               >
-                <div className="flex items-center gap-2">
-                  {isFullscreen ? <Minimize className="w-4 h-4 text-[#39BEAE]" /> : <Maximize className="w-4 h-4" />}
-                  <span className={`text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  {isFullscreen ? <Minimize className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#39BEAE]" /> : <Maximize className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                  <span className={`text-xs sm:text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>
                     {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
                   </span>
                 </div>
-                <span className={`text-xs ${isDark ? 'text-white/30' : 'text-gray-400'}`}>F</span>
+                <span className={`text-[10px] sm:text-xs ${isDark ? 'text-white/30' : 'text-gray-400'}`}>F</span>
               </button>
             </div>
           )}
@@ -960,37 +974,37 @@ export function UnifiedSidebar({
               SYSTEM TAB
               ============================================================ */}
           {activeTab === 'system' && (
-            <div className="p-3 space-y-4">
+            <div className="p-2 sm:p-3 space-y-3 sm:space-y-4">
               {/* Performance Monitor */}
-              <div className={`p-3 rounded-lg ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
-                <h3 className={`text-xs font-medium mb-3 ${isDark ? 'text-white/70' : 'text-gray-600'}`}>Performance</h3>
+              <div className={`p-2 sm:p-3 rounded-lg ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
+                <h3 className={`text-[11px] sm:text-xs font-medium mb-2 sm:mb-3 ${isDark ? 'text-white/70' : 'text-gray-600'}`}>Performance</h3>
                 <button
                   onClick={() => setShowFps(!showFps)}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all ${
+                  className={`w-full flex items-center justify-between px-2 sm:px-3 py-2 sm:py-2.5 rounded-lg transition-all ${
                     isDark
                       ? 'bg-gray-700/50 hover:bg-gray-600/50'
                       : 'bg-gray-100 hover:bg-gray-200'
                   }`}
                 >
-                  <div className="flex items-center gap-2">
-                    <Gauge className="w-4 h-4 text-[#39BEAE]" />
-                    <span className={`text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>Show FPS</span>
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    <Gauge className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#39BEAE]" />
+                    <span className={`text-xs sm:text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>Show FPS</span>
                   </div>
-                  <div className={`w-10 h-5 rounded-full relative transition-colors ${showFps ? 'bg-[#39BEAE]' : 'bg-gray-400'}`}>
-                    <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform shadow ${showFps ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                  <div className={`w-8 h-4 sm:w-10 sm:h-5 rounded-full relative transition-colors ${showFps ? 'bg-[#39BEAE]' : 'bg-gray-400'}`}>
+                    <div className={`absolute top-0.5 w-3 h-3 sm:w-4 sm:h-4 bg-white rounded-full transition-transform shadow ${showFps ? 'translate-x-4 sm:translate-x-5' : 'translate-x-0.5'}`} />
                   </div>
                 </button>
               </div>
 
               {/* Target FPS */}
-              <div className={`p-3 rounded-lg ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
-                <h3 className={`text-xs font-medium mb-3 ${isDark ? 'text-white/70' : 'text-gray-600'}`}>Target FPS</h3>
-                <div className="grid grid-cols-4 gap-1.5">
+              <div className={`p-2 sm:p-3 rounded-lg ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
+                <h3 className={`text-[11px] sm:text-xs font-medium mb-2 sm:mb-3 ${isDark ? 'text-white/70' : 'text-gray-600'}`}>Target FPS</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-1.5">
                   {[30, 60, 90, 120].map((fps) => (
                     <button
                       key={fps}
                       onClick={() => setTargetFps(fps)}
-                      className={`px-2 py-2 rounded-lg text-xs font-medium transition-all ${
+                      className={`px-1.5 sm:px-2 py-1.5 sm:py-2 rounded-lg text-[11px] sm:text-xs font-medium transition-all ${
                         targetFps === fps
                           ? 'bg-[#39BEAE] text-white'
                           : isDark
@@ -1005,17 +1019,17 @@ export function UnifiedSidebar({
               </div>
 
               {/* Resolution */}
-              <div className={`p-3 rounded-lg ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
-                <div className="flex items-center gap-2 mb-3">
-                  <Monitor className="w-3.5 h-3.5 text-[#39BEAE]" />
-                  <h3 className={`text-xs font-medium ${isDark ? 'text-white/70' : 'text-gray-600'}`}>Resolution</h3>
+              <div className={`p-2 sm:p-3 rounded-lg ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
+                <div className="flex items-center gap-1.5 sm:gap-2 mb-2 sm:mb-3">
+                  <Monitor className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#39BEAE]" />
+                  <h3 className={`text-[11px] sm:text-xs font-medium ${isDark ? 'text-white/70' : 'text-gray-600'}`}>Resolution</h3>
                 </div>
-                <div className="grid grid-cols-4 gap-1.5">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-1.5">
                   {(['720p', '1080p', '1440p', '4k'] as const).map((res) => (
                     <button
                       key={res}
                       onClick={() => setResolution(res)}
-                      className={`px-2 py-2 rounded-lg text-xs font-medium transition-all ${
+                      className={`px-1.5 sm:px-2 py-1.5 sm:py-2 rounded-lg text-[11px] sm:text-xs font-medium transition-all ${
                         resolution === res
                           ? 'bg-[#39BEAE] text-white'
                           : isDark
@@ -1030,14 +1044,14 @@ export function UnifiedSidebar({
               </div>
 
               {/* Bandwidth */}
-              <div className={`p-3 rounded-lg ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
-                <div className="flex items-center gap-2 mb-3">
-                  <Wifi className="w-3.5 h-3.5 text-[#39BEAE]" />
-                  <h3 className={`text-xs font-medium ${isDark ? 'text-white/70' : 'text-gray-600'}`}>Bandwidth Limit</h3>
+              <div className={`p-2 sm:p-3 rounded-lg ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
+                <div className="flex items-center gap-1.5 sm:gap-2 mb-2 sm:mb-3">
+                  <Wifi className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#39BEAE]" />
+                  <h3 className={`text-[11px] sm:text-xs font-medium ${isDark ? 'text-white/70' : 'text-gray-600'}`}>Bandwidth Limit</h3>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1.5 sm:space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className={`text-xs ${isDark ? 'text-white/50' : 'text-gray-500'}`}>
+                    <span className={`text-[10px] sm:text-xs ${isDark ? 'text-white/50' : 'text-gray-500'}`}>
                       {bandwidthLimit === 0 ? 'Unlimited' : `${bandwidthLimit} Mbps`}
                     </span>
                   </div>
@@ -1050,7 +1064,7 @@ export function UnifiedSidebar({
                     onChange={(e) => setBandwidthLimit(Number(e.target.value))}
                     className={`w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-[#39BEAE] ${isDark ? 'bg-gray-700' : 'bg-gray-300'}`}
                   />
-                  <div className="flex justify-between text-[10px] text-gray-500">
+                  <div className="flex justify-between text-[9px] sm:text-[10px] text-gray-500">
                     <span>Unlimited</span>
                     <span>100 Mbps</span>
                   </div>
@@ -1061,23 +1075,24 @@ export function UnifiedSidebar({
         </div>
 
         {/* ================================================================
-            FOOTER
+            FOOTER - Hidden on mobile to save space
             ================================================================ */}
-        <div className={`px-3 py-2 border-t text-center flex-shrink-0 ${
+        <div className={`hidden sm:block px-2 sm:px-3 py-1.5 sm:py-2 border-t text-center flex-shrink-0 ${
           isDark ? 'border-white/10' : 'border-gray-200'
         }`}>
-          <p className={`text-[10px] ${isDark ? 'text-white/30' : 'text-gray-400'}`}>
-            Press <kbd className={`px-1 py-0.5 rounded ${isDark ? 'bg-white/10' : 'bg-gray-100'}`}>M</kbd> to toggle menu
+          <p className={`text-[9px] sm:text-[10px] ${isDark ? 'text-white/30' : 'text-gray-400'}`}>
+            Press <kbd className={`px-0.5 sm:px-1 py-0.5 rounded ${isDark ? 'bg-white/10' : 'bg-gray-100'}`}>M</kbd> to toggle menu
           </p>
         </div>
       </div>
 
       {/* ====================================================================
           MOBILE: Floating action button to open menu
+          Only visible on mobile (< 640px)
           ==================================================================== */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`sm:hidden fixed top-4 left-4 z-50 w-10 h-10 rounded-xl flex items-center justify-center backdrop-blur-md border transition-all duration-200 ${
+        className={`sm:hidden fixed top-3 left-3 z-50 w-9 h-9 rounded-xl flex items-center justify-center backdrop-blur-md border transition-all duration-200 ${
           isOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'
         } ${
           isDark
@@ -1085,7 +1100,7 @@ export function UnifiedSidebar({
             : 'bg-white/90 hover:bg-white text-gray-700 hover:text-gray-900 border-gray-200 shadow-lg'
         }`}
       >
-        <Sliders className="w-5 h-5" />
+        <Sliders className="w-4 h-4" />
       </button>
     </>
   )
@@ -1108,23 +1123,32 @@ interface AccordionSectionProps {
 function AccordionSection({ title, icon, isExpanded, onToggle, isDark, children, headerAction }: AccordionSectionProps) {
   return (
     <div className={`rounded-lg overflow-hidden ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
-      <button
-        onClick={onToggle}
+      {/* Use div instead of button to allow nested interactive elements */}
+      <div
         className={`w-full flex items-center justify-between px-3 py-2.5 transition-colors ${
           isDark
             ? isExpanded ? 'bg-[#39BEAE]/10' : 'hover:bg-white/5'
             : isExpanded ? 'bg-[#39BEAE]/5' : 'hover:bg-gray-100'
         }`}
       >
-        <div className="flex items-center gap-2">
+        {/* Clickable area for toggle - excludes headerAction */}
+        <button
+          onClick={onToggle}
+          className="flex-1 flex items-center gap-2 text-left"
+        >
           <span className="text-[#39BEAE]">{icon}</span>
           <span className={`font-medium text-xs ${isDark ? 'text-white' : 'text-gray-900'}`}>{title}</span>
-        </div>
+        </button>
         <div className="flex items-center gap-1">
           {headerAction}
-          <ChevronDown className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''} ${isDark ? 'text-gray-400' : 'text-gray-500'}`} />
+          <button
+            onClick={onToggle}
+            className="p-0.5"
+          >
+            <ChevronDown className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''} ${isDark ? 'text-gray-400' : 'text-gray-500'}`} />
+          </button>
         </div>
-      </button>
+      </div>
       {isExpanded && (
         <div className={`px-3 pb-3 pt-1 ${isDark ? 'border-t border-white/5' : 'border-t border-gray-100'}`}>
           {children}

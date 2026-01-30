@@ -5,7 +5,6 @@ import type { ParsedMessage, CameraPerspective, CameraMode } from '@/app/lib/mes
 import { WEB_TO_UE_MESSAGES } from '@/app/lib/messageTypes'
 import type { UseMessageBusReturn } from '@/app/features/messaging/hooks/useMessageBus'
 import { eventBus } from '@/app/lib/events'
-import { useThrottledCallback } from '@/app/lib/performance'
 
 // =============================================================================
 // Camera State Type
@@ -63,6 +62,10 @@ export function useCameraControl(
   const callbacksRef = useRef(callbacks)
   callbacksRef.current = callbacks
 
+  // Track if we're ignoring UE5 updates (after user clicks)
+  const ignoreUE5UpdateRef = useRef(false)
+  const ignoreTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
   // ==========================================================================
   // Message Handler
   // ==========================================================================
@@ -73,6 +76,11 @@ export function useCameraControl(
       const parts = dataString.split(':')
 
       if (type === 'camera_update') {
+        // Skip UE5 updates briefly after user clicks to prevent overwriting
+        if (ignoreUE5UpdateRef.current) {
+          return
+        }
+
         const mode = (parts[0] as CameraMode) || 'Manual'
         const perspective = parts[1] || 'IsometricNE'
         const distance = parseFloat(parts[2]) || 1500
@@ -95,38 +103,68 @@ export function useCameraControl(
     return unsubscribe
   }, [messageBus])
 
+  // Helper to temporarily ignore UE5 updates
+  const temporarilyIgnoreUE5 = useCallback(() => {
+    ignoreUE5UpdateRef.current = true
+    if (ignoreTimeoutRef.current) {
+      clearTimeout(ignoreTimeoutRef.current)
+    }
+    ignoreTimeoutRef.current = setTimeout(() => {
+      ignoreUE5UpdateRef.current = false
+    }, 500) // Ignore UE5 updates for 500ms after click
+  }, [])
+
   // ==========================================================================
-  // Actions (throttled to prevent rapid clicking)
+  // Actions - State updates are immediate, ignore UE5 updates briefly
   // ==========================================================================
 
-  const setCameraPerspectiveInternal = useCallback((perspective: CameraPerspective) => {
+  const setCameraPerspective = useCallback((perspective: CameraPerspective) => {
+    // Ignore UE5 updates briefly to prevent overwriting
+    temporarilyIgnoreUE5()
+    // Immediate UI update
+    setState(prev => ({
+      ...prev,
+      cameraPerspective: perspective
+    }))
+    // Send message to UE5
     messageBus.sendMessage(WEB_TO_UE_MESSAGES.CAMERA_CONTROL, perspective)
     eventBus.emit('camera:perspectiveChanged', { perspective })
-  }, [messageBus])
+  }, [messageBus, temporarilyIgnoreUE5])
 
-  // Throttle camera perspective changes to 300ms to prevent rapid clicking
-  const setCameraPerspective = useThrottledCallback(setCameraPerspectiveInternal, 300)
-
-  const toggleAutoOrbitInternal = useCallback(() => {
-    const newMode = state.cameraMode === 'Orbit' ? 'Manual' : 'Orbit'
+  const toggleAutoOrbit = useCallback(() => {
+    // Ignore UE5 updates briefly to prevent overwriting
+    temporarilyIgnoreUE5()
+    // Immediate UI update
+    setState(prev => {
+      const newMode = prev.cameraMode === 'Orbit' ? 'Manual' : 'Orbit'
+      return {
+        ...prev,
+        cameraMode: newMode
+      }
+    })
+    // Send message to UE5
     if (state.cameraMode === 'Orbit') {
       messageBus.sendMessage(WEB_TO_UE_MESSAGES.CAMERA_CONTROL, 'orbit_stop')
+      eventBus.emit('camera:modeChanged', { mode: 'Manual' })
     } else {
       messageBus.sendMessage(WEB_TO_UE_MESSAGES.CAMERA_CONTROL, 'orbit_start')
+      eventBus.emit('camera:modeChanged', { mode: 'Orbit' })
     }
-    eventBus.emit('camera:modeChanged', { mode: newMode })
-  }, [state.cameraMode, messageBus])
+  }, [state.cameraMode, messageBus, temporarilyIgnoreUE5])
 
-  // Throttle orbit toggle to 500ms
-  const toggleAutoOrbit = useThrottledCallback(toggleAutoOrbitInternal, 500)
-
-  const resetCameraInternal = useCallback(() => {
+  const resetCamera = useCallback(() => {
+    // Ignore UE5 updates briefly to prevent overwriting
+    temporarilyIgnoreUE5()
+    // Immediate UI update - reset to default, clear active perspective
+    setState({
+      cameraMode: 'Manual',
+      cameraPerspective: '',
+      cameraDistance: 1500
+    })
+    // Send message to UE5
     messageBus.sendMessage(WEB_TO_UE_MESSAGES.CAMERA_CONTROL, 'reset')
     eventBus.emit('camera:reset', undefined)
-  }, [messageBus])
-
-  // Throttle reset to 500ms
-  const resetCamera = useThrottledCallback(resetCameraInternal, 500)
+  }, [messageBus, temporarilyIgnoreUE5])
 
   return {
     state,

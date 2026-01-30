@@ -74,7 +74,7 @@ const REASON_CONFIG = {
     useOffButton: true,
     defaultTitle: 'Session Ended',
     defaultMessage: 'Disconnected',
-    defaultText: 'Your session was ended by an administrator. Please contact support if you need assistance.'
+    defaultText: 'Your session was ended due to unexpected issue. Please contact support if you need assistance.'
   },
   other: {
     icon: LogOut,
