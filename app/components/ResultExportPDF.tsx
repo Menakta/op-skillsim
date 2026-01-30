@@ -80,23 +80,37 @@ function formatMs(ms: number): string {
   return formatSeconds(totalSeconds)
 }
 
+/**
+ * Load image as base64 for PDF embedding
+ * Uses fetch API which works reliably on Vercel deployments
+ */
 async function loadImageAsBase64(path: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-    img.onload = () => {
-      const canvas = document.createElement('canvas')
-      canvas.width = img.width
-      canvas.height = img.height
-      const ctx = canvas.getContext('2d')
-      if (!ctx) { reject(new Error('No canvas context')); return }
-      ctx.drawImage(img, 0, 0)
-      resolve(canvas.toDataURL('image/png'))
+  try {
+    // Use fetch to get the image as a blob - works reliably on Vercel
+    const response = await fetch(path)
+    if (!response.ok) {
+      throw new Error(`Failed to fetch image: ${response.status}`)
     }
-    img.onerror = () => reject(new Error('Failed to load image'))
-    const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
-    img.src = `${baseUrl}${path}`
-  })
+
+    const blob = await response.blob()
+
+    // Convert blob to base64
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          resolve(reader.result)
+        } else {
+          reject(new Error('Failed to convert image to base64'))
+        }
+      }
+      reader.onerror = () => reject(new Error('FileReader error'))
+      reader.readAsDataURL(blob)
+    })
+  } catch (error) {
+    console.error('Error loading image for PDF:', path, error)
+    throw error
+  }
 }
 
 // =============================================================================
@@ -113,7 +127,7 @@ export async function generateResultPDF(data: ResultPDFData): Promise<void> {
   // Load logo
   let logoBase64: string | null = null
   try {
-    logoBase64 = await loadImageAsBase64('/logos/Dark_Logo.png')
+    logoBase64 = await loadImageAsBase64('/logos/Dark_logo.png')
   } catch { /* logo optional */ }
 
   // =========================================================================

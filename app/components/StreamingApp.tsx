@@ -58,6 +58,8 @@ import { useSessionInfo } from "../hooks/useSessionInfo";
 import { useSessionSelection } from "../hooks/useSessionSelection";
 // Training persistence hook - auto-save and quiz submission
 import { useTrainingPersistence } from "../hooks/useTrainingPersistence";
+// Note: useStreamHealthMonitor is available but disabled due to hot reload issues
+// import { useStreamHealthMonitor } from "../hooks/useStreamHealthMonitor";
 // =============================================================================
 // Configuration
 // =============================================================================
@@ -119,6 +121,9 @@ function getLoadingStatus(params: LoadingStatusParams): {
 // =============================================================================
 export default function StreamingApp() {
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Ref to track if TrainingComplete modal should be shown after question closes
+  const pendingTrainingCompleteRef = useRef(false);
 
   // Theme context
   const { theme } = useTheme();
@@ -208,7 +213,15 @@ export default function StreamingApp() {
           currentTask,
           totalTasks,
         });
-        modals.openTrainingComplete();
+        // Don't open TrainingComplete modal if a question is currently open
+        // This prevents the quiz modal from being closed unexpectedly
+        if (modals.isOpen("question")) {
+          console.log("⏳ Question modal is open - deferring TrainingComplete modal");
+          // Store that we need to show training complete after question closes
+          pendingTrainingCompleteRef.current = true;
+        } else {
+          modals.openTrainingComplete();
+        }
       },
       onTaskCompleted: (taskId, nextTaskIndex) => {
         console.log(
@@ -218,6 +231,13 @@ export default function StreamingApp() {
           nextTaskIndex,
         );
         console.log("📋 TASK_SEQUENCE:", TASK_SEQUENCE);
+
+        // Don't show phase success modal if a question modal is currently open
+        // This prevents overriding quiz modals that need to be answered
+        if (modals.isOpen("question")) {
+          console.log("⏳ Question modal is open - skipping PhaseSuccess modal for:", taskId);
+          return;
+        }
 
         // Find the completed task - try matching by taskId first, then by index
         let completedTaskDef = TASK_SEQUENCE.find((t) => t.taskId === taskId);
@@ -378,6 +398,14 @@ export default function StreamingApp() {
     enabled: stream.isConnected, // Only detect idle when connected
   });
   // ==========================================================================
+  // Stream Health Monitor - Disabled for now, keeping manual reconnect only
+  // TODO: Re-enable once hot reload issues are resolved
+  // ==========================================================================
+  // Note: The useStreamHealthMonitor hook is available but disabled due to
+  // React hot reload compatibility issues. Manual reconnect via the sidebar
+  // button still works. Users can click "Reconnect Stream" anytime.
+  const streamHealth = { status: 'healthy' as const };
+  // ==========================================================================
   // Consolidated Action Handlers
   // Groups related handlers to reduce declaration overhead
   // ==========================================================================
@@ -389,6 +417,16 @@ export default function StreamingApp() {
       close: () => {
         training.closeQuestion();
         modals.closeModal("question");
+
+        // Check if TrainingComplete modal was deferred while question was open
+        if (pendingTrainingCompleteRef.current) {
+          console.log("📋 Opening deferred TrainingComplete modal");
+          pendingTrainingCompleteRef.current = false;
+          // Small delay to ensure question modal is fully closed
+          setTimeout(() => {
+            modals.openTrainingComplete();
+          }, 100);
+        }
       },
     }),
     [training, modals],
@@ -617,6 +655,10 @@ export default function StreamingApp() {
           onPause={trainingControlActions.pause}
           onResume={trainingControlActions.resume}
           onQuit={trainingControlActions.quitClick}
+          // Stream Health Props (for reconnection)
+          onReconnectStream={stream.reconnectStream}
+          isReconnecting={stream.isReconnecting}
+          streamHealthStatus={streamHealth.status}
           // Materials Props (training mode only)
           trainingState={training.state}
           onSelectPipe={training.selectPipe}

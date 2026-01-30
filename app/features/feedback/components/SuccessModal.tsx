@@ -60,7 +60,7 @@ export function SuccessModal({
 
       {/* Action Buttons */}
       <ModalFooter>
-        {showRetryButton && onRetry && (
+        {/* {showRetryButton && onRetry && (
           <Button
             variant="secondary"
             onClick={onRetry}
@@ -68,7 +68,7 @@ export function SuccessModal({
           >
             {retryButtonText}
           </Button>
-        )}
+        )} */}
         <Button
           variant="primary"
           onClick={onContinue}

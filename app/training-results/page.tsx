@@ -241,7 +241,7 @@ function TrainingResultsContent() {
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Image
-              src={isDark ? '/logos/Dark_logo.png' : '/logos/Light_Logo.png'}
+              src={isDark ? '/logos/Main_Logo.png' : '/logos/Dark_logo.png'}
               alt="OP SkillSim"
               width={100}
               height={32}

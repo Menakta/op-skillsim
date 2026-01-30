@@ -16,7 +16,7 @@
  * - Session: Pause/Resume, Quit - Training mode only
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Layers,
   Navigation,
@@ -125,6 +125,11 @@ interface UnifiedSidebarProps {
   onResume?: () => void
   onQuit?: () => void
 
+  // Stream Health Props (for reconnection)
+  onReconnectStream?: () => void
+  isReconnecting?: boolean
+  streamHealthStatus?: 'healthy' | 'degraded' | 'frozen' | 'disconnected' | 'idle'
+
   // Materials Props (only used when mode === 'training')
   trainingState?: TrainingState
   onSelectPipe?: (pipe: string) => void
@@ -189,6 +194,11 @@ export function UnifiedSidebar({
   onResume,
   onQuit,
 
+  // Stream health props
+  onReconnectStream,
+  isReconnecting = false,
+  streamHealthStatus = 'healthy',
+
   // Materials props
   trainingState,
   onSelectPipe,
@@ -222,6 +232,48 @@ export function UnifiedSidebar({
 
   const isTrainingMode = mode === 'training'
   const isCinematiceMode = mode === 'cinematic'
+
+  // ==========================================================================
+  // Auto-open sidebar for phases requiring material selection
+  // ==========================================================================
+
+  // Determine if current phase requires inventory (material selection)
+  const currentTool = trainingState?.selectedTool
+  const requiresInventory = currentTool === 'PipeConnection' || currentTool === 'PressureTester'
+
+  // Determine which materials are enabled based on current phase
+  // Pipes are only enabled during PipeConnection phase (index 3)
+  // Pressure test is only enabled during PressureTester phase (index 5)
+  const isPipesEnabled = currentTool === 'PipeConnection'
+  const isPressureTestEnabled = currentTool === 'PressureTester'
+
+  // Track if we've already auto-opened for this tool to prevent repeated opens
+  const lastAutoOpenToolRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    // Only auto-open in training mode when a phase requires inventory
+    if (!isTrainingMode || !requiresInventory || !currentTool) {
+      return
+    }
+
+    // Check if we already auto-opened for this tool
+    if (lastAutoOpenToolRef.current === currentTool) {
+      return
+    }
+
+    // Auto-open sidebar and switch to inventory tab
+    console.log(`📦 Auto-opening inventory for ${currentTool} phase`)
+    lastAutoOpenToolRef.current = currentTool
+    setIsOpen(true)
+    setActiveTab('inventory')
+  }, [isTrainingMode, requiresInventory, currentTool])
+
+  // Reset the auto-open tracking when tool changes to non-inventory tool
+  useEffect(() => {
+    if (!requiresInventory) {
+      lastAutoOpenToolRef.current = null
+    }
+  }, [requiresInventory])
 
   // ==========================================================================
   // Fullscreen handlers
@@ -487,6 +539,52 @@ export function UnifiedSidebar({
                   Quit
                 </button>
               </div>
+
+              {/* Stream Health / Reconnect Section */}
+              {onReconnectStream && (
+                <div className={`mt-2 sm:mt-3 pt-2 sm:pt-3 border-t ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
+                  <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+                    <span className={`text-[10px] sm:text-[11px] ${isDark ? 'text-white/50' : 'text-gray-500'}`}>
+                      Stream Status
+                    </span>
+                    {streamHealthStatus === 'frozen' && (
+                      <span className="flex items-center gap-0.5 sm:gap-1 px-1 sm:px-1.5 py-0.5 bg-red-500/20 rounded text-[9px] sm:text-[10px] text-red-400 font-medium">
+                        <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 bg-red-500 rounded-full animate-pulse" />
+                        Frozen
+                      </span>
+                    )}
+                    {streamHealthStatus === 'degraded' && (
+                      <span className="flex items-center gap-0.5 sm:gap-1 px-1 sm:px-1.5 py-0.5 bg-amber-500/20 rounded text-[9px] sm:text-[10px] text-amber-400 font-medium">
+                        <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 bg-amber-500 rounded-full animate-pulse" />
+                        Slow
+                      </span>
+                    )}
+                    {streamHealthStatus === 'healthy' && (
+                      <span className="flex items-center gap-0.5 sm:gap-1 px-1 sm:px-1.5 py-0.5 bg-green-500/20 rounded text-[9px] sm:text-[10px] text-green-400 font-medium">
+                        <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 bg-green-500 rounded-full" />
+                        OK
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    onClick={onReconnectStream}
+                    disabled={isReconnecting}
+                    className={`w-full flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[11px] sm:text-xs font-medium transition-all ${
+                      isReconnecting
+                        ? 'bg-gray-500/50 text-gray-400 cursor-not-allowed'
+                        : streamHealthStatus === 'frozen'
+                          ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30'
+                          : isDark
+                            ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                    title="Reconnect stream without losing training progress"
+                  >
+                    <RefreshCw className={`w-3 h-3 sm:w-3.5 sm:h-3.5 ${isReconnecting ? 'animate-spin' : ''}`} />
+                    {isReconnecting ? 'Reconnecting...' : 'Reconnect Stream'}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         
@@ -499,11 +597,18 @@ export function UnifiedSidebar({
 
 
               {/* Pipe Selection */}
-              <div>
-                <h3 className={`text-[11px] sm:text-xs font-medium mb-2 flex items-center gap-1.5 sm:gap-2 ${isDark ? 'text-white/70' : 'text-gray-600'}`}>
-                  <Wrench className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                  Pipes
-                </h3>
+              <div className={!isPipesEnabled ? 'opacity-50' : ''}>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className={`text-[11px] sm:text-xs font-medium flex items-center gap-1.5 sm:gap-2 ${isDark ? 'text-white/70' : 'text-gray-600'}`}>
+                    <Wrench className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                    Pipes
+                  </h3>
+                  {!isPipesEnabled && (
+                    <span className={`text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded ${isDark ? 'bg-white/10 text-white/40' : 'bg-gray-200 text-gray-400'}`}>
+                      Phase 4
+                    </span>
+                  )}
+                </div>
                 {fittingsLoading ? (
                   <div className={`text-[11px] sm:text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Loading...</div>
                 ) : (
@@ -513,22 +618,28 @@ export function UnifiedSidebar({
                       return (
                         <button
                           key={pipe.id}
-                          onClick={() => handleActionWithAutoClose(() => onSelectPipe?.(pipe.id))}
+                          onClick={() => isPipesEnabled && handleActionWithAutoClose(() => onSelectPipe?.(pipe.id))}
+                          disabled={!isPipesEnabled}
                           className={`aspect-square rounded-lg flex items-center justify-center transition-all ${
-                            isSelected
-                              ? 'bg-[#39BEAE] ring-2 ring-[#39BEAE]/50'
-                              : isDark
-                                ? 'bg-white/10 hover:bg-[#39BEAE]/30'
-                                : 'bg-gray-100 hover:bg-[#39BEAE]/20'
+                            !isPipesEnabled
+                              ? 'cursor-not-allowed grayscale'
+                              : isSelected
+                                ? 'bg-[#39BEAE] ring-2 ring-[#39BEAE]/50'
+                                : isDark
+                                  ? 'bg-white/10 hover:bg-[#39BEAE]/30'
+                                  : 'bg-gray-100 hover:bg-[#39BEAE]/20'
                           }`}
-                          title={pipe.label}
+                          title={isPipesEnabled ? pipe.label : `Available in Pipe Connection phase`}
                         >
                           <Image
                             src={pipe.icon}
                             alt={pipe.label}
                             width={24}
                             height={24}
-                            className="w-5 h-5 sm:w-6 sm:h-6"
+                            className="w-5 h-5 sm:w-6 sm:h-6 transition-all"
+                            style={{
+                              filter: !isDark && !isSelected ? 'invert(1) brightness(0.3)' : 'none'
+                            }}
                           />
                         </button>
                       )
@@ -538,35 +649,49 @@ export function UnifiedSidebar({
               </div>
 
               {/* Pressure Test */}
-              <div>
-                <h3 className={`text-[11px] sm:text-xs font-medium mb-2 flex items-center gap-1.5 sm:gap-2 ${isDark ? 'text-white/70' : 'text-gray-600'}`}>
-                  <Gauge className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                  Pressure Test
-                </h3>
+              <div className={!isPressureTestEnabled ? 'opacity-50' : ''}>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className={`text-[11px] sm:text-xs font-medium flex items-center gap-1.5 sm:gap-2 ${isDark ? 'text-white/70' : 'text-gray-600'}`}>
+                    <Gauge className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                    Pressure Test
+                  </h3>
+                  {!isPressureTestEnabled && (
+                    <span className={`text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded ${isDark ? 'bg-white/10 text-white/40' : 'bg-gray-200 text-gray-400'}`}>
+                      Phase 6
+                    </span>
+                  )}
+                </div>
                 <div className="flex gap-1.5 sm:gap-2">
                   <button
-                    onClick={() => handleActionWithAutoClose(() => onSelectPressureTest?.('air-plug'))}
+                    onClick={() => isPressureTestEnabled && handleActionWithAutoClose(() => onSelectPressureTest?.('air-plug'))}
+                    disabled={!isPressureTestEnabled}
                     className={`flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-2.5 rounded-lg text-[11px] sm:text-xs font-medium transition-all ${
-                      trainingState?.airPlugSelected
-                        ? 'bg-[#39BEAE] text-white'
-                        : isDark
-                          ? 'bg-white/10 text-gray-300 hover:bg-white/20'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      !isPressureTestEnabled
+                        ? 'cursor-not-allowed bg-gray-700/30 text-gray-500'
+                        : trainingState?.airPlugSelected
+                          ? 'bg-[#39BEAE] text-white'
+                          : isDark
+                            ? 'bg-white/10 text-gray-300 hover:bg-white/20'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
+                    title={isPressureTestEnabled ? 'Select Air Plug' : 'Available in Pressure Testing phase'}
                   >
                     <Plug className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                     Air Plug
                   </button>
                   <button
-                    onClick={() => trainingState?.airPlugSelected && handleActionWithAutoClose(() => onSelectPressureTest?.('conduct-test'))}
-                    disabled={!trainingState?.airPlugSelected}
+                    onClick={() => isPressureTestEnabled && trainingState?.airPlugSelected && handleActionWithAutoClose(() => onSelectPressureTest?.('conduct-test'))}
+                    disabled={!isPressureTestEnabled || !trainingState?.airPlugSelected}
                     className={`flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-2.5 rounded-lg text-[11px] sm:text-xs font-medium transition-all ${
-                      trainingState?.airPlugSelected
-                        ? isDark
-                          ? 'bg-white/10 text-gray-300 hover:bg-[#39BEAE] hover:text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-[#39BEAE] hover:text-white'
-                        : 'bg-gray-700/30 opacity-50 cursor-not-allowed text-gray-500'
+                      !isPressureTestEnabled
+                        ? 'cursor-not-allowed bg-gray-700/30 text-gray-500'
+                        : trainingState?.airPlugSelected
+                          ? isDark
+                            ? 'bg-white/10 text-gray-300 hover:bg-[#39BEAE] hover:text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-[#39BEAE] hover:text-white'
+                          : 'bg-gray-700/30 opacity-50 cursor-not-allowed text-gray-500'
                     }`}
+                    title={!isPressureTestEnabled ? 'Available in Pressure Testing phase' : !trainingState?.airPlugSelected ? 'Select Air Plug first' : 'Conduct pressure test'}
                   >
                     <Play className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                     Conduct Test

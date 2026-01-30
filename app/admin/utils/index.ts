@@ -106,30 +106,36 @@ export interface PDFExportOptions {
 }
 
 /**
- * Load an image and convert to base64
+ * Load image as base64 for PDF embedding
+ * Uses fetch API which works reliably on Vercel deployments
  */
 async function loadImageAsBase64(path: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-    img.onload = () => {
-      const canvas = document.createElement('canvas')
-      canvas.width = img.width
-      canvas.height = img.height
-      const ctx = canvas.getContext('2d')
-      if (!ctx) {
-        reject(new Error('Could not get canvas context'))
-        return
-      }
-      ctx.drawImage(img, 0, 0)
-      const dataUrl = canvas.toDataURL('image/png')
-      resolve(dataUrl)
+  try {
+    // Use fetch to get the image as a blob - works reliably on Vercel
+    const response = await fetch(path)
+    if (!response.ok) {
+      throw new Error(`Failed to fetch image: ${response.status}`)
     }
-    img.onerror = () => reject(new Error('Failed to load image'))
-    // Use absolute URL based on current origin
-    const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
-    img.src = `${baseUrl}${path}`
-  })
+
+    const blob = await response.blob()
+
+    // Convert blob to base64
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          resolve(reader.result)
+        } else {
+          reject(new Error('Failed to convert image to base64'))
+        }
+      }
+      reader.onerror = () => reject(new Error('FileReader error'))
+      reader.readAsDataURL(blob)
+    })
+  } catch (error) {
+    console.error('Error loading image for PDF:', path, error)
+    throw error
+  }
 }
 
 /**
@@ -160,7 +166,7 @@ export async function exportToPDF<T>(
   // Try to load the logo
   let logoBase64: string | null = null
   try {
-    logoBase64 = await loadImageAsBase64('/logos/Dark_Logo.png')
+    logoBase64 = await loadImageAsBase64('/logos/Dark_logo.png')
   } catch (error) {
     console.warn('Could not load logo for PDF:', error)
   }
@@ -311,7 +317,8 @@ export async function exportChartToPDF(
   // Try to load the logo (use opposite theme logo for visibility)
   let logoBase64: string | null = null
   try {
-    const logoPath = isDarkTheme ? '/logos/Dark_Logo.png' : '/logos/Light_Logo.png'
+    // Use Dark_logo for light backgrounds, Main_Logo for dark backgrounds
+    const logoPath = isDarkTheme ? '/logos/Main_Logo.png' : '/logos/Dark_logo.png'
     logoBase64 = await loadImageAsBase64(logoPath)
   } catch (error) {
     console.warn('Could not load logo for PDF:', error)

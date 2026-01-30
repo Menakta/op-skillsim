@@ -83,11 +83,11 @@ export function QuestionModal({
   if (!question) return null
 
   return (
-    <div className={`absolute inset-0 z-30 flex items-center justify-center ${
+    <div className={`absolute inset-0 z-30 flex items-start sm:items-center justify-center overflow-y-auto py-4 sm:py-8 ${
       isDark ? 'bg-black/20' : 'bg-black/30'
     } backdrop-blur-sm`}>
       <div
-        className={`backdrop-blur-md rounded-2xl max-w-[660px] w-full mx-4 shadow-2xl border ${
+        className={`backdrop-blur-md rounded-2xl max-w-[660px] w-full mx-4 shadow-2xl border my-auto max-h-[calc(100vh-120px)] sm:max-h-[calc(100vh-80px)] flex flex-col ${
           isDark
             ? 'bg-[#000000]/55 border-gray-700/50'
             : 'bg-white/88 border-gray-200'
@@ -96,8 +96,8 @@ export function QuestionModal({
           animation: 'modalFadeIn 0.3s ease-out'
         }}
       >
-        {/* Question Header */}
-        <div className={`flex items-center justify-between pb-4 border-b px-2 py-4 ${
+        {/* Question Header - Fixed at top */}
+        <div className={`flex-shrink-0 flex items-center justify-between pb-4 border-b px-2 py-4 ${
           isDark ? 'border-gray-400' : 'border-gray-900'
         }`}>
           <div className="flex items-center gap-3">
@@ -109,91 +109,93 @@ export function QuestionModal({
           </div>
         </div>
 
-        {/* Content Area - Image on left, Question/Answers on right */}
-        <div className="flex gap-2 px-2 py-3">
-          {/* Left Side - Image Placeholder */}
-          <div
-            className={`flex-shrink-0 rounded-xl hidden md:flex items-center justify-center ${
-              isDark ? 'bg-white' : 'bg-[#000000]/55'
-            }`}
-            style={{ width: '256px', height: '294px' }}
-          >
-            <span className="text-gray-400 text-sm">Image</span>
-          </div>
+        {/* Scrollable Content Area */}
+        <div className="flex-1 overflow-y-auto min-h-0">
+          {/* Content Area - Image on left, Question/Answers on right */}
+          <div className="flex gap-2 px-2 py-3">
+            {/* Left Side - Image Placeholder */}
+            <div
+              className={`flex-shrink-0 rounded-xl hidden md:flex items-center justify-center ${
+                isDark ? 'bg-white' : 'bg-[#000000]/55'
+              }`}
+              style={{ width: '256px', height: '294px' }}
+            >
+              <span className="text-gray-400 text-sm">Image</span>
+            </div>
 
-          {/* Right Side - Question and Answers */}
-          <div className="flex-1">
-            {/* Question Text */}
-            <p className={`text-sm text-base lg:mb-3 mb-2 leading-relaxed ${
-              isDark ? 'text-gray-200' : 'text-gray-900'
-            }`}>{question.text}</p>
+            {/* Right Side - Question and Answers */}
+            <div className="flex-1">
+              {/* Question Text */}
+              <p className={`text-sm text-base lg:mb-3 mb-2 leading-relaxed ${
+                isDark ? 'text-gray-200' : 'text-gray-900'
+              }`}>{question.text}</p>
 
-            {/* Answer Options */}
-            <div className="space-y-2">
-              {question.options.map((option, index) => {
-                const isSelected = selectedAnswer === index
-                const isCorrectAnswer = answerFeedback?.correct && isSelected
-                const isWrongAnswer = wrongAnswer === index
+              {/* Answer Options */}
+              <div className="space-y-2">
+                {question.options.map((option, index) => {
+                  const isSelected = selectedAnswer === index
+                  const isCorrectAnswer = answerFeedback?.correct && isSelected
+                  const isWrongAnswer = wrongAnswer === index
 
-                return (
-                  <button
-                    key={index}
-                    onClick={() => handleSelectAnswer(index)}
-                    disabled={answerFeedback?.correct}
-                    className={`w-full lg:p-3 p-2 text-left rounded-xl transition-all duration-200 flex items-center lg:gap-3 gap-2 ${
-                      isCorrectAnswer
-                        ? 'text-green-500'
-                        : isWrongAnswer
-                        ? 'bg-red-500/20 border border-red-500/50 text-red-400'
-                        : isSelected
-                        ? isDark ? 'text-white' : 'text-gray-900'
-                        : isDark
-                          ? 'text-gray-200 hover:bg-[#000000]/30 hover:border-[#39BEAE]/50'
-                          : 'text-gray-700 hover:bg-gray-100 hover:border-[#39BEAE]/50'
-                    }`}
-                  >
-                    {/* Radio Button */}
-                    <div
-                      className={`w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0 transition-all duration-200 ${
+                  return (
+                    <button
+                      key={index}
+                      onClick={() => handleSelectAnswer(index)}
+                      disabled={answerFeedback?.correct}
+                      className={`w-full lg:p-3 p-2 text-left rounded-xl transition-all duration-200 flex items-center lg:gap-3 gap-2 ${
                         isCorrectAnswer
-                          ? 'border-green-400'
+                          ? 'text-green-500'
                           : isWrongAnswer
-                          ? 'border-red-400 bg-red-400'
+                          ? 'bg-red-500/20 border border-red-500/50 text-red-400'
                           : isSelected
-                          ? isDark ? 'border-gray-300' : 'border-gray-600'
-                          : isDark ? 'border-gray-500' : 'border-gray-400'
+                          ? isDark ? 'text-white' : 'text-gray-900'
+                          : isDark
+                            ? 'text-gray-200 hover:bg-[#000000]/30 hover:border-[#39BEAE]/50'
+                            : 'text-gray-700 hover:bg-gray-100 hover:border-[#39BEAE]/50'
                       }`}
                     >
-                      {(isSelected || isWrongAnswer) && (
-                        <div className={`w-2 h-2 rounded-full transition-all duration-200 ${
-                          isDark ? 'bg-white' : 'bg-gray-800'
-                        }`} />
-                      )}
-                    </div>
-                    <span>{option}</span>
-                  </button>
-                )
-              })}
+                      {/* Radio Button */}
+                      <div
+                        className={`w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0 transition-all duration-200 ${
+                          isCorrectAnswer
+                            ? 'border-green-400'
+                            : isWrongAnswer
+                            ? 'border-red-400 bg-red-400'
+                            : isSelected
+                            ? isDark ? 'border-gray-300' : 'border-gray-600'
+                            : isDark ? 'border-gray-500' : 'border-gray-400'
+                        }`}
+                      >
+                        {(isSelected || isWrongAnswer) && (
+                          <div className={`w-2 h-2 rounded-full transition-all duration-200 ${
+                            isDark ? 'bg-white' : 'bg-gray-800'
+                          }`} />
+                        )}
+                      </div>
+                      <span>{option}</span>
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           </div>
+
+          {/* Feedback Message - Inside scrollable area */}
+          {answerFeedback && (
+            <div className={`p-1 rounded-xl mb-1 mx-1 ${
+              answerFeedback.correct
+                ? 'bg-green-500/20 border border-green-500/40 text-green-400'
+                : 'bg-red-500/20 border border-red-500/40 text-red-400'
+            }`}>
+              <div className="flex items-center gap-2">
+                <span className="text-sm">{answerFeedback.message}</span>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Feedback Message - Full Width */}
-        {answerFeedback && (
-          <div className={`p-1 rounded-xl mb-1 mx-1 ${
-            answerFeedback.correct
-              ? 'bg-green-500/20 border border-green-500/40 text-green-400'
-              : 'bg-red-500/20 border border-red-500/40 text-red-400'
-          }`}>
-            <div className="flex items-center gap-2">
-              <span className="text-sm">{answerFeedback.message}</span>
-            </div>
-          </div>
-        )}
-
-        
-        {/* Action Buttons */}
-        <div className={`flex items-center justify-center gap-1 px-5 pb-3 border-t py-2 ${
+        {/* Action Buttons - Fixed at bottom */}
+        <div className={`flex-shrink-0 flex items-center justify-center gap-1 px-5 pb-3 border-t py-2 ${
           isDark ? 'border-gray-400' : 'border-gray-900'
         }`}>
           {!answerFeedback?.correct ? (

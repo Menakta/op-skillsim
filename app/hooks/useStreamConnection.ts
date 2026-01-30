@@ -20,6 +20,7 @@ import {
 } from '@pureweb/platform-sdk'
 import { useLaunchRequest, useStreamer } from '@pureweb/platform-sdk-react'
 import { RETRY_CONFIG } from '../config'
+import { getStreamErrorMessage } from '../lib/errorUtils'
 
 // =============================================================================
 // Types
@@ -61,6 +62,10 @@ export interface UseStreamConnectionReturn {
 
   // Actions
   initializePlatform: (attempt?: number) => Promise<void>
+  /** Reconnect stream without full page reload - preserves training state */
+  reconnectStream: () => Promise<void>
+  /** Whether a reconnection is currently in progress */
+  isReconnecting: boolean
 
   // State setters (for connectionActions in StreamingApp)
   setRetryCount: React.Dispatch<React.SetStateAction<number>>
@@ -105,6 +110,7 @@ export function useStreamConnection(config: UseStreamConnectionConfig): UseStrea
   // Retry state
   const [retryCount, setRetryCount] = useState(0)
   const [isRetrying, setIsRetrying] = useState(false)
+  const [isReconnecting, setIsReconnecting] = useState(false)
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('initializing')
 
   // ==========================================================================
@@ -227,7 +233,7 @@ export function useStreamConnection(config: UseStreamConnectionConfig): UseStrea
       } else {
         setConnectionStatus('failed')
         setIsRetrying(false)
-        onError?.(String(err))
+        onError?.(getStreamErrorMessage(err))
       }
     }
   }, [projectId, modelId, onError])
@@ -242,6 +248,55 @@ export function useStreamConnection(config: UseStreamConnectionConfig): UseStrea
       initializePlatform(1)
     }
   }, [streamStarted, initializePlatform])
+
+  // ==========================================================================
+  // Reconnect Stream - Manual reconnection without page reload
+  // ==========================================================================
+
+  const reconnectStream = useCallback(async () => {
+    console.log('🔄 Manual stream reconnection requested')
+    setIsReconnecting(true)
+    setConnectionStatus('retrying')
+
+    try {
+      // Step 1: Disconnect current stream cleanly
+      if (platformRef.current) {
+        try {
+          console.log('🔌 Disconnecting current stream...')
+          platformRef.current.disconnect()
+        } catch (e) {
+          console.log('Disconnect error (ignored):', e)
+        }
+      }
+
+      // Step 2: Small delay to ensure clean disconnect
+      await new Promise(resolve => setTimeout(resolve, 500))
+
+      // Step 3: Reset platform instance
+      console.log('🔧 Resetting platform instance...')
+      platformRef.current = new PlatformNext()
+      platformRef.current.initialize({ endpoint: 'https://api.pureweb.io' })
+
+      // Step 4: Reset state for fresh connection
+      setAvailableModels(undefined)
+      setModelDefinition(new UndefinedModelDefinition())
+      setLoading(false)
+      setRetryCount(0)
+      setIsRetrying(false)
+
+      // Step 5: Re-initialize platform connection
+      console.log('🚀 Re-initializing platform connection...')
+      await initializePlatform(1)
+
+      console.log('✅ Reconnection initiated successfully')
+    } catch (err) {
+      console.error('❌ Reconnection failed:', err)
+      setConnectionStatus('failed')
+      onError?.(getStreamErrorMessage(err))
+    } finally {
+      setIsReconnecting(false)
+    }
+  }, [initializePlatform, onError])
 
   // ==========================================================================
   // Model Selection
@@ -287,7 +342,7 @@ export function useStreamConnection(config: UseStreamConnectionConfig): UseStrea
       await queueLaunchRequest()
     } catch (err) {
       console.error('❌ Launch failed:', err)
-      onError?.(String(err))
+      onError?.(getStreamErrorMessage(err))
     }
   }, [queueLaunchRequest, onError])
 
@@ -376,6 +431,7 @@ export function useStreamConnection(config: UseStreamConnectionConfig): UseStrea
     connectionStatus,
     isConnected,
     isRetrying,
+    isReconnecting,
     retryCount,
     loading,
     modelDefinition,
@@ -387,6 +443,7 @@ export function useStreamConnection(config: UseStreamConnectionConfig): UseStrea
     audioStream,
     messageSubject,
     initializePlatform,
+    reconnectStream,
     setRetryCount,
     setAvailableModels,
     setModelDefinition,
@@ -396,6 +453,7 @@ export function useStreamConnection(config: UseStreamConnectionConfig): UseStrea
     connectionStatus,
     isConnected,
     isRetrying,
+    isReconnecting,
     retryCount,
     loading,
     modelDefinition,
@@ -407,6 +465,7 @@ export function useStreamConnection(config: UseStreamConnectionConfig): UseStrea
     audioStream,
     messageSubject,
     initializePlatform,
+    reconnectStream,
   ])
 }
 

@@ -127,11 +127,17 @@ export function useModalManager(): UseModalManagerReturn {
   // ==========================================================================
 
   const openQuestion = useCallback((question: QuestionData) => {
-    setState(prev => ({
-      ...prev,
-      activeModal: 'question',
-      questionData: question,
-    }))
+    console.log('🔓 [useModalManager] Opening question modal:', question.id)
+    setState(prev => {
+      if (prev.activeModal && prev.activeModal !== 'phaseSuccess') {
+        console.log(`⚠️ [useModalManager] Another modal (${prev.activeModal}) is already open, but question takes priority`)
+      }
+      return {
+        ...prev,
+        activeModal: 'question',
+        questionData: question,
+      }
+    })
   }, [])
 
   const openTrainingComplete = useCallback(() => {
@@ -142,11 +148,19 @@ export function useModalManager(): UseModalManagerReturn {
   }, [])
 
   const openPhaseSuccess = useCallback((data: PhaseSuccessData) => {
-    setState(prev => ({
-      ...prev,
-      activeModal: 'phaseSuccess',
-      phaseSuccessData: data,
-    }))
+    setState(prev => {
+      // Don't open phase success if a question modal is currently open
+      // This prevents overriding the quiz modal which must be answered
+      if (prev.activeModal === 'question') {
+        console.log('⚠️ [useModalManager] Question modal is open - skipping PhaseSuccess modal')
+        return prev
+      }
+      return {
+        ...prev,
+        activeModal: 'phaseSuccess',
+        phaseSuccessData: data,
+      }
+    })
   }, [])
 
   const openError = useCallback((message?: string | null) => {
