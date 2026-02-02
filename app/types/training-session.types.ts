@@ -169,10 +169,13 @@ export interface UpdateProgressRequest {
 
 export interface CompletePhaseRequest {
   phase: string
-  score: number
-  timeSpentMs: number
-  tasksCompleted: number
-  totalTasks: number
+  score?: number
+  timeSpentMs?: number
+  tasksCompleted?: number
+  totalTasks?: number
+  nextPhase?: string
+  totalPhases?: number
+  progress?: number
 }
 
 export interface CompleteTrainingRequest {

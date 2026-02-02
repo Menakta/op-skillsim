@@ -181,3 +181,17 @@ export function calculateScorePercentage(questionData: QuestionDataMap): number 
   const correctCount = entries.filter(e => e.correct).length
   return Math.round((correctCount / entries.length) * 100 * 100) / 100 // 2 decimal places
 }
+
+/**
+ * Convert QuestionDataMap back to QuizAnswerState array
+ * Used when restoring quiz state from database on session resume
+ */
+export function questionDataMapToAnswers(questionData: QuestionDataMap): QuizAnswerState[] {
+  return Object.entries(questionData).map(([questionId, entry]) => ({
+    questionId,
+    selectedAnswer: answerToIndex(entry.answer),
+    isCorrect: entry.correct,
+    attemptCount: entry.attempts,
+    timeToAnswer: entry.time,
+  }))
+}

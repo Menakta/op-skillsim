@@ -246,6 +246,23 @@ export default function StreamingApp() {
         );
         console.log("📋 TASK_SEQUENCE:", TASK_SEQUENCE);
 
+        // Save phase completion to database (for LTI students)
+        // nextTaskIndex is already incremented, so phases completed = nextTaskIndex
+        const phasesCompleted = nextTaskIndex;
+        console.log("📊 Saving phase completion to database:", { phase: taskId, phasesCompleted });
+        trainingSessionService.completePhase({
+          phase: taskId,
+          nextPhase: TASK_SEQUENCE[nextTaskIndex]?.taskId || taskId,
+          totalPhases: TASK_SEQUENCE.length,
+          progress: Math.round((phasesCompleted / TASK_SEQUENCE.length) * 100),
+        }).then(result => {
+          if (result.success) {
+            console.log("✅ Phase completion saved:", result.data);
+          } else {
+            console.warn("⚠️ Failed to save phase completion:", result.error);
+          }
+        });
+
         // Don't show phase success modal if a question modal is currently open
         // This prevents overriding quiz modals that need to be answered
         if (modals.isOpen("question")) {
@@ -365,6 +382,7 @@ export default function StreamingApp() {
 
       // State persistence
       restoreState: persistence.statePersistence.restoreState,
+      restoreQuizAnswers: training.restoreQuizAnswers,
 
       // External state setters
       onEnterTrainingMode: () => setShowExplosionControls(false),

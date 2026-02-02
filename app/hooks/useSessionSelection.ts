@@ -46,6 +46,8 @@ export interface SessionSelectionCallbacks {
 
   // State persistence
   restoreState: () => Promise<RestoredStateData | null>
+  /** Restore quiz answers from database when resuming session */
+  restoreQuizAnswers: () => Promise<boolean>
 
   // External state setters
   onEnterTrainingMode: () => void
@@ -97,6 +99,7 @@ export function useSessionSelection(
     startTraining,
     startFromTask,
     restoreState,
+    restoreQuizAnswers,
     onEnterTrainingMode,
     onEnterCinematicMode,
     onStateRestoreAttempted,
@@ -170,6 +173,16 @@ export function useSessionSelection(
       // Mark this session as handled
       hasResumedSessionRef.current = selectedSession.id
       onStateRestoreAttempted()
+
+      // Restore quiz answers from database
+      console.log('📂 Restoring quiz answers from database...')
+      restoreQuizAnswers().then(restored => {
+        if (restored) {
+          console.log('✅ Quiz answers restored successfully')
+        } else {
+          console.warn('⚠️ Failed to restore quiz answers')
+        }
+      })
 
       // Set training state
       setTrainingPhase(selectedSession.current_training_phase)
@@ -272,6 +285,7 @@ export function useSessionSelection(
     startTraining,
     startFromTask,
     restoreState,
+    restoreQuizAnswers,
     onEnterTrainingMode,
     onEnterCinematicMode,
     onStateRestoreAttempted,

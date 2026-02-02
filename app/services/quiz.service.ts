@@ -14,7 +14,7 @@ import type {
   QuestionDataMap,
   QuestionDataEntry,
 } from '@/app/types'
-import { buildQuestionDataMap, calculateScorePercentage } from '@/app/types'
+import { buildQuestionDataMap, calculateScorePercentage, questionDataMapToAnswers } from '@/app/types'
 
 // =============================================================================
 // Types
@@ -219,6 +219,34 @@ export const quizService = {
         success: false,
         error: 'Network error: Failed to fetch quiz results',
       }
+    }
+  },
+
+  /**
+   * Get saved quiz answers as QuizAnswerState array
+   * Used to restore in-memory state when resuming a session
+   */
+  async getSavedAnswers(): Promise<ServiceResult<QuizAnswerState[]>> {
+    try {
+      console.log('📝 [quizService] Fetching saved answers...')
+      const result = await this.getSessionResults()
+
+      if (!result.success) {
+        return { success: false, error: result.error }
+      }
+
+      if (!result.data || !result.data.question_data) {
+        console.log('📝 [quizService] No saved answers found')
+        return { success: true, data: [] }
+      }
+
+      const answers = questionDataMapToAnswers(result.data.question_data)
+      console.log('📝 [quizService] Restored answers:', answers)
+
+      return { success: true, data: answers }
+    } catch (error) {
+      console.error('📝 [quizService] Error fetching saved answers:', error)
+      return { success: false, error: 'Failed to fetch saved answers' }
     }
   },
 

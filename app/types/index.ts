@@ -169,6 +169,7 @@ export {
   keyToQuestionId,
   buildQuestionDataMap,
   calculateScorePercentage,
+  questionDataMapToAnswers,
 } from './quiz.types'
 
 // =============================================================================

@@ -197,9 +197,19 @@ export function useTrainingPersistence(
         ? buildQuestionDataMap(quizData.quizAnswers)
         : undefined
 
+      // phasesCompleted = currentTaskIndex + 1 (since index is 0-based)
+      // When training completes, currentTaskIndex should be at the last completed phase
+      const phasesCompleted = trainingState.currentTaskIndex + 1
+
+      console.log('📊 [useTrainingPersistence] Completing training with:', {
+        phasesCompleted,
+        currentTaskIndex: trainingState.currentTaskIndex,
+        totalTasks: trainingState.totalTasks,
+      })
+
       trainingSessionService.completeTraining({
         totalTimeMs: Date.now() - sessionStartTime,
-        phasesCompleted: trainingState.totalTasks,
+        phasesCompleted,
         quizData: quizDataMap,
         totalQuestions: questionCount,
       }).then(result => {
@@ -210,7 +220,7 @@ export function useTrainingPersistence(
         }
       })
     }
-  }, [isTrainingComplete, quizData.quizAnswers.length, questionCount, quizData, sessionStartTime, userRole, trainingState.totalTasks])
+  }, [isTrainingComplete, quizData.quizAnswers.length, questionCount, quizData, sessionStartTime, userRole, trainingState.currentTaskIndex, trainingState.totalTasks])
 
   // ==========================================================================
   // Utility functions

@@ -51,6 +51,8 @@ export interface UseQuestionFlowReturn {
   resetQuestionState: () => void
   submitQuizResults: (totalQuestions: number) => Promise<boolean>
   clearAnswers: () => void
+  /** Restore answers from database (for session resume) */
+  restoreAnswers: () => Promise<boolean>
 }
 
 // =============================================================================
@@ -187,14 +189,14 @@ export function useQuestionFlow(
       const answerMessage = `${question.id}:${state.questionTryCount}:true`
       messageBus.sendMessage(WEB_TO_UE_MESSAGES.QUESTION_ANSWER, answerMessage)
 
-      // Save answer to database immediately
-      // Use dynamic questionCount from database instead of hardcoded value
-      console.log('📝 [useQuestionFlow] Saving correct answer to database... (totalQuestions:', questionCount, ')')
+      // Save answer to database immediately for persistence (in case user closes session)
+      // This ensures answers are preserved if user resumes session later
+      console.log('📝 [useQuestionFlow] Saving answer to database for persistence:', question.id)
       quizService.saveAnswer(answerState, questionCount).then(result => {
         if (result.success) {
-          console.log('✅ [useQuestionFlow] Answer saved to database:', question.id)
+          console.log('✅ [useQuestionFlow] Answer persisted to database:', question.id)
         } else {
-          console.warn('⚠️ [useQuestionFlow] Failed to save answer:', result.error)
+          console.warn('⚠️ [useQuestionFlow] Failed to persist answer:', result.error)
         }
         callbacksRef.current.onAnswerSaved?.(answerState, result.success)
       })
@@ -252,6 +254,29 @@ export function useQuestionFlow(
   }, [])
 
   // ==========================================================================
+  // Restore Answers from Database (for session resume)
+  // ==========================================================================
+
+  const restoreAnswers = useCallback(async (): Promise<boolean> => {
+    console.log('📝 [useQuestionFlow] Restoring answers from database...')
+    const result = await quizService.getSavedAnswers()
+
+    if (!result.success) {
+      console.warn('📝 [useQuestionFlow] Failed to restore answers:', result.error)
+      return false
+    }
+
+    if (result.data.length > 0) {
+      console.log('📝 [useQuestionFlow] Restored', result.data.length, 'answers from database')
+      setAnswers(result.data)
+      return true
+    }
+
+    console.log('📝 [useQuestionFlow] No saved answers to restore')
+    return true
+  }, [])
+
+  // ==========================================================================
   // Close Question
   // ==========================================================================
 
@@ -291,7 +316,8 @@ export function useQuestionFlow(
     closeQuestion,
     resetQuestionState,
     submitQuizResults,
-    clearAnswers
+    clearAnswers,
+    restoreAnswers,
   }
 }
 
