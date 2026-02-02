@@ -10,6 +10,8 @@ import {
   StarterScreen,
   SessionSelectionScreen,
   CinematicTimer,
+  CinematicWalkthrough,
+  TrainingModeWalkthrough,
   type LoadingStep,
   type ActiveSession,
 } from "../features";
@@ -170,6 +172,18 @@ export default function StreamingApp() {
   const [showExplosionControls, setShowExplosionControls] = useState(true);
   // Training pause state
   const [isTrainingPaused, setIsTrainingPaused] = useState(false);
+  // Cinematic walkthrough state
+  const [showCinematicWalkthrough, setShowCinematicWalkthrough] = useState(true);
+  // Training walkthrough state - only show when transitioning from cinematic (not resume)
+  const [showTrainingWalkthrough, setShowTrainingWalkthrough] = useState(false);
+  // Track if user is transitioning from cinematic to training (to show walkthrough)
+  const isTransitioningToTrainingRef = useRef(false);
+  // Pending training start - will be executed after walkthrough completes
+  const pendingTrainingStartRef = useRef<(() => void) | null>(null);
+  // Sidebar open state (controlled by walkthrough)
+  const [forceSidebarOpen, setForceSidebarOpen] = useState<boolean | undefined>(undefined);
+  // Sidebar active tab (controlled by walkthrough for inventory tab highlight)
+  const [forceSidebarTab, setForceSidebarTab] = useState<'inventory' | 'controls' | 'settings' | 'system' | undefined>(undefined);
   // Handler for closing navigation walkthrough
   const handleCloseNavigationWalkthrough = useCallback(() => {
     modals.closeModal("navigationWalkthrough");
@@ -468,9 +482,18 @@ export default function StreamingApp() {
         modals.closeModal("resumeConfirmation");
         sessionSelection.actions.confirmResume(modals.resumePhaseIndex);
       },
-      skipToTraining: sessionSelection.actions.skipToTraining,
+      skipToTraining: async () => {
+        // Mark that we're transitioning from cinematic to training (for walkthrough)
+        isTransitioningToTrainingRef.current = true;
+        // Store startTraining to call after walkthrough completes
+        pendingTrainingStartRef.current = training.startTraining;
+        // Show training walkthrough flag - will show after entering training mode
+        setShowTrainingWalkthrough(true);
+        // Transition to training mode but delay actual training start (for walkthrough)
+        await sessionSelection.actions.skipToTraining({ delayTrainingStart: true });
+      },
     }),
-    [sessionSelection.actions, modals],
+    [sessionSelection.actions, modals, training.startTraining],
   );
   // Connection/error handlers
   const connectionActions = useMemo(
@@ -623,7 +646,8 @@ export default function StreamingApp() {
             screenFlow.isCinematicMode ||
             training.state.trainingStarted ||
             training.state.isActive ||
-            training.state.mode === "training"
+            training.state.mode === "training" ||
+            showTrainingWalkthrough
           }
           // Explosion Controls Props
           explosionValue={training.state.explosionValue}
@@ -664,6 +688,15 @@ export default function StreamingApp() {
           trainingState={training.state}
           onSelectPipe={training.selectPipe}
           onSelectPressureTest={training.selectPressureTest}
+          // External control (for walkthrough)
+          forceOpen={forceSidebarOpen}
+          forceActiveTab={forceSidebarTab}
+          onOpenChange={(isOpen) => {
+            // Only clear force state when user manually closes during walkthrough
+            if (!isOpen && forceSidebarOpen === true) {
+              setForceSidebarOpen(undefined);
+            }
+          }}
         />
       )}
       {/* Cinematic Mode Timer - Show when connected and in cinematic mode */}
@@ -674,6 +707,58 @@ export default function StreamingApp() {
           onSkipToTraining={sessionActions.skipToTraining}
           onTimeChange={persistence.setCinematicTimeRemaining}
           isActive={screenFlow.isCinematicMode}
+        />
+      )}
+      {/* Cinematic Mode Walkthrough - Show when connected and in cinematic mode */}
+      {stream.isConnected && screenFlow.isCinematicMode && showCinematicWalkthrough && (
+        <CinematicWalkthrough
+          onComplete={() => {
+            setShowCinematicWalkthrough(false);
+            setForceSidebarOpen(undefined);
+          }}
+          onSkip={() => {
+            setShowCinematicWalkthrough(false);
+            setForceSidebarOpen(undefined);
+          }}
+          onOpenSidebar={() => setForceSidebarOpen(true)}
+          onCloseSidebar={() => setForceSidebarOpen(false)}
+        />
+      )}
+      {/* Training Mode Walkthrough - Show in training mode when transitioning from cinematic */}
+      {stream.isConnected && !screenFlow.isCinematicMode && showTrainingWalkthrough && (
+        <TrainingModeWalkthrough
+          onComplete={() => {
+            setShowTrainingWalkthrough(false);
+            setForceSidebarOpen(undefined);
+            setForceSidebarTab(undefined);
+            // Execute the pending training start
+            if (pendingTrainingStartRef.current) {
+              pendingTrainingStartRef.current();
+              pendingTrainingStartRef.current = null;
+            }
+            isTransitioningToTrainingRef.current = false;
+          }}
+          onSkip={() => {
+            setShowTrainingWalkthrough(false);
+            setForceSidebarOpen(undefined);
+            setForceSidebarTab(undefined);
+            // Execute the pending training start
+            if (pendingTrainingStartRef.current) {
+              pendingTrainingStartRef.current();
+              pendingTrainingStartRef.current = null;
+            }
+            isTransitioningToTrainingRef.current = false;
+          }}
+          onOpenSidebar={() => {
+            console.log('📂 [StreamingApp] TrainingWalkthrough onOpenSidebar called');
+            setForceSidebarOpen(true);
+            setForceSidebarTab('inventory');
+          }}
+          onCloseSidebar={() => {
+            console.log('📂 [StreamingApp] TrainingWalkthrough onCloseSidebar called');
+            setForceSidebarOpen(false);
+            setForceSidebarTab(undefined);
+          }}
         />
       )}
       {/* Control Panel (ToolBar) - Only show when stream is connected and NOT in cinematic mode */}

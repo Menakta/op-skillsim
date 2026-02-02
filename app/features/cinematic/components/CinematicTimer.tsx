@@ -129,6 +129,7 @@ export function CinematicTimer({
 
       {/* Skip Button */}
       <button
+        id="btn-skip-to-training"
         onClick={onSkipToTraining}
         className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-[#39BEAE] hover:bg-[#2ea89a] text-white rounded-full transition-all duration-200 text-xs sm:text-sm font-medium w-full sm:w-auto justify-center"
       >

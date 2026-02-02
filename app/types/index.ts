@@ -203,3 +203,17 @@ export type {
   FittingOptionsResponse,
   FittingOptionResponse,
 } from './fitting.types'
+
+// =============================================================================
+// Walkthrough Types
+// =============================================================================
+
+export type {
+  WalkthroughStep,
+  WalkthroughMetadata,
+  UserWalkthroughProgress,
+  WalkthroughStepsResponse,
+  WalkthroughProgressResponse,
+  CinematicWalkthroughProps,
+  TrainingWalkthroughProps,
+} from './walkthrough.types'

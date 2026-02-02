@@ -40,6 +40,7 @@ export function ToolBar({ state, onSelectTool }: ToolBarProps) {
 
   return (
     <div
+      id="toolbar"
       className="fixed bottom-0 left-1/2 -translate-x-1/2 bg-[#000000]/05 rounded-2xl transition-all duration-300 max-w-[540px] py-3 mb-2"
       style={{ zIndex: 2147483646 }}
     >

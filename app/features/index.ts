@@ -34,3 +34,6 @@ export * from './streaming'
 
 // Training feature
 export * from './training'
+
+// Walkthrough feature
+export * from './walkthrough'

@@ -66,7 +66,8 @@ export interface UseSessionSelectionReturn {
     resume: (session: ActiveSession) => Promise<void>
     startNew: () => void
     confirmResume: (phaseIndex: number) => void
-    skipToTraining: () => Promise<void>
+    /** Skip to training mode. If delayTrainingStart is true, don't send start command to UE5 */
+    skipToTraining: (options?: { delayTrainingStart?: boolean }) => Promise<void>
   }
 
   // For session resume effect - marks session as handled
@@ -307,8 +308,9 @@ export function useSessionSelection(
       phaseIndex > 0 ? startFromTask(phaseIndex) : startTraining()
     },
 
-    skipToTraining: async () => {
-      console.log('⏭️ Skipping to training mode - starting from phase 0')
+    skipToTraining: async (options?: { delayTrainingStart?: boolean }) => {
+      const { delayTrainingStart = false } = options || {}
+      console.log('⏭️ Skipping to training mode', delayTrainingStart ? '(delaying training start for walkthrough)' : '- starting from phase 0')
       goToTraining()
       onEnterTrainingMode()
 
@@ -322,7 +324,11 @@ export function useSessionSelection(
           console.error('Error creating training session:', error)
         }
       }
-      startTraining()
+
+      // Only start training immediately if not delayed (for walkthrough)
+      if (!delayTrainingStart) {
+        startTraining()
+      }
     },
   }), [
     goToLoadingForTraining,

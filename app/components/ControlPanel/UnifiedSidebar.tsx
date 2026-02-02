@@ -134,6 +134,14 @@ interface UnifiedSidebarProps {
   trainingState?: TrainingState
   onSelectPipe?: (pipe: string) => void
   onSelectPressureTest?: (testType: 'air-plug' | 'conduct-test') => void
+
+  // External control props (for walkthrough integration)
+  /** Force open/close the sidebar from parent component */
+  forceOpen?: boolean
+  /** Callback when sidebar open state changes internally */
+  onOpenChange?: (isOpen: boolean) => void
+  /** Force switch to a specific tab (e.g., 'inventory' for walkthrough) */
+  forceActiveTab?: MenuTab
 }
 
 // =============================================================================
@@ -203,6 +211,11 @@ export function UnifiedSidebar({
   trainingState,
   onSelectPipe,
   onSelectPressureTest,
+
+  // External control props
+  forceOpen,
+  onOpenChange,
+  forceActiveTab,
 }: UnifiedSidebarProps) {
   // ==========================================================================
   // State
@@ -232,6 +245,39 @@ export function UnifiedSidebar({
 
   const isTrainingMode = mode === 'training'
   const isCinematiceMode = mode === 'cinematic'
+
+  // ==========================================================================
+  // External control - sync with forceOpen prop
+  // ==========================================================================
+
+  // Track previous forceOpen value to detect changes
+  const prevForceOpenRef = useRef<boolean | undefined>(undefined)
+
+  useEffect(() => {
+    // Only act when forceOpen actually changes (not on every render)
+    if (forceOpen !== prevForceOpenRef.current) {
+      console.log('📂 [UnifiedSidebar] forceOpen changed:', prevForceOpenRef.current, '->', forceOpen, 'current isOpen:', isOpen)
+      prevForceOpenRef.current = forceOpen
+
+      if (forceOpen !== undefined) {
+        console.log('📂 [UnifiedSidebar] Setting isOpen to:', forceOpen)
+        setIsOpen(forceOpen)
+      }
+    }
+  }, [forceOpen, isOpen])
+
+  // External control - switch to specific tab when requested
+  useEffect(() => {
+    if (forceActiveTab !== undefined) {
+      console.log('📂 [UnifiedSidebar] forceActiveTab:', forceActiveTab)
+      setActiveTab(forceActiveTab)
+    }
+  }, [forceActiveTab])
+
+  // Notify parent when open state changes
+  useEffect(() => {
+    onOpenChange?.(isOpen)
+  }, [isOpen, onOpenChange])
 
   // ==========================================================================
   // Auto-open sidebar for phases requiring material selection
@@ -384,7 +430,13 @@ export function UnifiedSidebar({
     }
   }
 
-  if (!isVisible) return null
+  // Debug logging for visibility
+  console.log('📂 [UnifiedSidebar] Render check - isVisible:', isVisible, 'mode:', mode, 'isOpen:', isOpen, 'forceOpen:', forceOpen)
+
+  if (!isVisible) {
+    console.log('📂 [UnifiedSidebar] NOT VISIBLE - returning null')
+    return null
+  }
 
   // ==========================================================================
   // Menu tabs configuration
@@ -435,6 +487,7 @@ export function UnifiedSidebar({
           - Desktop (>= 1024px): w-80 (320px) comfortable
           ==================================================================== */}
       <div
+        id="sidebar"
         className={`fixed top-0 left-0 bottom-0 z-40 w-48 md:w-50 lg:w-60 flex flex-col backdrop-blur-md border-r transition-transform duration-300 ease-in-out ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         } ${isDark ? 'bg-[#000000]/55 border-black/10' : 'bg-white/88 border-gray-100 shadow-2xl'}`}
@@ -483,6 +536,7 @@ export function UnifiedSidebar({
             {visibleTabs.map(tab => (
               <button
                 key={tab.id}
+                id={`tab-${tab.id}`}
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-medium transition-all whitespace-nowrap ${
                   activeTab === tab.id
@@ -592,7 +646,7 @@ export function UnifiedSidebar({
               INVENTORY TAB (Training Mode Only)
               ============================================================ */}
           {activeTab === 'inventory' && isTrainingMode && (
-            <div className="p-2 sm:p-3 space-y-3 sm:space-y-4">
+            <div id="materials" className="p-2 sm:p-3 space-y-3 sm:space-y-4">
               {/* Session Controls */}
 
 

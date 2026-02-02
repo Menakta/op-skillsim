@@ -235,10 +235,10 @@ function TrainingResultsContent() {
   }
 
   return (
-    <div className={`min-h-screen ${isDark ? 'bg-[#000000]/80' : 'bg-[#dee5e6]'}`}>
+    <div className={`min-h-screen ${isDark ? 'bg-[#000000]' : 'bg-[#dee5e6]'}`}>
       {/* Header */}
-      <header className={`sticky top-0 z-10 border-b ${isDark ? 'bg-[#0A0A0A] border-gray-800' : 'bg-white border-gray-200'}`}>
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+      <header className={`sticky top-0 z-10 border-b ${isDark ? 'bg-[#1a2525] border-gray-800' : 'bg-white border-gray-200'}`}>
+        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between flex-col md:flex-row md:gap-4 gap-6">
           <div className="flex items-center gap-3">
             <Image
               src={isDark ? '/logos/Main_Logo.png' : '/logos/Dark_logo.png'}
@@ -253,10 +253,10 @@ function TrainingResultsContent() {
             <button
               onClick={handleExportPDF}
               disabled={isExporting}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors text-xs md:text-lg ${
                 isDark
-                  ? 'bg-gray-800 hover:bg-gray-700 text-white'
-                  : 'bg-gray-100 hover:bg-gray-200 text-gray-800'
+                  ? 'bg-gray-700 hover:bg-gray-700 text-white'
+                  : 'bg-gray-200 hover:bg-gray-200 text-gray-800'
               } ${isExporting ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <Download className="w-4 h-4" />
@@ -264,7 +264,7 @@ function TrainingResultsContent() {
             </button>
             <button
               onClick={handleReturnToCourse}
-              className="flex items-center gap-2 px-4 py-2 bg-[#39BEAE] hover:bg-[#2da89a] text-white rounded-lg font-medium transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-[#39BEAE] hover:bg-[#2da89a] text-white rounded-lg font-medium transition-colors text-xs md:text-lg"
             >
               <ExternalLink className="w-4 h-4" />
               Return to Course
@@ -297,40 +297,43 @@ function TrainingResultsContent() {
         {/* Stats Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-[#39BEAE] rounded-xl p-3 flex items-center justify-between">
+            
+            <div className="text-2xl font-bold text-white text-sm md:text-lg">{data.session.overall_progress}%
+              <div className="text-xs text-white/70 mt-1">Progress</div>
+            </div>
             <div className="flex items-center justify-between bg-blue-500/50 p-2 rounded-md w-fit">
               <Target className="w-6 h-6 text-white/70" />
-            </div>
-            <div className="text-2xl font-bold text-white mb-1">{data.session.overall_progress}%
-              <div className="text-xs text-white/70 mt-1">Progress</div>
             </div>
             
           </div>
 
           <div className="bg-[#39BEAE] rounded-xl p-3 flex items-center justify-between">
+            
+            <div className="text-2xl font-bold text-white text-sm md:text-lg">{data.session.phases_completed}/6
+               <div className="text-xs text-white/70 mt-1">Phases</div>
+            </div>
             <div className="flex items-center justify-between bg-pink-500/50 p-2 rounded-md w-fit">
               <Award className="w-6 h-6 text-white/70" />
-            </div>
-            <div className="text-2xl font-bold text-white mb-1">{data.session.phases_completed}/6
-               <div className="text-xs text-white/70 mt-1">Phases</div>
             </div>
            
           </div>
 
           <div className="bg-[#39BEAE] rounded-xl p-3 flex items-center justify-between">
-            <div className="flex items-center justify-between bg-orange-400/50 p-2 rounded-md w-fit">
+           
+            <div className="text-2xl font-bold text-white text-sm md:text-lg">{formatTime(data.session.total_time_spent)} <div className="text-xs text-white/70 mt-1">Time Spent</div></div>
+             <div className="flex items-center justify-between bg-orange-400/50 p-2 rounded-md w-fit">
               <Clock className="w-6 h-6 text-white/70" />
             </div>
-            <div className="text-2xl font-bold text-white mb-1">{formatTime(data.session.total_time_spent)} <div className="text-xs text-white/70 mt-1">Time Spent</div></div>
-            
           </div>
 
           <div className="bg-[#39BEAE] rounded-xl p-3 flex items-center justify-between">
-            <div className="flex items-center justify-between bg-green-400 p-2 rounded-md w-fit">
-              <Trophy className="w-6 h-6 text-white/70" />
-            </div>
-            <div className={`text-2xl font-bold text-white mb-1`}>
+           
+            <div className={`text-2xl font-bold text-white text-sm md:text-lg`}>
               {quizStats?.correctAnswers}/{quizStats?.totalQuestions}
               <div className="text-xs text-white/70 mt-1">Quiz Score</div>
+            </div>
+             <div className="flex items-center justify-between bg-green-400 p-2 rounded-md w-fit">
+              <Trophy className="w-6 h-6 text-white/70" />
             </div>
             
           </div>
@@ -481,7 +484,7 @@ function TrainingResultsContent() {
         </div>
 
         {/* Footer Actions */}
-        <div className={`mt-8 p-6 rounded-2xl border ${isDark ? 'bg-[#0A0A0A] border-gray-800' : 'bg-white border-gray-200'}`}>
+        <div className={`mt-8 p-6 rounded-2xl border ${isDark ? 'bg-gray-800 border-gray-800' : 'bg-white border-gray-200'}`}>
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
               Your training has been completed and recorded. You can export your results as a PDF for your records.
@@ -491,7 +494,7 @@ function TrainingResultsContent() {
       </main>
 
       {/* Footer */}
-      <footer className={`py-6 text-center border-t ${isDark ? 'border-gray-800' : 'border-gray-200'}`}>
+      <footer className={`py-6 text-center border-t bg-[#1a2525] ${isDark ? 'border-gray-800' : 'border-gray-200'}`}>
         <p className={`text-sm ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
           Open Polytechnic New Zealand Te Pukenga
         </p>
