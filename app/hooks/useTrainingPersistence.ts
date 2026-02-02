@@ -197,9 +197,10 @@ export function useTrainingPersistence(
         ? buildQuestionDataMap(quizData.quizAnswers)
         : undefined
 
-      // phasesCompleted = currentTaskIndex + 1 (since index is 0-based)
-      // When training completes, currentTaskIndex should be at the last completed phase
-      const phasesCompleted = trainingState.currentTaskIndex + 1
+      // When training completes, currentTaskIndex is set to totalTasks (e.g., 6)
+      // This represents the number of completed phases, so use it directly
+      // Cap at totalTasks to ensure we never exceed the maximum
+      const phasesCompleted = Math.min(trainingState.currentTaskIndex, trainingState.totalTasks)
 
       console.log('📊 [useTrainingPersistence] Completing training with:', {
         phasesCompleted,
