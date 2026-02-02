@@ -178,33 +178,29 @@ export async function GET(request: NextRequest) {
         logger.warn({ quizId: quiz.id }, 'Failed to parse question_data')
       }
 
-      // Convert question_data to array format
-      const allQuestions: QuestionDetail[] = Object.entries(questionData).map(([questionId, data]) => ({
-        questionId,
-        answer: data.answer,
-        correct: data.correct,
-        attempts: data.attempts,
-        time: data.time,
-      }))
+      // Convert question_data to array format and sort by questionId for consistent ordering
+      const questions: QuestionDetail[] = Object.entries(questionData)
+        .map(([questionId, data]) => ({
+          questionId,
+          answer: data.answer,
+          correct: data.correct,
+          attempts: data.attempts,
+          time: data.time,
+        }))
+        .sort((a, b) => a.questionId.localeCompare(b.questionId, undefined, { numeric: true }))
 
       // Get session info
       const sessionInfo = sessionMap.get(quiz.session_id)
 
-      // Calculate totals from question_data if not in quiz record
-      const totalQuestions = quiz.total_questions || allQuestions.length
+      // Calculate totals from actual question_data entries (like training-results page)
+      // This is the accurate count - not from DB field which may be incorrect
+      const totalQuestions = questions.length
+      const correctCount = questions.filter(q => q.correct).length
 
-      // Limit questions to totalQuestions (in case of corrupted data with extra entries)
-      // Sort by questionId to ensure consistent ordering (Q1, Q2, Q3, etc.)
-      const questions = allQuestions
-        .sort((a, b) => a.questionId.localeCompare(b.questionId))
-        .slice(0, totalQuestions)
-      // Ensure correctCount doesn't exceed totalQuestions (prevents >100% scores)
-      const rawCorrectCount = quiz.correct_count ?? questions.filter(q => q.correct).length
-      const correctCount = Math.min(rawCorrectCount, totalQuestions)
-      // Cap scorePercentage at 100%
-      const rawScorePercentage = parseFloat(quiz.score_percentage) ||
-        (totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0)
-      const scorePercentage = Math.min(rawScorePercentage, 100)
+      // Calculate score percentage from actual data
+      const scorePercentage = totalQuestions > 0
+        ? Math.round((correctCount / totalQuestions) * 100)
+        : 0
 
       // Determine if passed (75% threshold)
       const passed = scorePercentage >= 75

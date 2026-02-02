@@ -296,38 +296,43 @@ function TrainingResultsContent() {
 
         {/* Stats Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-[#39BEAE] rounded-xl p-4">
-            <div className="flex items-center justify-between mb-2">
+          <div className="bg-[#39BEAE] rounded-xl p-3 flex items-center justify-between">
+            <div className="flex items-center justify-between bg-blue-500/50 p-2 rounded-md w-fit">
               <Target className="w-6 h-6 text-white/70" />
             </div>
-            <div className="text-3xl font-bold text-white mb-1">{data.session.overall_progress}%</div>
-            <div className="text-sm text-white/70">Progress</div>
+            <div className="text-2xl font-bold text-white mb-1">{data.session.overall_progress}%
+              <div className="text-xs text-white/70 mt-1">Progress</div>
+            </div>
+            
           </div>
 
-          <div className="bg-[#39BEAE] rounded-xl p-4">
-            <div className="flex items-center justify-between mb-2">
+          <div className="bg-[#39BEAE] rounded-xl p-3 flex items-center justify-between">
+            <div className="flex items-center justify-between bg-pink-500/50 p-2 rounded-md w-fit">
               <Award className="w-6 h-6 text-white/70" />
             </div>
-            <div className="text-3xl font-bold text-white mb-1">{data.session.phases_completed}/6</div>
-            <div className="text-sm text-white/70">Phases</div>
+            <div className="text-2xl font-bold text-white mb-1">{data.session.phases_completed}/6
+               <div className="text-xs text-white/70 mt-1">Phases</div>
+            </div>
+           
           </div>
 
-          <div className="bg-[#39BEAE] rounded-xl p-4">
-            <div className="flex items-center justify-between mb-2">
+          <div className="bg-[#39BEAE] rounded-xl p-3 flex items-center justify-between">
+            <div className="flex items-center justify-between bg-orange-400/50 p-2 rounded-md w-fit">
               <Clock className="w-6 h-6 text-white/70" />
             </div>
-            <div className="text-3xl font-bold text-white mb-1">{formatTime(data.session.total_time_spent)}</div>
-            <div className="text-sm text-white/70">Time Spent</div>
+            <div className="text-2xl font-bold text-white mb-1">{formatTime(data.session.total_time_spent)} <div className="text-xs text-white/70 mt-1">Time Spent</div></div>
+            
           </div>
 
-          <div className="bg-[#39BEAE] rounded-xl p-4">
-            <div className="flex items-center justify-between mb-2">
+          <div className="bg-[#39BEAE] rounded-xl p-3 flex items-center justify-between">
+            <div className="flex items-center justify-between bg-green-400 p-2 rounded-md w-fit">
               <Trophy className="w-6 h-6 text-white/70" />
             </div>
-            <div className={`text-3xl font-bold text-white mb-1`}>
+            <div className={`text-2xl font-bold text-white mb-1`}>
               {quizStats?.correctAnswers}/{quizStats?.totalQuestions}
+              <div className="text-xs text-white/70 mt-1">Quiz Score</div>
             </div>
-            <div className="text-sm text-white/70">Quiz Score</div>
+            
           </div>
         </div>
 
@@ -341,7 +346,7 @@ function TrainingResultsContent() {
             </div>
             <div className="p-6 space-y-4">
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isDark ? 'bg-gray-800' : 'bg-gray-100'}`}>
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center bg-green-300`}>
                   <User className={`w-5 h-5 ${isDark ? 'text-gray-400' : 'text-gray-600'}`} />
                 </div>
                 <div>
@@ -351,7 +356,7 @@ function TrainingResultsContent() {
               </div>
 
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isDark ? 'bg-gray-800' : 'bg-gray-100'}`}>
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center bg-green-300`}>
                   <Mail className={`w-5 h-5 ${isDark ? 'text-gray-400' : 'text-gray-600'}`} />
                 </div>
                 <div>
@@ -361,7 +366,7 @@ function TrainingResultsContent() {
               </div>
 
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isDark ? 'bg-gray-800' : 'bg-gray-100'}`}>
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center bg-green-300`}>
                   <BookOpen className={`w-5 h-5 ${isDark ? 'text-gray-400' : 'text-gray-600'}`} />
                 </div>
                 <div>
@@ -371,7 +376,7 @@ function TrainingResultsContent() {
               </div>
 
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isDark ? 'bg-gray-800' : 'bg-gray-100'}`}>
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center bg-green-300`}>
                   <Building className={`w-5 h-5 ${isDark ? 'text-gray-400' : 'text-gray-600'}`} />
                 </div>
                 <div>

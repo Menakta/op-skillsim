@@ -47,7 +47,7 @@ export interface ResultPDFData {
 const COLORS = {
   teal: [57, 190, 174] as [number, number, number],       // #39BEAE
   tealLight: [121, 207, 194] as [number, number, number],  // #79CFC2
-  navy: [13, 29, 64] as [number, number, number],          // #0D1D40
+  navy: [13, 29, 64] as [number, number, number],          // #ff985d
   white: [255, 255, 255] as [number, number, number],
   textPrimary: [13, 29, 64] as [number, number, number],
   textMuted: [107, 111, 138] as [number, number, number],  // #6B6F8A
