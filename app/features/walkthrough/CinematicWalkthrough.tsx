@@ -152,10 +152,8 @@ export function CinematicWalkthrough({
   // Loading state
   if (isLoading) {
     return (
-      <div className="fixed inset-0 z-[2147483646] flex items-center justify-center pointer-events-none">
-        <div className="bg-black/50 rounded-xl shadow-xl p-6 max-w-[400px] w-[calc(100%-2rem)]">
-          <p className="text-gray-200 text-center">Loading walkthrough...</p>
-        </div>
+      <div className="fixed inset-0 z-[2147483646] pointer-events-none">
+    
       </div>
     )
   }

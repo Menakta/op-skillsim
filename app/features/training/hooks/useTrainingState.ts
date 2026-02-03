@@ -40,7 +40,7 @@ export interface TrainingStateCallbacks {
     isActive: boolean
   }) => void
   onTrainingComplete?: (progress: number, currentTask: number, totalTasks: number) => void
-  onTaskCompleted?: (taskId: string, nextTaskIndex: number) => void
+  onTaskCompleted?: (taskId: string, nextTaskIndex: number, completedTaskIndex: number) => void
   onTaskStart?: (toolName: string) => void
 }
 
@@ -236,27 +236,30 @@ export function useTrainingState(
           console.log('=== TASK COMPLETED MESSAGE ===')
           console.log('Completed task ID:', taskId)
 
-          // Get current state to calculate next index
+          // Use setState to get the LATEST state value (avoids stale closure)
           setState(prev => {
-            const nextIndex = prev.currentTaskIndex + 1
+            // training_progress has already updated currentTaskIndex to the NEXT task
+            // So the completed task is currentTaskIndex - 1
+            const completedTaskIndex = prev.currentTaskIndex > 0 ? prev.currentTaskIndex - 1 : 0
+            const nextIndex = prev.currentTaskIndex
 
-            // Schedule callback to run after state update
+            console.log('📢 Completed task index:', completedTaskIndex, 'Next index:', nextIndex, 'Current state index:', prev.currentTaskIndex)
+
+            // Call callback with correct indices
             setTimeout(() => {
-              console.log('📢 Calling onTaskCompleted callback with taskId:', taskId, 'nextIndex:', nextIndex)
-              callbacksRef.current.onTaskCompleted?.(taskId, nextIndex)
+              callbacksRef.current.onTaskCompleted?.(taskId, nextIndex, completedTaskIndex)
             }, 0)
 
+            // Update phase display
             if (trainingService.isTrainingComplete(nextIndex)) {
               return {
                 ...prev,
-                currentTaskIndex: nextIndex,
                 phase: 'All Tasks Complete'
               }
             }
 
             return {
               ...prev,
-              currentTaskIndex: nextIndex,
               phase: 'Tool Selection'
             }
           })

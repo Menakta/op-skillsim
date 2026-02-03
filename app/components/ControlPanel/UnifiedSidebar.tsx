@@ -256,11 +256,9 @@ export function UnifiedSidebar({
   useEffect(() => {
     // Only act when forceOpen actually changes (not on every render)
     if (forceOpen !== prevForceOpenRef.current) {
-      console.log('📂 [UnifiedSidebar] forceOpen changed:', prevForceOpenRef.current, '->', forceOpen, 'current isOpen:', isOpen)
       prevForceOpenRef.current = forceOpen
 
       if (forceOpen !== undefined) {
-        console.log('📂 [UnifiedSidebar] Setting isOpen to:', forceOpen)
         setIsOpen(forceOpen)
       }
     }
@@ -269,7 +267,6 @@ export function UnifiedSidebar({
   // External control - switch to specific tab when requested
   useEffect(() => {
     if (forceActiveTab !== undefined) {
-      console.log('📂 [UnifiedSidebar] forceActiveTab:', forceActiveTab)
       setActiveTab(forceActiveTab)
     }
   }, [forceActiveTab])
@@ -278,6 +275,7 @@ export function UnifiedSidebar({
   useEffect(() => {
     onOpenChange?.(isOpen)
   }, [isOpen, onOpenChange])
+
 
   // ==========================================================================
   // Auto-open sidebar for phases requiring material selection
@@ -799,7 +797,13 @@ export function UnifiedSidebar({
                 title="Waypoints"
                 icon={<Navigation className="w-4 h-4" />}
                 isExpanded={expandedSections.has('waypoints')}
-                onToggle={() => toggleSection('waypoints')}
+                onToggle={() => {
+                  toggleSection('waypoints')
+                  // Auto-fetch waypoints when expanding
+                  if (!expandedSections.has('waypoints')) {
+                    onRefreshWaypoints()
+                  }
+                }}
                 isDark={isDark}
                 headerAction={
                   <button
@@ -877,7 +881,13 @@ export function UnifiedSidebar({
                 title="Layers"
                 icon={<Eye className="w-4 h-4" />}
                 isExpanded={expandedSections.has('layers')}
-                onToggle={() => toggleSection('layers')}
+                onToggle={() => {
+                  toggleSection('layers')
+                  // Auto-fetch layers when expanding
+                  if (!expandedSections.has('layers')) {
+                    onRefreshLayers()
+                  }
+                }}
                 isDark={isDark}
                 headerAction={
                   <button

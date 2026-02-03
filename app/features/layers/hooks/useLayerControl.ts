@@ -124,19 +124,53 @@ export function useLayerControl(
           const groups: HierarchicalLayerData[] = []
 
           if (count > 0 && groupData) {
+            // Track Windows child layers to merge (Windows Left, Windows Right)
+            const windowChildLayers: { name: string; visible: boolean; actorCount: number; parentName: string; childIndex: number }[] = []
+
             groupData.split(',').forEach(group => {
               const [name, visible, isChild, actorCount, parentName, childIndex] = group.split(':')
               if (name) {
-                groups.push({
-                  name,
-                  visible: visible === 'true',
-                  isChild: isChild === 'true',
-                  actorCount: parseInt(actorCount) || 0,
-                  parentName: parentName || undefined,
-                  childIndex: childIndex ? parseInt(childIndex) : undefined
-                })
+                // Check if this is "Widnows Left" or "Widnows Right" (child of Windows parent)
+                // Note: UE5 has typo "Widnows" instead of "Windows"
+                const isWindowChild = isChild === 'true' && parentName === 'Windows' &&
+                  (name === 'Widnows Left' || name === 'Widnows Right')
+
+                if (isWindowChild) {
+                  // Collect for merging, don't add to groups yet
+                  windowChildLayers.push({
+                    name,
+                    visible: visible === 'true',
+                    actorCount: parseInt(actorCount) || 0,
+                    parentName: parentName || '',
+                    childIndex: parseInt(childIndex) || 0
+                  })
+                } else {
+                  groups.push({
+                    name,
+                    visible: visible === 'true',
+                    isChild: isChild === 'true',
+                    actorCount: parseInt(actorCount) || 0,
+                    parentName: parentName || undefined,
+                    childIndex: childIndex ? parseInt(childIndex) : undefined
+                  })
+                }
               }
             })
+
+            // Update Windows parent to include merged child info
+            if (windowChildLayers.length > 0) {
+              const windowsParent = groups.find(g => g.name === 'Windows' && !g.isChild)
+              if (windowsParent) {
+                // Add merged layers info to the parent
+                windowsParent.actorCount = windowChildLayers.reduce((sum, w) => sum + w.actorCount, 0)
+                windowsParent.visible = windowChildLayers.every(w => w.visible)
+                windowsParent._mergedLayers = windowChildLayers.map(w => ({
+                  name: w.name,
+                  parentName: w.parentName,
+                  childIndex: w.childIndex
+                }))
+              }
+            }
           }
 
           setState(prev => ({ ...prev, hierarchicalGroups: groups }))
@@ -212,9 +246,9 @@ export function useLayerControl(
     messageBus.sendMessage(WEB_TO_UE_MESSAGES.HIERARCHICAL_CONTROL, 'list')
   }, [messageBus])
 
-  // Throttle refresh actions to 500ms
-  const refreshLayers = useThrottledCallback(refreshLayersInternal, 500)
-  const refreshHierarchicalLayers = useThrottledCallback(refreshHierarchicalLayersInternal, 500)
+  // Throttle refresh actions to 100ms (fast for dropdown auto-fetch)
+  const refreshLayers = useThrottledCallback(refreshLayersInternal, 100)
+  const refreshHierarchicalLayers = useThrottledCallback(refreshHierarchicalLayersInternal, 100)
 
   const toggleLayerInternal = useCallback((index: number) => {
     const layer = state.layers.find(l => l.index === index)
@@ -266,20 +300,54 @@ export function useLayerControl(
   const hideAllLayers = useThrottledCallback(hideAllLayersInternal, 500)
 
   const toggleMainGroupInternal = useCallback((groupName: string) => {
-    console.log('Toggling main group:', groupName)
-    messageBus.sendMessage(WEB_TO_UE_MESSAGES.HIERARCHICAL_CONTROL, `toggle_main:${groupName}`)
-    setTimeout(() => {
-      messageBus.sendMessage(WEB_TO_UE_MESSAGES.HIERARCHICAL_CONTROL, 'list')
-    }, 200)
-  }, [messageBus])
+    // Check if this is a merged layer (e.g., "Windows" with merged children)
+    const group = state.hierarchicalGroups.find(g => g.name === groupName && !g.isChild)
+
+    if (group?._mergedLayers && group._mergedLayers.length > 0) {
+      // Toggle all original child layers for merged group
+      console.log('Toggling merged Windows layers:', group._mergedLayers)
+      group._mergedLayers.forEach((layer, idx) => {
+        setTimeout(() => {
+          messageBus.sendMessage(WEB_TO_UE_MESSAGES.HIERARCHICAL_CONTROL, `toggle_child:${layer.parentName}:${layer.childIndex}`)
+        }, idx * 50)
+      })
+      setTimeout(() => {
+        messageBus.sendMessage(WEB_TO_UE_MESSAGES.HIERARCHICAL_CONTROL, 'list')
+      }, group._mergedLayers.length * 50 + 100)
+    } else {
+      // Normal toggle
+      console.log('Toggling main group:', groupName)
+      messageBus.sendMessage(WEB_TO_UE_MESSAGES.HIERARCHICAL_CONTROL, `toggle_main:${groupName}`)
+      setTimeout(() => {
+        messageBus.sendMessage(WEB_TO_UE_MESSAGES.HIERARCHICAL_CONTROL, 'list')
+      }, 200)
+    }
+  }, [messageBus, state.hierarchicalGroups])
 
   const toggleChildGroupInternal = useCallback((parentName: string, childIndex: number) => {
-    console.log('Toggling child group:', parentName, childIndex)
-    messageBus.sendMessage(WEB_TO_UE_MESSAGES.HIERARCHICAL_CONTROL, `toggle_child:${parentName}:${childIndex}`)
-    setTimeout(() => {
-      messageBus.sendMessage(WEB_TO_UE_MESSAGES.HIERARCHICAL_CONTROL, 'list')
-    }, 200)
-  }, [messageBus])
+    // Check if this is a merged layer (e.g., "Windows")
+    const group = state.hierarchicalGroups.find(g => g.parentName === parentName && g.childIndex === childIndex)
+
+    if (group?._mergedLayers && group._mergedLayers.length > 0) {
+      // Toggle all original layers for merged group
+      console.log('Toggling merged layers:', group._mergedLayers)
+      group._mergedLayers.forEach((layer, idx) => {
+        setTimeout(() => {
+          messageBus.sendMessage(WEB_TO_UE_MESSAGES.HIERARCHICAL_CONTROL, `toggle_child:${layer.parentName}:${layer.childIndex}`)
+        }, idx * 50) // Stagger requests slightly
+      })
+      setTimeout(() => {
+        messageBus.sendMessage(WEB_TO_UE_MESSAGES.HIERARCHICAL_CONTROL, 'list')
+      }, group._mergedLayers.length * 50 + 100)
+    } else {
+      // Normal toggle
+      console.log('Toggling child group:', parentName, childIndex)
+      messageBus.sendMessage(WEB_TO_UE_MESSAGES.HIERARCHICAL_CONTROL, `toggle_child:${parentName}:${childIndex}`)
+      setTimeout(() => {
+        messageBus.sendMessage(WEB_TO_UE_MESSAGES.HIERARCHICAL_CONTROL, 'list')
+      }, 200)
+    }
+  }, [messageBus, state.hierarchicalGroups])
 
   // Throttle group toggles to 300ms
   const toggleMainGroup = useThrottledCallback(toggleMainGroupInternal, 300)

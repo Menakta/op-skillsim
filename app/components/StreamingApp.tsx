@@ -151,9 +151,7 @@ export default function StreamingApp() {
     onError: (error) => modals.openError(error),
     onConnected: (isFirstConnection) => {
       screenFlow.setConnected(true);
-      if (isFirstConnection) {
-        modals.openNavigationWalkthrough();
-      }
+      // NavigationWalkthrough will be shown after CinematicWalkthrough completes
     },
     onSessionEnd: (reason) => modals.openSessionEnd(reason),
   });
@@ -237,17 +235,17 @@ export default function StreamingApp() {
           modals.openTrainingComplete();
         }
       },
-      onTaskCompleted: (taskId, nextTaskIndex) => {
+      onTaskCompleted: (taskId, nextTaskIndex, completedTaskIndex) => {
         console.log(
           "✅ Task completed:",
           taskId,
+          "Completed index:",
+          completedTaskIndex,
           "Next task index:",
           nextTaskIndex,
         );
-        console.log("📋 TASK_SEQUENCE:", TASK_SEQUENCE);
 
         // Save phase completion to database (for LTI students)
-        // nextTaskIndex is already incremented, so phases completed = nextTaskIndex
         const phasesCompleted = nextTaskIndex;
         console.log("📊 Saving phase completion to database:", { phase: taskId, phasesCompleted });
         trainingSessionService.completePhase({
@@ -270,17 +268,9 @@ export default function StreamingApp() {
           return;
         }
 
-        // Find the completed task - try matching by taskId first, then by index
-        let completedTaskDef = TASK_SEQUENCE.find((t) => t.taskId === taskId);
-        // If not found by taskId, use the previous task index (since nextTaskIndex is already incremented)
-        if (
-          !completedTaskDef &&
-          nextTaskIndex > 0 &&
-          nextTaskIndex <= TASK_SEQUENCE.length
-        ) {
-          completedTaskDef = TASK_SEQUENCE[nextTaskIndex - 1];
-          console.log("📋 Found task by index:", completedTaskDef);
-        }
+        // Use completedTaskIndex directly (passed from useTrainingState which calculates it correctly)
+        const completedTaskDef = TASK_SEQUENCE[completedTaskIndex];
+        console.log("📋 Completed task:", completedTaskDef?.name, "| UE5 sent taskId:", taskId);
         // Show modal if we found the task and there are more tasks
         if (completedTaskDef && nextTaskIndex < TASK_SEQUENCE.length) {
           console.log(
@@ -395,35 +385,6 @@ export default function StreamingApp() {
       onStateRestoreAttempted: persistence.markStateRestored,
     },
   );
-  // ==========================================================================
-  // Initial Data Request (after connection)
-  // ==========================================================================
-  useEffect(() => {
-    if (stream.streamerStatus === StreamerStatus.Connected) {
-      console.log(
-        "📤 Connection established - Requesting initial data from UE5...",
-      );
-      // Initial request after connection stabilizes
-      const initialTimer = setTimeout(() => {
-        training.testConnection();
-        training.refreshWaypoints();
-        training.refreshHierarchicalLayers();
-        console.log("📤 Initial data requests sent");
-      }, 1500);
-
-      // Retry waypoints after a bit more time in case first request was missed
-      const retryTimer = setTimeout(() => {
-        if (training.state.waypoints.length === 0) {
-          console.log("📤 Retrying waypoint fetch...");
-          training.refreshWaypoints();
-        }
-      }, 3500);
-      return () => {
-        clearTimeout(initialTimer);
-        clearTimeout(retryTimer);
-      };
-    }
-  }, [stream.streamerStatus, training]);
   // Idle detection - only active when stream is connected
   const { isIdle, resetIdle } = useIdleDetection({
     idleTimeout: 5 * 60 * 1000, // 5 minutes
@@ -733,10 +694,14 @@ export default function StreamingApp() {
           onComplete={() => {
             setShowCinematicWalkthrough(false);
             setForceSidebarOpen(undefined);
+            // Show NavigationWalkthrough after CinematicWalkthrough completes
+            modals.openNavigationWalkthrough();
           }}
           onSkip={() => {
             setShowCinematicWalkthrough(false);
             setForceSidebarOpen(undefined);
+            // Show NavigationWalkthrough after CinematicWalkthrough is skipped
+            modals.openNavigationWalkthrough();
           }}
           onOpenSidebar={() => setForceSidebarOpen(true)}
           onCloseSidebar={() => setForceSidebarOpen(false)}

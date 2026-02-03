@@ -44,7 +44,7 @@ export interface TrainingMessageCallbacks {
     isActive: boolean
   }) => void
   onToolChange?: (toolName: ToolName) => void
-  onTaskCompleted?: (taskId: string, nextTaskIndex: number) => void
+  onTaskCompleted?: (taskId: string, nextTaskIndex: number, completedTaskIndex: number) => void
   onTaskStart?: (toolName: string) => void
   onQuestionRequest?: (questionId: string, question: QuestionData) => void
   onTrainingComplete?: (progress: number, currentTask: number, totalTasks: number) => void

@@ -19,6 +19,7 @@ import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { CheckCircle, Clock, LogOut, UserX, AlertCircle } from 'lucide-react'
 import { completeSessionCleanup } from '@/app/lib/clearSessionData'
+import { useTheme } from '../context/ThemeContext'
 
 // =============================================================================
 // Types
@@ -99,6 +100,7 @@ const REASON_CONFIG: Record<SessionEndReason, {
 function SessionCompleteContent() {
   const searchParams = useSearchParams()
   const [isClearing, setIsClearing] = useState(true)
+   const {theme}=useTheme()
   const [data, setData] = useState<SessionCompleteData>({
     reason: 'other',
     role: 'student',
@@ -108,6 +110,7 @@ function SessionCompleteContent() {
     returnUrl: null,
     isLti: false,
   })
+  
 
   // Parse URL parameters
   useEffect(() => {
@@ -118,6 +121,7 @@ function SessionCompleteContent() {
     const totalPhases = parseInt(searchParams.get('total') || '6', 10)
     const returnUrl = searchParams.get('returnUrl')
     const isLti = searchParams.get('isLti') === 'true'
+   
 
     setData({
       reason,
@@ -162,7 +166,7 @@ function SessionCompleteContent() {
   }
 
   return (
-    <div className="min-h-screen bg-[#1E1E1E] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#1E1E1E]/50 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
         {/* Logo */}
         <div className="text-center mb-8">
@@ -178,7 +182,7 @@ function SessionCompleteContent() {
         </div>
 
         {/* Main Card */}
-        <div className="bg-[#2A2A2A] rounded-2xl p-8 shadow-xl border border-gray-700">
+        <div className="bg-[#000000] rounded-2xl p-8 shadow-xl">
           {/* Icon */}
           <div className="flex justify-center mb-6">
             {config.icon}
@@ -196,7 +200,7 @@ function SessionCompleteContent() {
 
           {/* Progress Summary (Students only, for completed/quit) */}
           {!isStaff && (data.reason === 'completed' || data.reason === 'quit' || data.reason === 'idle') && data.progress > 0 && (
-            <div className="bg-[#1E1E1E] rounded-xl p-4 mb-6 border border-gray-600">
+            <div className="bg-[#1E1E1E] rounded-xl p-4 mb-6">
               <h3 className="text-sm font-medium text-gray-400 mb-3">Your Progress</h3>
 
               {/* Progress Bar */}
@@ -216,7 +220,7 @@ function SessionCompleteContent() {
               {/* Phases Completed */}
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-400">Phases Completed</span>
-                <span className="text-sm font-medium text-white">
+                <span className="text-[12px] font-medium text-white">
                   {data.phasesCompleted} / {data.totalPhases}
                 </span>
               </div>

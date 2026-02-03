@@ -191,35 +191,28 @@ export function TrainingModeWalkthrough({
 
   // Don't render if complete or loading with no steps
   if (isComplete) {
-    console.log('📂 [TrainingWalkthrough] Walkthrough already completed, not rendering')
     return null
   }
 
   // Loading state
   if (isLoading) {
-    console.log('📂 [TrainingWalkthrough] Loading walkthrough steps...')
     return (
       <div className="fixed inset-0 z-[2147483646] flex items-center justify-center pointer-events-none">
-        <div className="bg-black/50 rounded-xl shadow-xl p-6 max-w-[400px] w-[calc(100%-2rem)]">
-          <p className="text-gray-200 text-center">Loading walkthrough...</p>
-        </div>
+       
       </div>
     )
   }
 
   // No steps available
   if (steps.length === 0) {
-    console.log('📂 [TrainingWalkthrough] No steps available')
     return null
   }
 
   // No current step (shouldn't happen but safety check)
   if (!currentStep) {
-    console.log('📂 [TrainingWalkthrough] No current step')
     return null
   }
 
-  console.log('📂 [TrainingWalkthrough] Rendering step:', currentStepIndex + 1, '/', totalSteps, '-', currentStep.title)
 
   const positionClasses = getPositionClasses(currentStep.metadata, currentStep.target_element_id)
   const hasTargetElement = !!currentStep.target_element_id

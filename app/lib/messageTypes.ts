@@ -257,6 +257,8 @@ export interface HierarchicalLayerData {
   actorCount: number
   parentName?: string
   childIndex?: number
+  // For merged layers (e.g., Windows = Left Window + Right Window)
+  _mergedLayers?: { name: string; parentName: string; childIndex: number }[]
 }
 
 // =============================================================================
