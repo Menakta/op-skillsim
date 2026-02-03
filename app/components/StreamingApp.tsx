@@ -712,25 +712,33 @@ export default function StreamingApp() {
         <TrainingModeWalkthrough
           onComplete={() => {
             setShowTrainingWalkthrough(false);
-            setForceSidebarOpen(undefined);
+            setForceSidebarOpen(false); // Explicitly close sidebar
             setForceSidebarTab(undefined);
-            // Execute the pending training start
-            if (pendingTrainingStartRef.current) {
-              pendingTrainingStartRef.current();
-              pendingTrainingStartRef.current = null;
-            }
-            isTransitioningToTrainingRef.current = false;
+            // Execute the pending training start after a short delay to ensure sidebar closes
+            setTimeout(() => {
+              if (pendingTrainingStartRef.current) {
+                pendingTrainingStartRef.current();
+                pendingTrainingStartRef.current = null;
+              }
+              isTransitioningToTrainingRef.current = false;
+              // Release control after training starts
+              setForceSidebarOpen(undefined);
+            }, 100);
           }}
           onSkip={() => {
             setShowTrainingWalkthrough(false);
-            setForceSidebarOpen(undefined);
+            setForceSidebarOpen(false); // Explicitly close sidebar
             setForceSidebarTab(undefined);
-            // Execute the pending training start
-            if (pendingTrainingStartRef.current) {
-              pendingTrainingStartRef.current();
-              pendingTrainingStartRef.current = null;
-            }
-            isTransitioningToTrainingRef.current = false;
+            // Execute the pending training start after a short delay to ensure sidebar closes
+            setTimeout(() => {
+              if (pendingTrainingStartRef.current) {
+                pendingTrainingStartRef.current();
+                pendingTrainingStartRef.current = null;
+              }
+              isTransitioningToTrainingRef.current = false;
+              // Release control after training starts
+              setForceSidebarOpen(undefined);
+            }, 100);
           }}
           onOpenSidebar={() => {
             console.log('📂 [StreamingApp] TrainingWalkthrough onOpenSidebar called');

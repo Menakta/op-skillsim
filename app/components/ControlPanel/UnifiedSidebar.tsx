@@ -250,19 +250,13 @@ export function UnifiedSidebar({
   // External control - sync with forceOpen prop
   // ==========================================================================
 
-  // Track previous forceOpen value to detect changes
-  const prevForceOpenRef = useRef<boolean | undefined>(undefined)
-
   useEffect(() => {
-    // Only act when forceOpen actually changes (not on every render)
-    if (forceOpen !== prevForceOpenRef.current) {
-      prevForceOpenRef.current = forceOpen
-
-      if (forceOpen !== undefined) {
-        setIsOpen(forceOpen)
-      }
+    // Sync with forceOpen when it has a defined value
+    if (forceOpen !== undefined) {
+      console.log('📂 [UnifiedSidebar] forceOpen changed to:', forceOpen)
+      setIsOpen(forceOpen)
     }
-  }, [forceOpen, isOpen])
+  }, [forceOpen])
 
   // External control - switch to specific tab when requested
   useEffect(() => {
