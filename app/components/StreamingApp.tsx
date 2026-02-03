@@ -568,6 +568,14 @@ export default function StreamingApp() {
           const timeSpentMs = Date.now() - sessionStartTime;
           await trainingSessionService.recordTimeSpent(timeSpentMs);
         }
+
+        // Staff (admin/teacher) with LTI session: redirect to /admin without clearing credentials
+        const isStaff = userRole === "admin" || userRole === "teacher";
+        if (isStaff && isLtiSession) {
+          window.location.href = "/admin";
+          return;
+        }
+
         redirectToSessionComplete({
           reason: "quit",
           role: userRole,
