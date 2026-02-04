@@ -36,12 +36,21 @@ function getSupabase() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password, fullName } = await request.json()
+    const { email, password, fullName, phone } = await request.json()
 
     // Validate required fields
-    if (!email || !password || !fullName) {
+    if (!email || !password || !fullName || !phone) {
       return NextResponse.json(
-        { success: false, error: 'Email, password, and full name are required' },
+        { success: false, error: 'Email, password, full name, and phone number are required' },
+        { status: 400 }
+      )
+    }
+
+    // Validate phone format (E.164 format recommended for Twilio)
+    const phoneRegex = /^\+[1-9]\d{6,14}$/
+    if (!phoneRegex.test(phone)) {
+      return NextResponse.json(
+        { success: false, error: 'Phone number must be in international format (e.g., +64211234567)' },
         { status: 400 }
       )
     }
@@ -71,9 +80,11 @@ export async function POST(request: NextRequest) {
     const { data: authData, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
+      phone,
       options: {
         data: {
           full_name: fullName,
+          phone,
           registration_type: 'outsider',
           approval_status: 'pending',
           role: 'student',

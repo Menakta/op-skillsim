@@ -6,6 +6,8 @@
  * Displays a bell icon with unread notification count badge.
  * Subscribes to real-time notifications via Supabase Realtime.
  * Shows a dropdown panel with recent notifications.
+ * Mobile: Full-screen bottom sheet
+ * Desktop: Positioned dropdown
  */
 
 import { useEffect, useState, useRef, useCallback } from 'react'
@@ -81,11 +83,14 @@ export function NotificationBell({ isAdmin }: NotificationBellProps) {
     }
   }, [isAdmin])
 
-  // Close dropdown when clicking outside
+  // Close dropdown when clicking outside (desktop only)
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false)
+        // Only close on desktop - mobile has its own backdrop
+        if (window.innerWidth >= 768) {
+          setIsOpen(false)
+        }
       }
     }
 
@@ -148,94 +153,145 @@ export function NotificationBell({ isAdmin }: NotificationBellProps) {
     return date.toLocaleDateString()
   }
 
+  // Notification list content (reused for mobile and desktop)
+  const renderNotificationList = () => (
+    <>
+      {isLoading ? (
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-spin w-6 h-6 border-2 border-[#39BEAE] border-t-transparent rounded-full" />
+        </div>
+      ) : notifications.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+          <Bell className="w-10 h-10 theme-text-muted mb-2" />
+          <p className="theme-text-muted text-sm">No notifications yet</p>
+          <p className="theme-text-muted text-xs mt-1">
+            You&apos;ll be notified when users register or verify their email
+          </p>
+        </div>
+      ) : (
+        <ul className="divide-y theme-divide">
+          {notifications.map((notification) => (
+            <li
+              key={notification.id}
+              className={`px-4 py-3 hover:theme-bg-hover transition-colors ${
+                !notification.is_read ? 'bg-[#39BEAE]/5' : ''
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 mt-0.5">
+                  {getNotificationIcon(notification.message)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm ${!notification.is_read ? 'font-medium theme-text-primary' : 'theme-text-secondary'}`}>
+                    {notification.message}
+                  </p>
+                  <p className="text-xs theme-text-muted mt-1">
+                    {formatRelativeTime(notification.created_at)}
+                  </p>
+                </div>
+                {!notification.is_read && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleMarkAsRead(notification.id)
+                    }}
+                    className="flex-shrink-0 p-1 rounded hover:bg-[#39BEAE]/10 transition-colors"
+                    title="Mark as read"
+                  >
+                    <Check className="w-4 h-4 text-[#39BEAE]" />
+                  </button>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  )
+
   // Don't render for non-admins
   if (!isAdmin) return null
 
   return (
-    <div className="relative" ref={dropdownRef}>
-      {/* Bell Button */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 rounded-lg transition-colors theme-btn-ghost"
-        aria-label={`Notifications ${unreadCount > 0 ? `(${unreadCount} unread)` : ''}`}
-      >
-        <Bell className="w-5 h-5" />
-        {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center text-xs font-bold text-white bg-red-500 rounded-full px-1">
-            {unreadCount > 99 ? '99+' : unreadCount}
-          </span>
-        )}
-      </button>
+    <>
+      <div className="relative" ref={dropdownRef}>
+        {/* Bell Button */}
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="relative p-2 rounded-lg transition-colors theme-btn-ghost"
+          aria-label={`Notifications ${unreadCount > 0 ? `(${unreadCount} unread)` : ''}`}
+        >
+          <Bell className="w-5 h-5" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center text-xs font-bold text-white bg-red-500 rounded-full px-1">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
+        </button>
 
-      {/* Dropdown Panel */}
-      {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 md:w-96 max-h-[70vh] overflow-hidden rounded-lg shadow-xl border theme-bg-secondary theme-border z-50">
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b theme-border">
-            <h3 className="font-semibold theme-text-primary">Notifications</h3>
-            {unreadCount > 0 && (
-              <button
-                onClick={handleMarkAllAsRead}
-                className="flex items-center gap-1 text-xs text-[#39BEAE] hover:text-[#39BEAE]/80 transition-colors"
-              >
-                <CheckCheck className="w-4 h-4" />
-                Mark all read
-              </button>
-            )}
+        {/* Desktop: Dropdown */}
+        {isOpen && (
+          <div className="hidden md:block absolute right-0 mt-2 w-96 max-h-[70vh] overflow-hidden rounded-lg shadow-xl border theme-bg-secondary theme-border z-50">
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b theme-border">
+              <h3 className="font-semibold theme-text-primary">Notifications</h3>
+              {unreadCount > 0 && (
+                <button
+                  onClick={handleMarkAllAsRead}
+                  className="flex items-center gap-1 text-xs text-[#39BEAE] hover:text-[#39BEAE]/80 transition-colors"
+                >
+                  <CheckCheck className="w-4 h-4" />
+                  Mark all read
+                </button>
+              )}
+            </div>
+            {/* Notification List */}
+            <div className="overflow-y-auto max-h-[calc(70vh-60px)]">
+              {renderNotificationList()}
+            </div>
           </div>
+        )}
+      </div>
 
-          {/* Notification List */}
-          <div className="overflow-y-auto max-h-[calc(70vh-60px)]">
-            {isLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="animate-spin w-6 h-6 border-2 border-[#39BEAE] border-t-transparent rounded-full" />
-              </div>
-            ) : notifications.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
-                <Bell className="w-10 h-10 theme-text-muted mb-2" />
-                <p className="theme-text-muted text-sm">No notifications yet</p>
-                <p className="theme-text-muted text-xs mt-1">
-                  You&apos;ll be notified when users register or verify their email
-                </p>
-              </div>
-            ) : (
-              <ul className="divide-y theme-divide">
-                {notifications.map((notification) => (
-                  <li
-                    key={notification.id}
-                    className={`px-4 py-3 hover:theme-bg-hover transition-colors ${
-                      !notification.is_read ? 'bg-[#39BEAE]/5' : ''
-                    }`}
+      {/* Mobile: Full screen bottom sheet */}
+      {isOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setIsOpen(false)}
+          />
+          {/* Panel */}
+          <div className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-hidden rounded-t-2xl shadow-xl theme-bg-secondary animate-slide-up">
+            {/* Drag handle */}
+            <div className="flex justify-center py-2">
+              <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full" />
+            </div>
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b theme-border">
+              <h3 className="font-semibold theme-text-primary text-lg">Notifications</h3>
+              <div className="flex items-center gap-2">
+                {unreadCount > 0 && (
+                  <button
+                    onClick={handleMarkAllAsRead}
+                    className="flex items-center gap-1 text-xs text-[#39BEAE] hover:text-[#39BEAE]/80 transition-colors"
                   >
-                    <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 mt-0.5">
-                        {getNotificationIcon(notification.message)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-sm ${!notification.is_read ? 'font-medium theme-text-primary' : 'theme-text-secondary'}`}>
-                          {notification.message}
-                        </p>
-                        <p className="text-xs theme-text-muted mt-1">
-                          {formatRelativeTime(notification.created_at)}
-                        </p>
-                      </div>
-                      {!notification.is_read && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleMarkAsRead(notification.id)
-                          }}
-                          className="flex-shrink-0 p-1 rounded hover:bg-[#39BEAE]/10 transition-colors"
-                          title="Mark as read"
-                        >
-                          <Check className="w-4 h-4 text-[#39BEAE]" />
-                        </button>
-                      )}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
+                    <CheckCheck className="w-4 h-4" />
+                    Mark all read
+                  </button>
+                )}
+                <button
+                  onClick={() => setIsOpen(false)}
+                  className="p-1 rounded-lg hover:theme-bg-hover"
+                >
+                  <X className="w-5 h-5 theme-text-muted" />
+                </button>
+              </div>
+            </div>
+            {/* Notification List */}
+            <div className="overflow-y-auto max-h-[calc(85vh-100px)]">
+              {renderNotificationList()}
+            </div>
           </div>
         </div>
       )}
@@ -264,7 +320,7 @@ export function NotificationBell({ isAdmin }: NotificationBellProps) {
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }
 

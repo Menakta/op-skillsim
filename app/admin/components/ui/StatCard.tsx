@@ -63,7 +63,7 @@ export function StatCard({ label, value, icon, trend, color = 'default' }: StatC
           )}
         </div>
         {icon && (
-          <div className={`w-12 h-12 rounded-lg flex items-center justify-center bg-white/30 text-gray-100`}>
+          <div className={`w-12 h-12 p-3 rounded-full flex items-center justify-center bg-gray-900 text-gray-100`}>
             {icon}
           </div>
         )}

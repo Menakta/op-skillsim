@@ -21,6 +21,7 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [fullName, setFullName] = useState('')
+  const [phone, setPhone] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -47,12 +48,20 @@ export default function RegisterPage() {
       return
     }
 
+    // Validate phone format (E.164)
+    const phoneRegex = /^\+[1-9]\d{6,14}$/
+    if (!phoneRegex.test(phone)) {
+      setError('Phone number must be in international format (e.g., +64211234567)')
+      setLoading(false)
+      return
+    }
+
     try {
       // Call the registration API endpoint
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, fullName }),
+        body: JSON.stringify({ email, password, fullName, phone }),
       })
 
       const data = await response.json()
@@ -128,6 +137,19 @@ export default function RegisterPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-8 py-2 border-2 rounded-md focus:outline-none focus:ring-1 bg-[#FFFFFF] border-[#848484] text-black placeholder-gray-500 focus:ring-gray-800"
                 placeholder="Email"
+                required
+              />
+            </div>
+
+            {/* Phone Number */}
+            <div>
+              <input
+                type="tel"
+                id="phone"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="w-full px-8 py-2 border-2 rounded-md focus:outline-none focus:ring-1 bg-[#FFFFFF] border-[#848484] text-black placeholder-gray-500 focus:ring-gray-800"
+                placeholder="Phone (e.g., +64211234567)"
                 required
               />
             </div>

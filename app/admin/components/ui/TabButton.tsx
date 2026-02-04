@@ -20,7 +20,7 @@ export function TabButton({ children, active, onClick, icon, count }: TabButtonP
         flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer
         ${active
           ? 'bg-[#39BEAE] text-white'
-          : 'theme-bg-secondary theme-text-primary hover:theme-bg-hover'
+          : 'bg-black theme-text-primary hover:bg-[#79CFC2]'
         }
       `}
     >

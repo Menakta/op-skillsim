@@ -192,11 +192,11 @@ export function SessionStatusChart({ className = '' }: SessionStatusChartProps) 
                 <p className="text-xs theme-text-muted">Total</p>
               </div>
               <div className="text-center">
-                <p className="text-2xl font-bold theme-text-success">{data.totals.completed}</p>
+                <p className="text-2xl font-bold text-green-500">{data.totals.completed}</p>
                 <p className="text-xs theme-text-muted">Completed</p>
               </div>
               <div className="text-center">
-                <p className="text-2xl font-bold theme-text-info">{data.totals.active}</p>
+                <p className="text-2xl font-bold text-blue-500">{data.totals.active}</p>
                 <p className="text-xs theme-text-muted">Active</p>
               </div>
             </div>

@@ -24,6 +24,12 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [redirectPath, setRedirectPath] = useState<string | null>(null)
 
+  // OTP state
+  const [otpStep, setOtpStep] = useState(false)
+  const [otp, setOtp] = useState('')
+  const [phone, setPhone] = useState('')
+  const [maskedPhone, setMaskedPhone] = useState('')
+
   // Get redirect path and error from URL params
   useEffect(() => {
     const redirect = searchParams.get('redirect')
@@ -59,55 +65,94 @@ export default function LoginPage() {
         return
       }
 
-      // Save user info to localStorage (including isLti flag)
-      if (data.user) {
-        localStorage.setItem('user', JSON.stringify({
-          id: data.user.id,
-          email: data.user.email,
-          name: data.user.name,
-          role: data.user.role,
-          isLti: false, // Mark as non-LTI user
-        }))
-        localStorage.setItem('userRole', data.user.role)
-        localStorage.setItem('isLti', 'false')
+      // Check if OTP is required (outsider users)
+      if (data.requiresOtp) {
+        setPhone(data.phone) // Store actual phone for Supabase OTP verification
+        setMaskedPhone(data.maskedPhone) // Display masked version
+        setOtpStep(true)
+        setLoading(false)
+        return
       }
 
-      // Small delay to ensure cookie is set before redirect
-      await new Promise(resolve => setTimeout(resolve, 100))
-
-      // Debug: Log the user role for troubleshooting
-      console.log('[Login] User data:', data.user)
-      console.log('[Login] Role:', data.user.role)
-      console.log('[Login] Redirect path:', redirectPath)
-
-      // Determine redirect destination based on role
-      // Teachers and admins should always go to /admin, students to /
-      const isAdminUser = data.user.role === 'teacher' || data.user.role === 'admin'
-
-      let destination: string
-      if (isAdminUser) {
-        // Admin/Teacher always goes to /admin
-        destination = '/admin'
-        console.log('[Login] Admin/Teacher role detected, destination: /admin')
-      } else if (data.user.role === 'student') {
-        // Students go to requested path (if not admin) or home
-        if (redirectPath && !redirectPath.startsWith('/admin')) {
-          destination = redirectPath
-        } else {
-          destination = '/'
-        }
-        console.log('[Login] Student role, destination:', destination)
-      } else {
-        destination = '/'
-        console.log('[Login] Unknown role, destination: /')
-      }
-
-      console.log('[Login] Final redirect destination:', destination)
-      window.location.href = destination
+      // No OTP required - complete login
+      completeLogin(data.user)
     } catch (err) {
       setError('Network error. Please try again.')
       setLoading(false)
     }
+  }
+
+  async function handleOtpSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setLoading(true)
+    setError(null)
+
+    try {
+      // Need to get the actual phone from user_profiles, not the masked one
+      // We'll re-fetch using email since we stored it
+      const response = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, otp }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        setError(data.error || 'Verification failed')
+        setLoading(false)
+        return
+      }
+
+      // OTP verified - complete login
+      completeLogin(data.user)
+    } catch (err) {
+      setError('Network error. Please try again.')
+      setLoading(false)
+    }
+  }
+
+  function completeLogin(user: { id: string; email: string; name: string; role: string }) {
+    // Save user info to localStorage (including isLti flag)
+    localStorage.setItem('user', JSON.stringify({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      isLti: false, // Mark as non-LTI user
+    }))
+    localStorage.setItem('userRole', user.role)
+    localStorage.setItem('isLti', 'false')
+
+    // Debug: Log the user role for troubleshooting
+    console.log('[Login] User data:', user)
+    console.log('[Login] Role:', user.role)
+    console.log('[Login] Redirect path:', redirectPath)
+
+    // Determine redirect destination based on role
+    // Teachers and admins should always go to /admin, students to /
+    const isAdminUser = user.role === 'teacher' || user.role === 'admin'
+
+    let destination: string
+    if (isAdminUser) {
+      // Admin/Teacher always goes to /admin
+      destination = '/admin'
+      console.log('[Login] Admin/Teacher role detected, destination: /admin')
+    } else if (user.role === 'student') {
+      // Students go to requested path (if not admin) or home
+      if (redirectPath && !redirectPath.startsWith('/admin')) {
+        destination = redirectPath
+      } else {
+        destination = '/'
+      }
+      console.log('[Login] Student role, destination:', destination)
+    } else {
+      destination = '/'
+      console.log('[Login] Unknown role, destination: /')
+    }
+
+    console.log('[Login] Final redirect destination:', destination)
+    window.location.href = destination
   }
 
   const isDark = theme === 'dark'
@@ -144,65 +189,127 @@ export default function LoginPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4 md:pr-20">
-            <div className='my-6'>
-              <input
-                type="email"
-                id="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className={`w-full px-8 py-2 border-2 rounded-md focus:outline-none focus:ring-1 bg-[#FFFFFF] border-[#848484] text-black placeholder-gray-900 focus:ring-gray-800`}
-                placeholder="Email"
-                required
-              />
-            </div>
+          {!otpStep ? (
+            /* Step 1: Email & Password */
+            <form onSubmit={handleSubmit} className="space-y-4 md:pr-20">
+              <div className='my-6'>
+                <input
+                  type="email"
+                  id="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className={`w-full px-8 py-2 border-2 rounded-md focus:outline-none focus:ring-1 bg-[#FFFFFF] border-[#848484] text-black placeholder-gray-900 focus:ring-gray-800`}
+                  placeholder="Email"
+                  required
+                />
+              </div>
 
-            <div className='my-6 relative'>
-              <input
-                type={showPassword ? 'text' : 'password'}
-                id="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className={`w-full px-8 py-2 pr-12 border-2 rounded-md focus:outline-none focus:ring-1 bg-[#FFFFFF] ${isDark ? 'text-black placeholder-gray-800 focus:ring-gray-500' : 'bg-[#D9D9D9] border-[#848484] text-black placeholder-gray-900 focus:ring-gray-800'}`}
-                placeholder="Password"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
-              >
-                {showPassword ? (
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                  </svg>
-                ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                  </svg>
-                )}
-              </button>
-            </div>
+              <div className='my-6 relative'>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  id="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className={`w-full px-8 py-2 pr-12 border-2 rounded-md focus:outline-none focus:ring-1 bg-[#FFFFFF] ${isDark ? 'text-black placeholder-gray-800 focus:ring-gray-500' : 'bg-[#D9D9D9] border-[#848484] text-black placeholder-gray-900 focus:ring-gray-800'}`}
+                  placeholder="Password"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
 
-            <div className='flex justify-between'>
-              <button
-                type="submit"
-                disabled={loading}
-                className="mr-4 py-2 px-10 bg-[#39BEAE] rounded-[20px] hover:bg-green-600 hover:text-black disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-small transition-colors"
-              >
-                {loading ? 'Signing in' : 'Sign In'}
-              </button>
-            </div>
+              <div className='flex justify-between'>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="mr-4 py-2 px-10 bg-[#39BEAE] rounded-[20px] hover:bg-green-600 hover:text-black disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-small transition-colors"
+                >
+                  {loading ? 'Signing in...' : 'Sign In'}
+                </button>
+              </div>
 
-            <p className={`text-sm text-center mt-4 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              Don&apos;t have an account?{' '}
-              <Link href="/register" className="text-[#39BEAE] hover:underline">
-                Register
-              </Link>
-            </p>
-          </form>
+              <p className={`text-sm text-center mt-4 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                Don&apos;t have an account?{' '}
+                <Link href="/register" className="text-[#39BEAE] hover:underline">
+                  Register
+                </Link>
+              </p>
+            </form>
+          ) : (
+            /* Step 2: OTP Verification */
+            <form onSubmit={handleOtpSubmit} className="space-y-4 md:pr-20">
+              <div className={`mb-4 p-3 rounded-lg ${isDark ? 'bg-blue-900/30 border border-blue-700/50' : 'bg-blue-100 border border-blue-300'}`}>
+                <p className={`text-sm ${isDark ? 'text-blue-300' : 'text-blue-800'}`}>
+                  A verification code has been sent to {maskedPhone}
+                </p>
+              </div>
+
+              <div className='my-6'>
+                <input
+                  type="text"
+                  id="otp"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  className={`w-full px-8 py-2 border-2 rounded-md focus:outline-none focus:ring-1 bg-[#FFFFFF] border-[#848484] text-black placeholder-gray-900 focus:ring-gray-800 text-center text-2xl tracking-widest`}
+                  placeholder="000000"
+                  maxLength={6}
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div className='flex justify-between items-center'>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOtpStep(false)
+                    setOtp('')
+                    setError(null)
+                  }}
+                  className={`py-2 px-6 rounded-[20px] border ${isDark ? 'border-gray-600 text-gray-300 hover:bg-gray-800' : 'border-gray-400 text-gray-700 hover:bg-gray-200'} transition-colors`}
+                >
+                  Back
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading || otp.length !== 6}
+                  className="py-2 px-10 bg-[#39BEAE] rounded-[20px] hover:bg-green-600 hover:text-black disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-small transition-colors"
+                >
+                  {loading ? 'Verifying...' : 'Verify'}
+                </button>
+              </div>
+
+              <p className={`text-sm text-center mt-4 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                Didn&apos;t receive the code?{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOtpStep(false)
+                    setOtp('')
+                    handleSubmit(new Event('submit') as unknown as React.FormEvent)
+                  }}
+                  className="text-[#39BEAE] hover:underline"
+                >
+                  Resend
+                </button>
+              </p>
+            </form>
+          )}
 
           </div>
            <div className={'col-span-5 hidden md:block'}>

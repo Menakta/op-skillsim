@@ -74,6 +74,7 @@ interface UserProfile {
   id: string
   email: string
   full_name: string | null
+  phone: string | null
   registration_type: 'lti' | 'outsider' | 'demo'
   approval_status: 'pending' | 'approved' | 'rejected'
   role: UserRole
@@ -110,7 +111,7 @@ export async function POST(request: NextRequest) {
       const supabaseAdmin = getSupabaseAdmin()
       const { data: profile, error: profileError } = await supabaseAdmin
         .from('user_profiles')
-        .select('id, email, full_name, registration_type, approval_status, role')
+        .select('id, email, full_name, phone, registration_type, approval_status, role')
         .eq('id', authData.user.id)
         .single<UserProfile>()
 
@@ -139,9 +140,102 @@ export async function POST(request: NextRequest) {
             { status: 403 }
           )
         }
+
+        // Approved outsider - trigger SMS OTP for 2FA
+        if (!profile.phone) {
+          logger.error({ email, userId: profile.id }, 'Approved outsider has no phone number')
+          return NextResponse.json(
+            { success: false, error: 'No phone number on file. Please contact an administrator.' },
+            { status: 400 }
+          )
+        }
+
+        // Send OTP via Supabase (Twilio)
+        // Use shouldCreateUser: false since the user already exists
+        const { error: otpError } = await supabase.auth.signInWithOtp({
+          phone: profile.phone,
+          options: {
+            shouldCreateUser: false,
+          },
+        })
+
+        if (otpError) {
+          logger.error({ email, phone: profile.phone, error: otpError.message, code: otpError.code }, 'Failed to send OTP')
+
+          // Return more specific error for debugging
+          let errorMessage = 'Failed to send verification code. Please try again.'
+          if (otpError.message.includes('Phone provider')) {
+            errorMessage = 'SMS service not configured. Please contact administrator.'
+          } else if (otpError.message.includes('Invalid phone')) {
+            errorMessage = 'Invalid phone number format.'
+          } else if (otpError.message.includes('User not found') || otpError.message.includes('Signups not allowed')) {
+            // Phone not linked to any user - we need to update the user's phone first
+            // Use admin client to update the user's phone in auth.users
+            const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+              profile.id,
+              { phone: profile.phone }
+            )
+
+            if (updateError) {
+              logger.error({ email, error: updateError.message }, 'Failed to update user phone')
+              return NextResponse.json(
+                { success: false, error: 'Failed to configure phone verification.', debug: updateError.message },
+                { status: 500 }
+              )
+            }
+
+            // Retry sending OTP after updating phone
+            const { error: retryError } = await supabase.auth.signInWithOtp({
+              phone: profile.phone,
+              options: {
+                shouldCreateUser: false,
+              },
+            })
+
+            if (retryError) {
+              logger.error({ email, error: retryError.message }, 'Failed to send OTP after phone update')
+              return NextResponse.json(
+                { success: false, error: 'Failed to send verification code.', debug: retryError.message },
+                { status: 500 }
+              )
+            }
+
+            // OTP sent successfully after retry
+            logger.info({ email, userId: profile.id, phone: profile.phone }, 'OTP sent after phone update')
+
+            return NextResponse.json({
+              success: true,
+              requiresOtp: true,
+              userId: profile.id,
+              email: profile.email,
+              phone: profile.phone,
+              maskedPhone: profile.phone.replace(/(\+\d{2})\d+(\d{4})/, '$1****$2'),
+              message: 'Verification code sent to your phone',
+            })
+          }
+
+          return NextResponse.json(
+            { success: false, error: errorMessage, debug: otpError.message },
+            { status: 500 }
+          )
+        }
+
+        logger.info({ email, userId: profile.id, phone: profile.phone }, 'OTP sent to outsider')
+
+        // Return response indicating OTP was sent (no session yet)
+        // Include the actual phone (for OTP verification) and masked version (for display)
+        return NextResponse.json({
+          success: true,
+          requiresOtp: true,
+          userId: profile.id,
+          email: profile.email, // Used to look up user during OTP verification
+          phone: profile.phone, // Actual phone for Supabase OTP verification
+          maskedPhone: profile.phone.replace(/(\+\d{2})\d+(\d{4})/, '$1****$2'), // For display
+          message: 'Verification code sent to your phone',
+        })
       }
 
-      // Approved outsider or other registration type - create session
+      // Non-outsider Supabase user (e.g., LTI user logging in directly) - create session
       const sessionId = randomUUID()
       const now = new Date()
       const expiresAt = new Date(now.getTime() + 60 * 60 * 1000) // 1 hour
@@ -166,7 +260,7 @@ export async function POST(request: NextRequest) {
         registrationType: profile.registration_type,
         isLti: false,
         sessionId,
-      }, 'Outsider login successful')
+      }, 'Non-outsider login successful')
 
       const response = NextResponse.json({
         success: true,
