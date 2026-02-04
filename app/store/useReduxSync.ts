@@ -6,6 +6,8 @@
  * Bridges the existing useTrainingMessagesComposite hook with Redux store.
  * This allows gradual migration while keeping the app working.
  *
+ * OPTIMIZED: Uses a single batched useEffect to reduce dispatch cycles.
+ *
  * Usage:
  * 1. Keep using useTrainingMessagesComposite as before
  * 2. Call useReduxSync(training) to sync state to Redux
@@ -13,7 +15,7 @@
  * 4. Gradually migrate components to use Redux selectors
  */
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useAppDispatch } from './hooks'
 import {
   syncFromHook,
@@ -35,32 +37,61 @@ interface TrainingHookReturn {
 /**
  * Syncs the training hook state to Redux store.
  * Call this in StreamingApp after useTrainingMessagesComposite.
+ *
+ * OPTIMIZED: Single batched effect with refs to track what changed.
  */
 export function useReduxSync(training: TrainingHookReturn) {
   const dispatch = useAppDispatch()
 
-  // Sync training state to Redux
-  useEffect(() => {
-    dispatch(syncFromHook(training.state))
-  }, [dispatch, training.state])
+  // Refs to track previous values and avoid unnecessary dispatches
+  const prevStateRef = useRef<TrainingState | null>(null)
+  const prevConnectedRef = useRef<boolean | null>(null)
+  const prevMessageLogLengthRef = useRef<number>(0)
+  const prevLastMessageRef = useRef<{ type: string; dataString: string } | null>(null)
 
-  // Sync connection state
+  // Single batched effect for all syncs
   useEffect(() => {
-    dispatch(setIsConnected(training.isConnected))
-    dispatch(setConnectionStatus(training.isConnected ? 'connected' : 'connecting'))
-  }, [dispatch, training.isConnected])
+    // Batch all dispatches together
+    const updates: (() => void)[] = []
 
-  // Sync last message
-  useEffect(() => {
-    if (training.lastMessage) {
-      dispatch(setLastMessage(training.lastMessage))
+    // Check if training state changed (compare by reference since useMemo returns same object if deps unchanged)
+    if (prevStateRef.current !== training.state) {
+      updates.push(() => dispatch(syncFromHook(training.state)))
+      prevStateRef.current = training.state
     }
-  }, [dispatch, training.lastMessage])
 
-  // Sync message log (only when length changes to avoid excessive updates)
-  useEffect(() => {
-    dispatch(setMessageLog(training.messageLog))
-  }, [dispatch, training.messageLog.length])
+    // Check if connection state changed
+    if (prevConnectedRef.current !== training.isConnected) {
+      updates.push(() => {
+        dispatch(setIsConnected(training.isConnected))
+        dispatch(setConnectionStatus(training.isConnected ? 'connected' : 'connecting'))
+      })
+      prevConnectedRef.current = training.isConnected
+    }
+
+    // Check if last message changed
+    if (training.lastMessage && prevLastMessageRef.current !== training.lastMessage) {
+      updates.push(() => dispatch(setLastMessage(training.lastMessage!)))
+      prevLastMessageRef.current = training.lastMessage
+    }
+
+    // Check if message log length changed
+    if (prevMessageLogLengthRef.current !== training.messageLog.length) {
+      updates.push(() => dispatch(setMessageLog(training.messageLog)))
+      prevMessageLogLengthRef.current = training.messageLog.length
+    }
+
+    // Execute all updates in a single batch
+    if (updates.length > 0) {
+      updates.forEach(update => update())
+    }
+  }, [
+    dispatch,
+    training.state,
+    training.isConnected,
+    training.lastMessage,
+    training.messageLog,
+  ])
 }
 
 /**

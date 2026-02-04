@@ -16,7 +16,7 @@
  * - Session: Pause/Resume, Quit - Training mode only
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, memo } from 'react'
 import {
   Layers,
   Navigation,
@@ -161,7 +161,7 @@ const CAMERA_PERSPECTIVES: { id: CameraPerspective; label: string }[] = [
 // Component
 // =============================================================================
 
-export function UnifiedSidebar({
+function UnifiedSidebarComponent({
   mode,
   isVisible,
 
@@ -1303,7 +1303,8 @@ interface AccordionSectionProps {
   headerAction?: React.ReactNode
 }
 
-function AccordionSection({ title, icon, isExpanded, onToggle, isDark, children, headerAction }: AccordionSectionProps) {
+// Memoized AccordionSection to prevent re-renders when other sections change
+const AccordionSection = memo(function AccordionSection({ title, icon, isExpanded, onToggle, isDark, children, headerAction }: AccordionSectionProps) {
   return (
     <div className={`rounded-lg overflow-hidden ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
       {/* Use div instead of button to allow nested interactive elements */}
@@ -1339,6 +1340,8 @@ function AccordionSection({ title, icon, isExpanded, onToggle, isDark, children,
       )}
     </div>
   )
-}
+})
 
+// Memoized export to prevent unnecessary re-renders when parent changes
+export const UnifiedSidebar = memo(UnifiedSidebarComponent)
 export default UnifiedSidebar

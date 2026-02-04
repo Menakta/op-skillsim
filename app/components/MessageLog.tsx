@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, memo, useMemo } from 'react'
 import type { MessageLogEntry, ParsedMessage } from '../lib/messageTypes'
 
 interface MessageLogProps {
@@ -16,7 +16,59 @@ interface MessageLogProps {
 // Accent color
 const ACCENT = '#39BEAE'
 
-export default function MessageLog({
+// Memoized message item to prevent re-renders
+const MessageItem = memo(function MessageItem({
+  entry,
+  isDark,
+  formatTimestamp,
+}: {
+  entry: MessageLogEntry
+  isDark: boolean
+  formatTimestamp: (ts: number) => string
+}) {
+  const colors = {
+    bgSecondary: isDark ? 'bg-gray-800' : 'bg-gray-100',
+    text: isDark ? 'text-white' : 'text-gray-900',
+    textSecondary: isDark ? 'text-gray-400' : 'text-gray-600',
+  }
+
+  return (
+    <div
+      className={`p-2 rounded-lg border-l-2 ${
+        entry.direction === 'sent'
+          ? `${isDark ? 'bg-blue-500/10' : 'bg-blue-50'} border-blue-500`
+          : `${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`
+      }`}
+      style={entry.direction === 'received' ? { borderColor: ACCENT } : {}}
+    >
+      <div className="flex items-center gap-2 mb-1">
+        <span
+          className="text-[10px] font-bold"
+          style={{ color: entry.direction === 'sent' ? '#3b82f6' : ACCENT }}
+        >
+          {entry.direction === 'sent' ? '↑ SENT' : '↓ RECV'}
+        </span>
+        <span className={`${colors.textSecondary} text-[10px]`}>
+          {formatTimestamp(entry.timestamp)}
+        </span>
+        <span className={`px-1.5 py-0.5 ${colors.bgSecondary} ${colors.textSecondary} text-[10px] rounded`}>
+          {entry.type}
+        </span>
+      </div>
+      <div className={`${colors.text} whitespace-pre-wrap break-all overflow-hidden`}>
+        <span style={{ color: ACCENT }}>{entry.type}</span>
+        {entry.data && (
+          <>
+            <span className={colors.textSecondary}>:</span>
+            <span className="text-cyan-500">{entry.data}</span>
+          </>
+        )}
+      </div>
+    </div>
+  )
+})
+
+function MessageLogComponent({
   messages,
   lastMessage,
   onClear,
@@ -44,17 +96,21 @@ export default function MessageLog({
     { label: 'Camera', msg: 'camera_control:IsometricNE' }
   ]
 
-  // Auto-scroll to latest message
+  // Auto-scroll to latest message - only when length changes
+  const messagesLength = messages.length
   useEffect(() => {
     if (autoScroll && logContainerRef.current) {
       logContainerRef.current.scrollTop = 0
     }
-  }, [messages, autoScroll])
+  }, [messagesLength, autoScroll])
 
-  const filteredMessages = messages.filter(m => {
-    if (filter === 'all') return true
-    return m.direction === filter
-  })
+  // Memoize filtered messages
+  const filteredMessages = useMemo(() => {
+    return messages.filter(m => {
+      if (filter === 'all') return true
+      return m.direction === filter
+    })
+  }, [messages, filter])
 
   const handleSendTest = () => {
     if (testMessage.trim() && onSendTest) {
@@ -238,39 +294,12 @@ export default function MessageLog({
               </div>
             ) : (
               filteredMessages.map((entry) => (
-                <div
+                <MessageItem
                   key={entry.id}
-                  className={`p-2 rounded-lg border-l-2 ${
-                    entry.direction === 'sent'
-                      ? `${isDark ? 'bg-blue-500/10' : 'bg-blue-50'} border-blue-500`
-                      : `${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`
-                  }`}
-                  style={entry.direction === 'received' ? { borderColor: ACCENT } : {}}
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <span
-                      className="text-[10px] font-bold"
-                      style={{ color: entry.direction === 'sent' ? '#3b82f6' : ACCENT }}
-                    >
-                      {entry.direction === 'sent' ? '↑ SENT' : '↓ RECV'}
-                    </span>
-                    <span className={`${colors.textSecondary} text-[10px]`}>
-                      {formatTimestamp(entry.timestamp)}
-                    </span>
-                    <span className={`px-1.5 py-0.5 ${colors.bgSecondary} ${colors.textSecondary} text-[10px] rounded`}>
-                      {entry.type}
-                    </span>
-                  </div>
-                  <div className={`${colors.text} whitespace-pre-wrap break-all overflow-hidden`}>
-                    <span style={{ color: ACCENT }}>{entry.type}</span>
-                    {entry.data && (
-                      <>
-                        <span className={colors.textSecondary}>:</span>
-                        <span className="text-cyan-500">{entry.data}</span>
-                      </>
-                    )}
-                  </div>
-                </div>
+                  entry={entry}
+                  isDark={isDark}
+                  formatTimestamp={formatTimestamp}
+                />
               ))
             )}
           </div>
@@ -318,3 +347,6 @@ export default function MessageLog({
     </div>
   )
 }
+
+// Export memoized component
+export default memo(MessageLogComponent)

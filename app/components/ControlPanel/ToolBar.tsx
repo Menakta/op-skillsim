@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, memo, useCallback } from 'react'
 import Image from 'next/image'
 import { ChevronUp } from 'lucide-react'
 import type { TrainingState } from '@/app/hooks/useTrainingMessagesComposite'
@@ -33,10 +33,15 @@ interface ToolBarProps {
 // Component
 // =============================================================================
 
-export function ToolBar({ state, onSelectTool }: ToolBarProps) {
+function ToolBarComponent({ state, onSelectTool }: ToolBarProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const currentTaskDef = TASK_SEQUENCE[state.currentTaskIndex]
   const isTrainingComplete = state.currentTaskIndex >= TASK_SEQUENCE.length
+
+  // Memoize the toggle handler
+  const handleToggleExpand = useCallback(() => {
+    setIsExpanded(prev => !prev)
+  }, [])
 
   return (
     <div
@@ -48,7 +53,7 @@ export function ToolBar({ state, onSelectTool }: ToolBarProps) {
       <div className="flex items-center justify-between px-4 py-2 border-b max-w-[540px]">
         <span className="text-white font-medium text-sm">Tools</span>
         <button
-          onClick={() => setIsExpanded(!isExpanded)}
+          onClick={handleToggleExpand}
           className="w-6 h-6 bg-[#000000]/55 hover:bg-[#2ea89a] rounded-full flex items-center justify-center transition-all duration-300"
         >
           <ChevronUp
@@ -125,4 +130,6 @@ export function ToolBar({ state, onSelectTool }: ToolBarProps) {
   )
 }
 
+// Memoized export to prevent unnecessary re-renders
+export const ToolBar = memo(ToolBarComponent)
 export default ToolBar

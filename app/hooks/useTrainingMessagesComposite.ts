@@ -139,7 +139,7 @@ export function useTrainingMessagesComposite(
   const layerControl = useLayerControl(messageBus)
 
   // ==========================================================================
-  // Combine state (backward compatible)
+  // Combine state (backward compatible) - OPTIMIZED with individual dependencies
   // ==========================================================================
 
   const state: TrainingState = useMemo(() => ({
@@ -181,12 +181,38 @@ export function useTrainingMessagesComposite(
     activeWaypointIndex: layerControl.state.activeWaypointIndex,
     activeWaypointName: layerControl.state.activeWaypointName
   }), [
-    trainingState.state,
-    toolSelection.state,
-    questionFlow.state,
-    cameraControl.state,
-    explosionControl.state,
-    layerControl.state
+    // Training state - individual properties
+    trainingState.state.mode,
+    trainingState.state.uiMode,
+    trainingState.state.progress,
+    trainingState.state.taskName,
+    trainingState.state.phase,
+    trainingState.state.currentTaskIndex,
+    trainingState.state.totalTasks,
+    trainingState.state.isActive,
+    trainingState.state.trainingStarted,
+    // Tool state - individual properties
+    toolSelection.state.currentTool,
+    toolSelection.state.selectedTool,
+    toolSelection.state.selectedPipe,
+    toolSelection.state.airPlugSelected,
+    // Question state - individual properties
+    questionFlow.state.currentQuestion,
+    questionFlow.state.questionTryCount,
+    questionFlow.state.questionAnsweredCorrectly,
+    // Camera state - individual properties
+    cameraControl.state.cameraMode,
+    cameraControl.state.cameraPerspective,
+    cameraControl.state.cameraDistance,
+    // Explosion state - individual properties
+    explosionControl.state.explosionValue,
+    explosionControl.state.isAnimating,
+    // Layer state - individual properties
+    layerControl.state.layers,
+    layerControl.state.hierarchicalGroups,
+    layerControl.state.waypoints,
+    layerControl.state.activeWaypointIndex,
+    layerControl.state.activeWaypointName
   ])
 
   // ==========================================================================

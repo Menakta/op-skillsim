@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import type { ToolName } from '@/app/lib/messageTypes'
 
 // Redux imports
@@ -28,7 +29,7 @@ interface ControlPanelProps {
 // Component - Now only contains ToolBar at bottom
 // =============================================================================
 
-export function ControlPanel({
+function ControlPanelComponent({
   isDark = true,
   onSelectTool,
   onSelectPipe,
@@ -51,5 +52,8 @@ export function ControlPanel({
     </>
   )
 }
+
+// Memoize to prevent re-renders when parent changes but props don't
+export const ControlPanel = memo(ControlPanelComponent)
 
 export default ControlPanel

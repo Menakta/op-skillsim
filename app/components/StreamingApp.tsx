@@ -402,7 +402,7 @@ export default function StreamingApp() {
   // Consolidated Action Handlers
   // Groups related handlers to reduce declaration overhead
   // ==========================================================================
-  // Question handlers
+  // Question handlers - use specific functions to avoid re-renders
   const questionActions = useMemo(
     () => ({
       submit: (selectedAnswer: number) =>
@@ -423,9 +423,9 @@ export default function StreamingApp() {
         }
       },
     }),
-    [training, modals],
+    [training.submitQuestionAnswer, training.closeQuestion, modals],
   );
-  // Phase success handlers
+  // Phase success handlers - use specific functions
   const phaseActions = useMemo(
     () => ({
       continue: () => {
@@ -450,7 +450,7 @@ export default function StreamingApp() {
         modals.closeModal("phaseSuccess");
       },
     }),
-    [modals, training],
+    [modals.completedPhase, modals.closeModal, training.selectTool],
   );
   // Session selection handlers - delegates to useSessionSelection hook
   const sessionActions = useMemo(
@@ -474,7 +474,7 @@ export default function StreamingApp() {
     }),
     [sessionSelection.actions, modals, training.startTraining],
   );
-  // Connection/error handlers
+  // Connection/error handlers - use specific functions
   const connectionActions = useMemo(
     () => ({
       retry: () => {
@@ -491,9 +491,18 @@ export default function StreamingApp() {
       refresh: () => window.location.reload(),
       sendTestMessage: (message: string) => training.sendRawMessage(message),
     }),
-    [stream, modals, training],
+    [
+      stream.setRetryCount,
+      stream.setAvailableModels,
+      stream.setModelDefinition,
+      stream.setLoading,
+      stream.setConnectionStatus,
+      stream.initializePlatform,
+      modals.closeModal,
+      training.sendRawMessage,
+    ],
   );
-  // Session end/expiry handlers
+  // Session end/expiry handlers - use specific state properties to avoid re-renders
   const sessionEndActions = useMemo(
     () => ({
       login: () => {
@@ -541,13 +550,15 @@ export default function StreamingApp() {
     [
       modals,
       userRole,
-      training.state,
+      training.state.progress,
+      training.state.currentTaskIndex,
+      training.state.totalTasks,
       sessionReturnUrl,
       isLtiSession,
       sessionStartTime,
     ],
   );
-  // Training control handlers (pause/resume/quit)
+  // Training control handlers (pause/resume/quit) - use specific functions and properties
   const trainingControlActions = useMemo(
     () => ({
       pause: () => {
@@ -589,8 +600,13 @@ export default function StreamingApp() {
       quitCancel: () => modals.closeModal("quitTraining"),
     }),
     [
-      training,
-      modals,
+      training.pauseTraining,
+      training.resumeTraining,
+      training.state.progress,
+      training.state.currentTaskIndex,
+      training.state.totalTasks,
+      modals.openQuitTraining,
+      modals.closeModal,
       sessionStartTime,
       userRole,
       sessionReturnUrl,
@@ -608,6 +624,78 @@ export default function StreamingApp() {
     availableModels: stream.availableModels,
     loading: stream.loading,
   });
+  // ==========================================================================
+  // Memoized Callbacks - Extracted from inline functions to prevent re-renders
+  // ==========================================================================
+
+  // Sidebar open change handler
+  const handleSidebarOpenChange = useCallback((isOpen: boolean) => {
+    if (!isOpen && forceSidebarOpen === true) {
+      setForceSidebarOpen(undefined);
+    }
+  }, [forceSidebarOpen]);
+
+  // Cinematic walkthrough handlers
+  const handleCinematicComplete = useCallback(() => {
+    setShowCinematicWalkthrough(false);
+    setForceSidebarOpen(undefined);
+    modals.openNavigationWalkthrough();
+  }, [modals]);
+
+  const handleCinematicSkip = useCallback(() => {
+    setShowCinematicWalkthrough(false);
+    setForceSidebarOpen(undefined);
+    modals.openNavigationWalkthrough();
+  }, [modals]);
+
+  const handleOpenSidebar = useCallback(() => setForceSidebarOpen(true), []);
+  const handleCloseSidebar = useCallback(() => setForceSidebarOpen(false), []);
+
+  // Training walkthrough handlers
+  const handleTrainingWalkthroughComplete = useCallback(() => {
+    setShowTrainingWalkthrough(false);
+    setForceSidebarOpen(false);
+    setForceSidebarTab(undefined);
+    setTimeout(() => {
+      if (pendingTrainingStartRef.current) {
+        pendingTrainingStartRef.current();
+        pendingTrainingStartRef.current = null;
+      }
+      isTransitioningToTrainingRef.current = false;
+      setForceSidebarOpen(undefined);
+    }, 100);
+  }, []);
+
+  const handleTrainingWalkthroughSkip = useCallback(() => {
+    setShowTrainingWalkthrough(false);
+    setForceSidebarOpen(false);
+    setForceSidebarTab(undefined);
+    setTimeout(() => {
+      if (pendingTrainingStartRef.current) {
+        pendingTrainingStartRef.current();
+        pendingTrainingStartRef.current = null;
+      }
+      isTransitioningToTrainingRef.current = false;
+      setForceSidebarOpen(undefined);
+    }, 100);
+  }, []);
+
+  const handleTrainingOpenSidebar = useCallback(() => {
+    console.log('📂 [StreamingApp] TrainingWalkthrough onOpenSidebar called');
+    setForceSidebarOpen(true);
+    setForceSidebarTab('inventory');
+  }, []);
+
+  const handleTrainingCloseSidebar = useCallback(() => {
+    console.log('📂 [StreamingApp] TrainingWalkthrough onCloseSidebar called');
+    setForceSidebarOpen(false);
+    setForceSidebarTab(undefined);
+  }, []);
+
+  // ==========================================================================
+  // Loading Status (computed from pure function)
+  // ==========================================================================
+
   // Force dark background when starter or loading screen is visible
   const forcesDarkBg =
     screenFlow.showStarterScreen ||
@@ -678,12 +766,7 @@ export default function StreamingApp() {
           // External control (for walkthrough)
           forceOpen={forceSidebarOpen}
           forceActiveTab={forceSidebarTab}
-          onOpenChange={(isOpen) => {
-            // Only clear force state when user manually closes during walkthrough
-            if (!isOpen && forceSidebarOpen === true) {
-              setForceSidebarOpen(undefined);
-            }
-          }}
+          onOpenChange={handleSidebarOpenChange}
         />
       )}
       {/* Cinematic Mode Timer - Show when connected and in cinematic mode */}
@@ -699,65 +782,19 @@ export default function StreamingApp() {
       {/* Cinematic Mode Walkthrough - Show when connected and in cinematic mode */}
       {stream.isConnected && screenFlow.isCinematicMode && showCinematicWalkthrough && (
         <CinematicWalkthrough
-          onComplete={() => {
-            setShowCinematicWalkthrough(false);
-            setForceSidebarOpen(undefined);
-            // Show NavigationWalkthrough after CinematicWalkthrough completes
-            modals.openNavigationWalkthrough();
-          }}
-          onSkip={() => {
-            setShowCinematicWalkthrough(false);
-            setForceSidebarOpen(undefined);
-            // Show NavigationWalkthrough after CinematicWalkthrough is skipped
-            modals.openNavigationWalkthrough();
-          }}
-          onOpenSidebar={() => setForceSidebarOpen(true)}
-          onCloseSidebar={() => setForceSidebarOpen(false)}
+          onComplete={handleCinematicComplete}
+          onSkip={handleCinematicSkip}
+          onOpenSidebar={handleOpenSidebar}
+          onCloseSidebar={handleCloseSidebar}
         />
       )}
       {/* Training Mode Walkthrough - Show in training mode when transitioning from cinematic */}
       {stream.isConnected && !screenFlow.isCinematicMode && showTrainingWalkthrough && (
         <TrainingModeWalkthrough
-          onComplete={() => {
-            setShowTrainingWalkthrough(false);
-            setForceSidebarOpen(false); // Explicitly close sidebar
-            setForceSidebarTab(undefined);
-            // Execute the pending training start after a short delay to ensure sidebar closes
-            setTimeout(() => {
-              if (pendingTrainingStartRef.current) {
-                pendingTrainingStartRef.current();
-                pendingTrainingStartRef.current = null;
-              }
-              isTransitioningToTrainingRef.current = false;
-              // Release control after training starts
-              setForceSidebarOpen(undefined);
-            }, 100);
-          }}
-          onSkip={() => {
-            setShowTrainingWalkthrough(false);
-            setForceSidebarOpen(false); // Explicitly close sidebar
-            setForceSidebarTab(undefined);
-            // Execute the pending training start after a short delay to ensure sidebar closes
-            setTimeout(() => {
-              if (pendingTrainingStartRef.current) {
-                pendingTrainingStartRef.current();
-                pendingTrainingStartRef.current = null;
-              }
-              isTransitioningToTrainingRef.current = false;
-              // Release control after training starts
-              setForceSidebarOpen(undefined);
-            }, 100);
-          }}
-          onOpenSidebar={() => {
-            console.log('📂 [StreamingApp] TrainingWalkthrough onOpenSidebar called');
-            setForceSidebarOpen(true);
-            setForceSidebarTab('inventory');
-          }}
-          onCloseSidebar={() => {
-            console.log('📂 [StreamingApp] TrainingWalkthrough onCloseSidebar called');
-            setForceSidebarOpen(false);
-            setForceSidebarTab(undefined);
-          }}
+          onComplete={handleTrainingWalkthroughComplete}
+          onSkip={handleTrainingWalkthroughSkip}
+          onOpenSidebar={handleTrainingOpenSidebar}
+          onCloseSidebar={handleTrainingCloseSidebar}
         />
       )}
       {/* Control Panel (ToolBar) - Only show when stream is connected and NOT in cinematic mode */}
