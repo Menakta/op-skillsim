@@ -21,6 +21,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "OP Skillsim",
   description: "Open Protocol Skillsimulator",
+  icons: {
+    icon: "/logos/OP1.png",
+    shortcut: "/logos/OP1.png",
+    apple: "/logos/OP1.png",
+  },
 };
 
 export default function RootLayout({

@@ -424,14 +424,12 @@ export default function SessionsPage() {
                 </>
               )}
               {["admins", "teachers"].includes(activeTab) && (
-                <>
-                  <FilterButton
-                    active={statusFilter === "inactive"}
-                    onClick={() => setStatusFilter("inactive")}
-                  >
-                    Inactive
-                  </FilterButton>
-                </>
+                <FilterButton
+                  active={statusFilter === "terminated"}
+                  onClick={() => setStatusFilter("terminated")}
+                >
+                  Terminated
+                </FilterButton>
               )}
 
               <ExportDropdown

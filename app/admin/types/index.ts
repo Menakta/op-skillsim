@@ -192,6 +192,7 @@ export interface SessionStudent {
 
 export interface SessionTeacher {
   id: string
+  sessionId: string
   name: string
   email: string
   institution: string
@@ -202,6 +203,7 @@ export interface SessionTeacher {
 
 export interface SessionAdmin {
   id: string
+  sessionId: string
   name: string
   email: string
   institution: string
@@ -236,7 +238,7 @@ export interface Course {
   title: string
 }
 
-export type StatusFilter = 'all' | 'active' | 'paused' | 'completed' |'inactive'
+export type StatusFilter = 'all' | 'active' | 'paused' | 'completed' | 'terminated'
 export type ResultFilter = 'all' | 'passed' | 'failed'
 export type SessionTabType = 'students' | 'teachers' | 'admins'
 

@@ -4,7 +4,7 @@
  * GET /api/admin/sessions - Get all sessions
  * Data sources:
  * - Students: training_sessions table
- * - Teachers/Admins: teacher_profiles table (distinguished by role column)
+ * - Teachers/Admins: user_sessions table (session_type: 'teacher', role: 'teacher' | 'admin')
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -43,15 +43,21 @@ interface TrainingSession {
   updated_at: string
 }
 
-interface TeacherProfile {
+interface UserSession {
   id: string
+  session_id: string
+  user_id: string
+  session_type: 'lti' | 'teacher' | 'pureweb'
   email: string
-  full_name: string | null
-  role: 'teacher' | 'admin'
-  institution: string | null
-  permissions: Record<string, boolean> | null
+  role: 'student' | 'teacher' | 'admin'
+  lti_context: {
+    full_name?: string
+    institution?: string
+  } | null
+  status: 'active' | 'terminated'
   created_at: string
-  last_login: string | null
+  last_activity: string | null
+  expires_at: string
 }
 
 // =============================================================================
@@ -131,22 +137,26 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Fetch all teacher profiles (for teachers and admins)
-    const { data: teacherProfiles, error: teacherProfilesError } = await supabase
-      .from('teacher_profiles')
+    // Fetch teacher and admin sessions from user_sessions table
+    // session_type: 'teacher' is used for both teachers and admins
+    // role: 'teacher' or 'admin' distinguishes them
+    const { data: userSessions, error: userSessionsError } = await supabase
+      .from('user_sessions')
       .select('*')
+      .eq('session_type', 'teacher')
+      .in('role', ['teacher', 'admin'])
       .order('created_at', { ascending: false })
 
-    if (teacherProfilesError) {
-      logger.error({ error: teacherProfilesError.message }, 'Failed to fetch teacher profiles')
+    if (userSessionsError) {
+      logger.error({ error: userSessionsError.message }, 'Failed to fetch user sessions')
       return NextResponse.json(
-        { success: false, error: 'Failed to fetch teacher profiles' },
+        { success: false, error: 'Failed to fetch user sessions' },
         { status: 500 }
       )
     }
 
     const allTrainingSessions = (trainingSessions || []) as TrainingSession[]
-    const allTeacherProfiles = (teacherProfiles || []) as TeacherProfile[]
+    const allUserSessions = (userSessions || []) as UserSession[]
 
     // Build students list from training_sessions
     const students: Array<{
@@ -197,9 +207,10 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Build teachers and admins lists from teacher_profiles
+    // Build teachers and admins lists from user_sessions
     const teachers: Array<{
       id: string
+      sessionId: string
       name: string
       email: string
       institution: string
@@ -210,6 +221,7 @@ export async function GET(request: NextRequest) {
 
     const admins: Array<{
       id: string
+      sessionId: string
       name: string
       email: string
       institution: string
@@ -218,34 +230,32 @@ export async function GET(request: NextRequest) {
       status: string
     }> = []
 
-    for (const profile of allTeacherProfiles) {
-      // Get name from profile or email prefix
-      const isFakeLtiEmail = profile.email.startsWith('lti-') || profile.email.endsWith('@lti.local')
-      const emailPrefix = !isFakeLtiEmail ? profile.email.split('@')[0] : undefined
-      const name = profile.full_name || emailPrefix || (profile.role === 'admin' ? 'Admin' : 'Teacher')
+    for (const userSession of allUserSessions) {
+      // Get name from lti_context or email prefix
+      const isFakeLtiEmail = userSession.email.startsWith('lti-') || userSession.email.endsWith('@lti.local')
+      const emailPrefix = !isFakeLtiEmail ? userSession.email.split('@')[0] : undefined
+      const name = userSession.lti_context?.full_name || emailPrefix || (userSession.role === 'admin' ? 'Admin' : 'Teacher')
 
-      // Determine status based on last_login
-      const lastLogin = profile.last_login ? new Date(profile.last_login) : null
-      const now = new Date()
-      const hoursSinceLogin = lastLogin ? (now.getTime() - lastLogin.getTime()) / (1000 * 60 * 60) : Infinity
-      const status = hoursSinceLogin < 24 ? 'active' : 'inactive'
+      // Use status directly from user_sessions table
+      const status = userSession.status
 
-      const profileData = {
-        id: profile.id,
+      const sessionData = {
+        id: userSession.id,
+        sessionId: userSession.session_id,
         name,
-        email: profile.email,
-        institution: profile.institution || 'Open Polytechnic Kuratini Tuwhera',
-        createdAt: profile.created_at,
-        lastActivity: profile.last_login || profile.created_at,
+        email: userSession.email,
+        institution: userSession.lti_context?.institution || 'Open Polytechnic Kuratini Tuwhera',
+        createdAt: userSession.created_at,
+        lastActivity: userSession.last_activity || userSession.created_at,
         status,
       }
 
       // Separate by role column
-      if (profile.role === 'admin') {
-        admins.push(profileData)
+      if (userSession.role === 'admin') {
+        admins.push(sessionData)
       } else {
-        // role === 'teacher' or any other value defaults to teacher
-        teachers.push(profileData)
+        // role === 'teacher'
+        teachers.push(sessionData)
       }
     }
 
@@ -358,15 +368,15 @@ export async function DELETE(request: NextRequest) {
             deletedIds.push(id)
           }
         } else {
-          // For teachers/admins: delete from teacher_profiles
-          // The id is now the teacher_profiles.id directly
+          // For teachers/admins: delete from user_sessions
+          // The id is now the user_sessions.id directly
           const { error: deleteError } = await supabase
-            .from('teacher_profiles')
+            .from('user_sessions')
             .delete()
             .eq('id', id)
 
           if (deleteError) {
-            errors.push(`Failed to delete profile ${id}: ${deleteError.message}`)
+            errors.push(`Failed to delete user session ${id}: ${deleteError.message}`)
           } else {
             deletedIds.push(id)
           }
