@@ -254,7 +254,6 @@ export default function TeacherDashboardPage() {
                               {activity.role}
                             </Badge>
                           </div>
-                          <p className="text-sm theme-text-muted">{activity.action}</p>
                           {activity.details && (
                             <p className="text-xs mt-1 theme-text-tertiary">{activity.details}</p>
                           )}

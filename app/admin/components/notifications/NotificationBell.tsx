@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { Bell, Check, CheckCheck, X, UserPlus, Mail } from 'lucide-react'
+import { Bell, Check, CheckCheck, X, UserPlus, Mail, EyeOff } from 'lucide-react'
 import { createClient } from '@/app/lib/supabase/client'
 import { notificationService } from '../../services/notification.service'
 import type { AdminNotification } from '../../types'
@@ -23,11 +23,15 @@ interface NotificationBellProps {
 
 export function NotificationBell({ isAdmin }: NotificationBellProps) {
   const [notifications, setNotifications] = useState<AdminNotification[]>([])
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set())
   const [unreadCount, setUnreadCount] = useState(0)
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [toast, setToast] = useState<{ message: string; visible: boolean } | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Filter out hidden notifications for display
+  const visibleNotifications = notifications.filter(n => !hiddenIds.has(n.id))
 
   // Fetch notifications on mount
   const fetchNotifications = useCallback(async () => {
@@ -126,6 +130,23 @@ export function NotificationBell({ isAdmin }: NotificationBellProps) {
     }
   }
 
+  // Hide notification (frontend only - not persisted to database)
+  const handleHideNotification = (id: string) => {
+    const notification = notifications.find(n => n.id === id)
+    setHiddenIds(prev => new Set(prev).add(id))
+    // Update unread count if hiding an unread notification
+    if (notification && !notification.is_read) {
+      setUnreadCount(prev => Math.max(0, prev - 1))
+    }
+  }
+
+  // Hide all notifications (frontend only)
+  const handleHideAll = () => {
+    const allIds = new Set(notifications.map(n => n.id))
+    setHiddenIds(allIds)
+    setUnreadCount(0)
+  }
+
   // Get icon based on notification message
   const getNotificationIcon = (message: string) => {
     if (message.includes('signed up') || message.includes('registered')) {
@@ -160,7 +181,7 @@ export function NotificationBell({ isAdmin }: NotificationBellProps) {
         <div className="flex items-center justify-center py-8">
           <div className="animate-spin w-6 h-6 border-2 border-[#39BEAE] border-t-transparent rounded-full" />
         </div>
-      ) : notifications.length === 0 ? (
+      ) : visibleNotifications.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
           <Bell className="w-10 h-10 theme-text-muted mb-2" />
           <p className="theme-text-muted text-sm">No notifications yet</p>
@@ -170,7 +191,7 @@ export function NotificationBell({ isAdmin }: NotificationBellProps) {
         </div>
       ) : (
         <ul className="divide-y theme-divide">
-          {notifications.map((notification) => (
+          {visibleNotifications.map((notification) => (
             <li
               key={notification.id}
               className={`px-4 py-3 hover:theme-bg-hover transition-colors ${
@@ -189,18 +210,30 @@ export function NotificationBell({ isAdmin }: NotificationBellProps) {
                     {formatRelativeTime(notification.created_at)}
                   </p>
                 </div>
-                {!notification.is_read && (
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {!notification.is_read && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleMarkAsRead(notification.id)
+                      }}
+                      className="p-1 rounded hover:bg-[#39BEAE]/10 transition-colors"
+                      title="Mark as read"
+                    >
+                      <Check className="w-4 h-4 text-[#39BEAE]" />
+                    </button>
+                  )}
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
-                      handleMarkAsRead(notification.id)
+                      handleHideNotification(notification.id)
                     }}
-                    className="flex-shrink-0 p-1 rounded hover:bg-[#39BEAE]/10 transition-colors"
-                    title="Mark as read"
+                    className="p-1 rounded hover:bg-red-500/10 transition-colors"
+                    title="Hide notification"
                   >
-                    <Check className="w-4 h-4 text-[#39BEAE]" />
+                    <EyeOff className="w-4 h-4 theme-text-muted hover:text-red-500" />
                   </button>
-                )}
+                </div>
               </div>
             </li>
           ))}
@@ -235,15 +268,26 @@ export function NotificationBell({ isAdmin }: NotificationBellProps) {
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b theme-border">
               <h3 className="font-semibold theme-text-primary">Notifications</h3>
-              {unreadCount > 0 && (
-                <button
-                  onClick={handleMarkAllAsRead}
-                  className="flex items-center gap-1 text-xs text-[#39BEAE] hover:text-[#39BEAE]/80 transition-colors"
-                >
-                  <CheckCheck className="w-4 h-4" />
-                  Mark all read
-                </button>
-              )}
+              <div className="flex items-center gap-3">
+                {unreadCount > 0 && (
+                  <button
+                    onClick={handleMarkAllAsRead}
+                    className="flex items-center gap-1 text-xs text-[#39BEAE] hover:text-[#39BEAE]/80 transition-colors"
+                  >
+                    <CheckCheck className="w-4 h-4" />
+                    Mark all read
+                  </button>
+                )}
+                {visibleNotifications.length > 0 && (
+                  <button
+                    onClick={handleHideAll}
+                    className="flex items-center gap-1 text-xs theme-text-muted hover:text-red-500 transition-colors"
+                  >
+                    <EyeOff className="w-4 h-4" />
+                    Hide all
+                  </button>
+                )}
+              </div>
             </div>
             {/* Notification List */}
             <div className="overflow-y-auto max-h-[calc(70vh-60px)]">
@@ -278,6 +322,15 @@ export function NotificationBell({ isAdmin }: NotificationBellProps) {
                   >
                     <CheckCheck className="w-4 h-4" />
                     Mark all read
+                  </button>
+                )}
+                {visibleNotifications.length > 0 && (
+                  <button
+                    onClick={handleHideAll}
+                    className="flex items-center gap-1 text-xs theme-text-muted hover:text-red-500 transition-colors"
+                  >
+                    <EyeOff className="w-4 h-4" />
+                    Hide all
                   </button>
                 )}
                 <button

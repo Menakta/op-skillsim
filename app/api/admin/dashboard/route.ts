@@ -9,9 +9,18 @@ import { jwtVerify } from 'jose'
 import { getSupabaseAdmin } from '@/app/lib/supabase/admin'
 import { logger } from '@/app/lib/logger'
 
+
 const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'your-super-secret-jwt-key-min-32-chars'
 )
+
+
+interface PhaseCount {
+  phaseKey: string
+  phaseName: string
+  phaseOrder: number
+  count: number
+}
 
 // =============================================================================
 // Helper: Get session from token
@@ -66,6 +75,16 @@ export async function GET(request: NextRequest) {
 
     if (sessionsError) {
       logger.error({ error: sessionsError.message }, 'Failed to fetch training sessions')
+      return NextResponse.json(
+        { success: false, error: 'Failed to fetch data' },
+        { status: 500 }
+      )
+    }
+    const {data:phases,error:phasesError}=await supabase
+    .from('training_phases')
+    .select('*')
+    if (phasesError) {
+      logger.error({ error: phasesError.message }, 'Failed to fetch training phases')
       return NextResponse.json(
         { success: false, error: 'Failed to fetch data' },
         { status: 500 }
@@ -188,6 +207,17 @@ export async function GET(request: NextRequest) {
         })
       }
     }
+    
+    
+    const phaseCountMap = new Map<string, number>()
+  
+    const phaseCounts: PhaseCount[] = (phases || []).map((phase) => ({
+    phaseKey: phase.phase_key,
+    phaseName: phase.phase_name,
+    phaseOrder: phase.phase_order,
+    count: phaseCountMap.get(phase.phase_key) || 0,
+  }))
+
 
     const students = Array.from(studentsMap.values()).map(s => ({
       id: s.id,
@@ -198,8 +228,8 @@ export async function GET(request: NextRequest) {
       progress: s.progress,
       status: s.status,
       averageScore: s.sessionsCount > 0 ? Math.round(s.totalScore / s.sessionsCount) : 0,
-      completedModules: Math.floor(s.progress / 25), // Approximate based on 4 phases
-      totalModules: 4,
+      completedModules: Math.floor(s.progress/(100/phaseCounts.length )), // Approximate based on 4 phases
+      totalModules: phaseCounts.length,
     }))
 
     // Recent activity from user_sessions (student logins/sessions)
@@ -219,7 +249,7 @@ export async function GET(request: NextRequest) {
 
         // Determine action based on session status
         let action = 'Logged in'
-        let details = userSession.session_type === 'lti' ? 'LTI Session' : 'Direct Login'
+        let details = userSession.session_type === 'lti' ? 'Student Session' :userSession.session_type==='teacher' ? 'Teacher Session' : 'Outsider Session'
 
         if (userSession.status === 'expired') {
           action = 'Session expired'
