@@ -161,7 +161,6 @@ export default function StreamingApp() {
   const {isLtiSession,isTestUser, userRole,sessionExpiresAt,sessionReturnUrl,sessionStartTime, } = useSessionInfo({
     onSessionExpiring: () => {
       if (!modals.isOpen("sessionExpiry")) {
-        console.log("⏰ Session expiring soon, showing warning modal");
         modals.openSessionExpiry();
       }
     },
@@ -191,7 +190,6 @@ export default function StreamingApp() {
   const handleStartHover = useCallback(() => {
     if (prefetchedRef.current) return;
     prefetchedRef.current = true;
-    console.log("🚀 Prefetching components on hover...");
     // Prefetch dynamic imports
     import("../components/ControlPanel");
     import("../components/ThemeToggle");
@@ -208,7 +206,6 @@ export default function StreamingApp() {
     stream.messageSubject,
     {
       onQuestionRequest: (questionId, question) => {
-        console.log("❓ Question requested:", questionId);
         modals.openQuestion(question);
       },
       onTrainingProgress: (data) => {
@@ -292,15 +289,6 @@ export default function StreamingApp() {
             TASK_SEQUENCE.length,
           );
         }
-      },
-      onTaskStart: (toolName) => {
-        console.log("🚀 Task started:", toolName);
-      },
-      onToolChange: (toolName) => {
-        console.log("🔧 Tool changed to:", toolName);
-      },
-      onMessage: (message) => {
-        console.log("📨 Message:", message.type, message.dataString);
       },
     },
     {
@@ -408,13 +396,11 @@ export default function StreamingApp() {
       submit: (selectedAnswer: number) =>
         training.submitQuestionAnswer(selectedAnswer),
       close: () => {
-        console.log("🔒 [StreamingApp] questionActions.close() called - user clicked Continue/Close");
         training.closeQuestion();
         modals.closeModal("question");
 
         // Check if TrainingComplete modal was deferred while question was open
         if (pendingTrainingCompleteRef.current) {
-          console.log("📋 Opening deferred TrainingComplete modal");
           pendingTrainingCompleteRef.current = false;
           // Small delay to ensure question modal is fully closed
           setTimeout(() => {
@@ -530,9 +516,7 @@ export default function StreamingApp() {
             })
             .then((result) => {
               if (result.success)
-                console.log(
-                  "✅ [StreamingApp] Training session ended due to idle timeout",
-                );
+                console.log( "✅ [StreamingApp] Training session ended due to idle timeout");
             });
         });
         redirectToSessionComplete({
@@ -562,12 +546,10 @@ export default function StreamingApp() {
   const trainingControlActions = useMemo(
     () => ({
       pause: () => {
-        console.log("⏸️ Pausing training");
         training.pauseTraining();
         setIsTrainingPaused(true);
       },
       resume: () => {
-        console.log("▶️ Resuming training");
         training.resumeTraining();
         setIsTrainingPaused(false);
       },
@@ -681,13 +663,11 @@ export default function StreamingApp() {
   }, []);
 
   const handleTrainingOpenSidebar = useCallback(() => {
-    console.log('📂 [StreamingApp] TrainingWalkthrough onOpenSidebar called');
     setForceSidebarOpen(true);
     setForceSidebarTab('inventory');
   }, []);
 
   const handleTrainingCloseSidebar = useCallback(() => {
-    console.log('📂 [StreamingApp] TrainingWalkthrough onCloseSidebar called');
     setForceSidebarOpen(false);
     setForceSidebarTab(undefined);
   }, []);
