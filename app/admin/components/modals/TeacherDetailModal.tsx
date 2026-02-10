@@ -4,7 +4,7 @@
  * Displays detailed information about a teacher profile.
  */
 
-import { Calendar, Activity, Building } from 'lucide-react'
+import { Calendar, Building, Globe, Monitor, LogIn, Clock } from 'lucide-react'
 import { BaseModal } from './BaseModal'
 import type { SessionTeacher } from '../../types'
 import { formatDate, getInitials } from '../../utils'
@@ -37,19 +37,50 @@ export function TeacherDetailModal({ teacher, onClose }: TeacherDetailModalProps
           </div>
           <p className="theme-text-primary text-sm font-medium">{teacher.institution}</p>
         </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="p-3 theme-bg-tertiary rounded-lg">
+            <div className="flex items-center gap-2 theme-text-muted mb-1">
+              <LogIn className="w-4 h-4" />
+              <span className="text-xs">Login Count</span>
+            </div>
+            <p className="theme-text-primary text-sm font-medium">{teacher.loginCount}</p>
+          </div>
+          <div className="p-3 theme-bg-tertiary rounded-lg">
+            <div className="flex items-center gap-2 theme-text-muted mb-1">
+              <Clock className="w-4 h-4" />
+              <span className="text-xs">Last Login</span>
+            </div>
+            <p className="theme-text-primary text-sm font-medium">
+              {teacher.lastLoginAt ? formatDate(teacher.lastLoginAt) : 'N/A'}
+            </p>
+          </div>
+        </div>
+
+        <div className="p-3 theme-bg-tertiary rounded-lg">
+          <div className="flex items-center gap-2 theme-text-muted mb-1">
+            <Globe className="w-4 h-4" />
+            <span className="text-xs">IP Address</span>
+          </div>
+          <p className="theme-text-primary text-sm font-medium">{teacher.ipAddress || 'N/A'}</p>
+        </div>
+
+        <div className="p-3 theme-bg-tertiary rounded-lg">
+          <div className="flex items-center gap-2 theme-text-muted mb-1">
+            <Monitor className="w-4 h-4" />
+            <span className="text-xs">User Agent</span>
+          </div>
+          <p className="theme-text-primary text-sm font-medium break-all">
+            {teacher.userAgent || 'N/A'}
+          </p>
+        </div>
+
         <div className="p-3 theme-bg-tertiary rounded-lg">
           <div className="flex items-center gap-2 theme-text-muted mb-1">
             <Calendar className="w-4 h-4" />
             <span className="text-xs">Created</span>
           </div>
           <p className="theme-text-primary text-sm font-medium">{formatDate(teacher.createdAt)}</p>
-        </div>
-        <div className="p-3 theme-bg-tertiary rounded-lg">
-          <div className="flex items-center gap-2 theme-text-muted mb-1">
-            <Activity className="w-4 h-4" />
-            <span className="text-xs">Last Activity</span>
-          </div>
-          <p className="theme-text-primary text-sm font-medium">{formatDate(teacher.lastActivity)}</p>
         </div>
       </div>
     </BaseModal>

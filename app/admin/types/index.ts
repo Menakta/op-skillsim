@@ -197,8 +197,11 @@ export interface SessionTeacher {
   email: string
   institution: string
   createdAt: string
-  lastActivity: string
   status: string
+  ipAddress: string | null
+  userAgent: string | null
+  loginCount: number
+  lastLoginAt: string | null
 }
 
 export interface SessionAdmin {
@@ -208,8 +211,11 @@ export interface SessionAdmin {
   email: string
   institution: string
   createdAt: string
-  lastActivity: string
   status: string
+  ipAddress: string | null
+  userAgent: string | null
+  loginCount: number
+  lastLoginAt: string | null
 }
 
 export interface SessionsStats {

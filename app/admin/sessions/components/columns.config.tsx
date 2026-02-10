@@ -12,6 +12,17 @@ import { formatDate, getInitials, type ExportColumn } from '../../utils'
 // PDF Export Columns
 // =============================================================================
 
+// Format seconds to human readable time (e.g., "1h 23m" or "45m")
+const formatTimeSpent = (seconds: number): string => {
+  if (!seconds || seconds < 60) return '< 1m'
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  if (hours > 0) {
+    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`
+  }
+  return `${minutes}m`
+}
+
 export const STUDENT_PDF_COLUMNS: ExportColumn<SessionStudent>[] = [
   { key: 'name', header: 'Name' },
   { key: 'email', header: 'Email' },
@@ -19,6 +30,7 @@ export const STUDENT_PDF_COLUMNS: ExportColumn<SessionStudent>[] = [
   { key: 'courseName', header: 'Course' },
   { key: 'progress', header: 'Progress (%)', getValue: (s) => `${s.progress}%` },
   { key: 'status', header: 'Status' },
+  { key: 'timeSpent', header: 'Time Spent', getValue: (s) => formatTimeSpent(s.timeSpent) },
   { key: 'lastActive', header: 'Last Active', getValue: (s) => formatDate(s.lastActive) },
 ]
 
@@ -27,7 +39,9 @@ export const TEACHER_PDF_COLUMNS: ExportColumn<SessionTeacher>[] = [
   { key: 'email', header: 'Email' },
   { key: 'institution', header: 'Institution' },
   { key: 'status', header: 'Status' },
-  { key: 'lastActivity', header: 'Last Activity', getValue: (t) => formatDate(t.lastActivity) },
+  { key: 'ipAddress', header: 'IP Address', getValue: (t) => t.ipAddress || 'N/A' },
+  { key: 'loginCount', header: 'Login Count', getValue: (t) => String(t.loginCount) },
+  { key: 'lastLoginAt', header: 'Last Login', getValue: (t) => t.lastLoginAt ? formatDate(t.lastLoginAt) : 'N/A' },
   { key: 'createdAt', header: 'Created', getValue: (t) => formatDate(t.createdAt) },
 ]
 
@@ -36,7 +50,9 @@ export const ADMIN_PDF_COLUMNS: ExportColumn<SessionAdmin>[] = [
   { key: 'email', header: 'Email' },
   { key: 'institution', header: 'Institution' },
   { key: 'status', header: 'Status' },
-  { key: 'lastActivity', header: 'Last Activity', getValue: (a) => formatDate(a.lastActivity) },
+  { key: 'ipAddress', header: 'IP Address', getValue: (a) => a.ipAddress || 'N/A' },
+  { key: 'loginCount', header: 'Login Count', getValue: (a) => String(a.loginCount) },
+  { key: 'lastLoginAt', header: 'Last Login', getValue: (a) => a.lastLoginAt ? formatDate(a.lastLoginAt) : 'N/A' },
   { key: 'createdAt', header: 'Created', getValue: (a) => formatDate(a.createdAt) },
 ]
 
@@ -128,18 +144,18 @@ export const teacherColumns: Column<SessionTeacher>[] = [
     ),
   },
   {
-    key: 'institution',
-    header: 'Institution',
+    key: 'loginCount',
+    header: 'Logins',
     headerClassName: 'hidden lg:table-cell',
     className: 'hidden lg:table-cell',
-    render: (teacher) => <span className="theme-text-secondary">{teacher.institution}</span>,
+    render: (teacher) => <span className="theme-text-secondary">{teacher.loginCount}</span>,
   },
   {
-    key: 'lastActivity',
-    header: 'Last Activity',
+    key: 'lastLoginAt',
+    header: 'Last Login',
     headerClassName: 'hidden lg:table-cell',
     className: 'hidden lg:table-cell',
-    render: (teacher) => <span className="text-gray-400">{formatDate(teacher.lastActivity)}</span>,
+    render: (teacher) => <span className="text-gray-400">{teacher.lastLoginAt ? formatDate(teacher.lastLoginAt) : 'N/A'}</span>,
   },
 ]
 
@@ -171,17 +187,17 @@ export const adminColumns: Column<SessionAdmin>[] = [
     ),
   },
   {
-    key: 'institution',
-    header: 'Institution',
+    key: 'loginCount',
+    header: 'Logins',
     headerClassName: 'hidden lg:table-cell',
     className: 'hidden lg:table-cell',
-    render: (admin) => <span className="theme-text-secondary">{admin.institution}</span>,
+    render: (admin) => <span className="theme-text-secondary">{admin.loginCount}</span>,
   },
   {
-    key: 'lastActivity',
-    header: 'Last Activity',
+    key: 'lastLoginAt',
+    header: 'Last Login',
     headerClassName: 'hidden lg:table-cell',
     className: 'hidden lg:table-cell',
-    render: (admin) => <span className="text-gray-400">{formatDate(admin.lastActivity)}</span>,
+    render: (admin) => <span className="text-gray-400">{admin.lastLoginAt ? formatDate(admin.lastLoginAt) : 'N/A'}</span>,
   },
 ]

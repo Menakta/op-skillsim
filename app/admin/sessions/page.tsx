@@ -304,6 +304,9 @@ export default function SessionsPage() {
     refetch,
   ]);
 
+  console.log("Students data",filteredStudents)
+  console.log("Teachers data",filteredTeachers)
+  console.log("Admins data",filteredAdmins)
   // =============================================================================
   // Render
   // =============================================================================

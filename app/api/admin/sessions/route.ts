@@ -56,8 +56,11 @@ interface UserSession {
   } | null
   status: 'active' | 'terminated'
   created_at: string
-  last_activity: string | null
   expires_at: string
+  ip_address: string | null
+  user_agent: string | null
+  login_count: number | null
+  last_login_at: string | null
 }
 
 // =============================================================================
@@ -215,8 +218,11 @@ export async function GET(request: NextRequest) {
       email: string
       institution: string
       createdAt: string
-      lastActivity: string
       status: string
+      ipAddress: string | null
+      userAgent: string | null
+      loginCount: number
+      lastLoginAt: string | null
     }> = []
 
     const admins: Array<{
@@ -226,8 +232,11 @@ export async function GET(request: NextRequest) {
       email: string
       institution: string
       createdAt: string
-      lastActivity: string
       status: string
+      ipAddress: string | null
+      userAgent: string | null
+      loginCount: number
+      lastLoginAt: string | null
     }> = []
 
     for (const userSession of allUserSessions) {
@@ -246,8 +255,11 @@ export async function GET(request: NextRequest) {
         email: userSession.email,
         institution: userSession.lti_context?.institution || 'Open Polytechnic Kuratini Tuwhera',
         createdAt: userSession.created_at,
-        lastActivity: userSession.last_activity || userSession.created_at,
         status,
+        ipAddress: userSession.ip_address,
+        userAgent: userSession.user_agent,
+        loginCount: userSession.login_count || 1,
+        lastLoginAt: userSession.last_login_at,
       }
 
       // Separate by role column
