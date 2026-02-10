@@ -163,6 +163,9 @@ export interface ExportData<T> {
 /**
  * Dynamic export hook for pages with tabs or dynamic data.
  * Instead of passing static data, you provide a callback that returns current data.
+ *
+ * Uses a ref to always get the latest getData function, avoiding stale closures
+ * when the active tab changes.
  */
 export function useExportDynamic<T>(
   getData: () => ExportData<T>,
@@ -170,6 +173,16 @@ export function useExportDynamic<T>(
 ): UseExportDynamicReturn {
   const [showExportMenu, setShowExportMenu] = useState(false)
   const exportMenuRef = useRef<HTMLDivElement>(null)
+
+  // Use refs to always get the latest functions (avoids stale closure issues)
+  const getDataRef = useRef(getData)
+  const getItemKeyRef = useRef(getItemKey)
+
+  // Keep refs updated with latest values
+  useEffect(() => {
+    getDataRef.current = getData
+    getItemKeyRef.current = getItemKey
+  }, [getData, getItemKey])
 
   // Close export menu on outside click
   useEffect(() => {
@@ -183,35 +196,35 @@ export function useExportDynamic<T>(
   }, [])
 
   const handleExportAll = useCallback(async () => {
-    const { all, columns, name } = getData()
+    const { all, columns, name } = getDataRef.current()
     const timestamp = new Date().toISOString().split('T')[0]
-    await exportToPDF(all, columns, `${name.toLowerCase()}-all-${timestamp}.pdf`, {
+    await exportToPDF(all, columns, `${name.toLowerCase().replace(/\s+/g, '-')}-all-${timestamp}.pdf`, {
       title: `${name}`,
       subtitle: `All Records (${all.length} total)`,
     })
     setShowExportMenu(false)
-  }, [getData])
+  }, [])
 
   const handleExportFiltered = useCallback(async () => {
-    const { all, filtered, columns, name } = getData()
+    const { all, filtered, columns, name } = getDataRef.current()
     const timestamp = new Date().toISOString().split('T')[0]
-    await exportToPDF(filtered, columns, `${name.toLowerCase()}-filtered-${timestamp}.pdf`, {
+    await exportToPDF(filtered, columns, `${name.toLowerCase().replace(/\s+/g, '-')}-filtered-${timestamp}.pdf`, {
       title: `${name}`,
       subtitle: `Filtered Records (${filtered.length} of ${all.length})`,
     })
     setShowExportMenu(false)
-  }, [getData])
+  }, [])
 
   const handleExportSelected = useCallback(async () => {
-    const { all, selectedKeys, columns, name } = getData()
-    const selectedData = all.filter(item => selectedKeys.has(getItemKey(item)))
+    const { all, selectedKeys, columns, name } = getDataRef.current()
+    const selectedData = all.filter(item => selectedKeys.has(getItemKeyRef.current(item)))
     const timestamp = new Date().toISOString().split('T')[0]
-    await exportToPDF(selectedData, columns, `${name.toLowerCase()}-selected-${timestamp}.pdf`, {
+    await exportToPDF(selectedData, columns, `${name.toLowerCase().replace(/\s+/g, '-')}-selected-${timestamp}.pdf`, {
       title: `${name}`,
       subtitle: `Selected Records (${selectedData.length})`,
     })
     setShowExportMenu(false)
-  }, [getData, getItemKey])
+  }, [])
 
   return {
     showExportMenu,
