@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { logger } from '@/app/lib/logger'
 import { sendAdminNotificationEmail, sendEmailConfirmation } from '@/app/lib/email'
+import { validatePhoneNumber, formatToE164 } from '@/app/lib/phoneValidation'
 
 // =============================================================================
 // Supabase Client
@@ -46,14 +47,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate phone format (E.164 format recommended for Twilio)
-    const phoneRegex = /^\+[1-9]\d{6,14}$/
-    if (!phoneRegex.test(phone)) {
+    // Validate phone number using libphonenumber-js (supports all countries)
+    const phoneValidation = validatePhoneNumber(phone)
+    if (!phoneValidation.isValid) {
       return NextResponse.json(
-        { success: false, error: 'Phone number must be in international format (e.g., +64211234567)' },
+        { success: false, error: phoneValidation.error || 'Invalid phone number' },
         { status: 400 }
       )
     }
+
+    // Format phone to E.164 for consistent storage
+    const formattedPhone = formatToE164(phone) || phone
 
     // Validate password strength
     if (password.length < 8) {
@@ -80,11 +84,11 @@ export async function POST(request: NextRequest) {
     const { data: authData, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
-      phone,
+      phone: formattedPhone,
       options: {
         data: {
           full_name: fullName,
-          phone,
+          phone: formattedPhone,
           registration_type: 'outsider',
           approval_status: 'pending',
           role: 'student',

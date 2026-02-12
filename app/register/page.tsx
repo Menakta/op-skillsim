@@ -13,6 +13,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useTheme } from '../context/ThemeContext'
+import { validatePhoneNumber, formatToE164 } from '../lib/phoneValidation'
 
 export default function RegisterPage() {
   const { theme, toggleTheme } = useTheme()
@@ -26,13 +27,29 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [phoneError, setPhoneError] = useState<string | null>(null)
 
   const isDark = theme === 'dark'
+
+  // Validate phone number on blur for immediate feedback
+  function handlePhoneBlur() {
+    if (phone.trim()) {
+      const result = validatePhoneNumber(phone)
+      if (!result.isValid) {
+        setPhoneError(result.error || 'Invalid phone number')
+      } else {
+        setPhoneError(null)
+      }
+    } else {
+      setPhoneError(null)
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError(null)
+    setPhoneError(null)
 
     // Validate passwords match
     if (password !== confirmPassword) {
@@ -48,20 +65,23 @@ export default function RegisterPage() {
       return
     }
 
-    // Validate phone format (E.164)
-    const phoneRegex = /^\+[1-9]\d{6,14}$/
-    if (!phoneRegex.test(phone)) {
-      setError('Phone number must be in international format (e.g., +64211234567)')
+    // Validate phone number using libphonenumber-js
+    const phoneValidation = validatePhoneNumber(phone)
+    if (!phoneValidation.isValid) {
+      setPhoneError(phoneValidation.error || 'Invalid phone number')
       setLoading(false)
       return
     }
+
+    // Format phone to E.164 for storage
+    const formattedPhone = formatToE164(phone) || phone
 
     try {
       // Call the registration API endpoint
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, fullName, phone }),
+        body: JSON.stringify({ email, password, fullName, phone: formattedPhone }),
       })
 
       const data = await response.json()
@@ -147,11 +167,23 @@ export default function RegisterPage() {
                 type="tel"
                 id="phone"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full px-8 py-2 border-2 rounded-md focus:outline-none focus:ring-1 bg-[#FFFFFF] border-[#848484] text-black placeholder-gray-500 focus:ring-gray-800"
-                placeholder="Phone (e.g., +64211234567)"
+                onChange={(e) => {
+                  setPhone(e.target.value)
+                  if (phoneError) setPhoneError(null) // Clear error on typing
+                }}
+                onBlur={handlePhoneBlur}
+                className={`w-full px-8 py-2 border-2 rounded-md focus:outline-none focus:ring-1 bg-[#FFFFFF] text-black placeholder-gray-500 focus:ring-gray-800 ${
+                  phoneError ? 'border-red-500' : 'border-[#848484]'
+                }`}
+                placeholder="Phone (e.g., +64 21 123 4567)"
                 required
               />
+              {phoneError && (
+                <p className="mt-1 text-xs text-red-500">{phoneError}</p>
+              )}
+              <p className={`mt-1 text-xs ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>
+                Include country code (e.g., +64 for NZ, +1 for US)
+              </p>
             </div>
 
             {/* Password */}

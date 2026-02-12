@@ -28,6 +28,7 @@
     "jsonwebtoken": "^9.0.3",
     "jspdf": "^4.0.0",
     "jspdf-autotable": "^5.0.7",
+    "libphonenumber-js": "^1.12.36",
     "lucide-react": "^0.561.0",
     "next": "16.0.7",
     "react": "19.2.0",
