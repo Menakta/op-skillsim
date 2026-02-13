@@ -1133,7 +1133,7 @@ function UnifiedSidebarComponent({
                 </div>
               </div>
 
-              {/* Fullscreen */}
+             
               <button
                 onClick={toggleFullscreen}
                 className={`w-full flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg transition-all ${
