@@ -1112,9 +1112,9 @@ function UnifiedSidebarComponent({
               </div>
 
               {/* Graphics Quality */}
-              <div className={`p-2 sm:p-3 rounded-lg ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
+              <div className={`p-1 sm:p-2 rounded-lg ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
                 <h3 className={`text-[11px] sm:text-xs font-medium mb-2 sm:mb-3 ${isDark ? 'text-white/70' : 'text-gray-600'}`}>Graphics Quality</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-1.5">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 sm:gap-1.5">
                   {(['low', 'medium', 'high', 'ultra'] as const).map((quality) => (
                     <button
                       key={quality}
