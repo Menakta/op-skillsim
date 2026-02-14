@@ -52,7 +52,10 @@ export const WEB_TO_UE_MESSAGES = {
   HIERARCHICAL_CONTROL: 'hierarchical_control', // list, show_all, hide_all, toggle_main:GroupName, toggle_child:ParentName:0
 
   // Application Control
-  APPLICATION_CONTROL: 'application_control' // quit
+  APPLICATION_CONTROL: 'application_control', // quit
+
+  // Settings Control
+  SETTINGS_CONTROL: 'settings_control' // settings_control:setting_type:parameters
 } as const
 
 /**
@@ -93,7 +96,12 @@ export const UE_TO_WEB_MESSAGES = {
   CAMERA_UPDATE: 'camera_update',           // mode:perspective:distance:isTransitioning
 
   // Error
-  ERROR: 'error'                            // code:details (error message from UE5)
+  ERROR: 'error',                           // code:details (error message from UE5)
+
+  // Settings Updates
+  FPS_UPDATE: 'fps_update',                 // value (e.g., 62.4)
+  SETTING_APPLIED: 'setting_applied',       // type:value:success (e.g., resolution:1920x1080:true)
+  SETTINGS_OPTIONS: 'settings_options'      // data (available options from UE5)
 } as const
 
 // =============================================================================
@@ -262,6 +270,41 @@ export interface HierarchicalLayerData {
 }
 
 // =============================================================================
+// Settings Types
+// =============================================================================
+
+export type GraphicsQuality = 'Low' | 'Medium' | 'High' | 'Epic'
+export type AudioGroup = 'Master' | 'Ambient' | 'SFX'
+export type BandwidthOption = 'Auto' | 'Low Quality' | 'Medium Quality' | 'High Quality'
+export type ResolutionPreset = '720p' | '1080p' | '1440p' | '4k'
+
+export interface SettingAppliedData {
+  settingType: string
+  value: string
+  success: boolean
+  [key: string]: unknown
+}
+
+export interface FpsUpdateData {
+  fps: number
+  [key: string]: unknown
+}
+
+export interface SettingsOptionsData {
+  category: string
+  options: string[]
+  [key: string]: unknown
+}
+
+// Resolution mapping
+export const RESOLUTION_MAP: Record<ResolutionPreset, { width: number; height: number }> = {
+  '720p': { width: 1280, height: 720 },
+  '1080p': { width: 1920, height: 1080 },
+  '1440p': { width: 2560, height: 1440 },
+  '4k': { width: 3840, height: 2160 }
+}
+
+// =============================================================================
 // Incoming Message Union Type
 // =============================================================================
 
@@ -282,6 +325,9 @@ export type IncomingMessageType =
   | 'explosion_update'
   | 'camera_update'
   | 'error'
+  | 'fps_update'
+  | 'setting_applied'
+  | 'settings_options'
   | 'unknown'
 
 export interface ParsedMessage {
@@ -471,6 +517,47 @@ function parseDataString(type: IncomingMessageType, dataString: string): Record<
       return { count, groups }
     }
 
+    case 'fps_update': {
+      // value (e.g., 62.4)
+      return {
+        fps: parseFloat(parts[0]) || 0
+      } as FpsUpdateData
+    }
+
+    case 'setting_applied': {
+      // Handle two formats:
+      // 1. Simple: resolution:1920x1080:true
+      // 2. Audio: audio_volume:Ambient:0.85:success
+      const settingType = parts[0] || ''
+
+      // Audio volume has format: audio_volume:Group:value:status
+      if (settingType === 'audio_volume') {
+        const group = parts[1] || ''
+        const volumeValue = parts[2] || ''
+        const status = parts[3] || ''
+        return {
+          settingType,
+          value: `${group}:${volumeValue}`, // Combine group and value
+          success: status === 'success' || status === 'true'
+        } as SettingAppliedData
+      }
+
+      // Standard format: type:value:status
+      return {
+        settingType,
+        value: parts[1] || '',
+        success: parts[2] === 'true' || parts[2] === 'success'
+      } as SettingAppliedData
+    }
+
+    case 'settings_options': {
+      // category:option1,option2,option3
+      return {
+        category: parts[0] || '',
+        options: parts[1] ? parts[1].split(',') : []
+      } as SettingsOptionsData
+    }
+
     default:
       // Generic parsing for unknown types
       return {
@@ -575,6 +662,65 @@ export function createHierarchicalControlMessage(
 // Application Control
 export function createApplicationControlMessage(action: 'quit'): string {
   return createMessage(WEB_TO_UE_MESSAGES.APPLICATION_CONTROL, action)
+}
+
+// =============================================================================
+// Settings Control Messages (Web → UE5)
+// =============================================================================
+
+/**
+ * Apply resolution setting
+ * @param width Screen width
+ * @param height Screen height
+ */
+export function createResolutionMessage(width: number, height: number): string {
+  return createMessage(WEB_TO_UE_MESSAGES.SETTINGS_CONTROL, `resolution:${width}:${height}`)
+}
+
+/**
+ * Apply graphics quality preset
+ * @param quality Quality preset name (Low, Medium, High, Epic)
+ */
+export function createGraphicsQualityMessage(quality: GraphicsQuality): string {
+  return createMessage(WEB_TO_UE_MESSAGES.SETTINGS_CONTROL, `graphics_quality:${quality}`)
+}
+
+/**
+ * Set audio group volume
+ * @param group Audio group name (Master, Ambient, SFX)
+ * @param volume Volume level (0.0 - 1.0)
+ */
+export function createAudioVolumeMessage(group: AudioGroup, volume: number): string {
+  return createMessage(WEB_TO_UE_MESSAGES.SETTINGS_CONTROL, `audio_volume:${group}:${volume}`)
+}
+
+/**
+ * Apply bandwidth setting
+ * @param option Bandwidth option name
+ */
+export function createBandwidthMessage(option: BandwidthOption): string {
+  return createMessage(WEB_TO_UE_MESSAGES.SETTINGS_CONTROL, `bandwidth:${option}`)
+}
+
+/**
+ * Start FPS tracking
+ */
+export function createStartFpsTrackingMessage(): string {
+  return createMessage(WEB_TO_UE_MESSAGES.SETTINGS_CONTROL, 'fps_tracking:start')
+}
+
+/**
+ * Stop FPS tracking
+ */
+export function createStopFpsTrackingMessage(): string {
+  return createMessage(WEB_TO_UE_MESSAGES.SETTINGS_CONTROL, 'fps_tracking:stop')
+}
+
+/**
+ * Request available settings options from UE5
+ */
+export function createGetSettingsOptionsMessage(): string {
+  return createMessage(WEB_TO_UE_MESSAGES.SETTINGS_CONTROL, 'get_options:request')
 }
 
 // =============================================================================

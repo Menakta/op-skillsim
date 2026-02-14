@@ -50,6 +50,8 @@ import { useTrainingMessagesComposite } from "../hooks/useTrainingMessagesCompos
 import { useModalManager } from "../hooks/useModalManager";
 import { useScreenFlow } from "../hooks/useScreenFlow";
 import { useStreamConnection } from "../hooks/useStreamConnection";
+// Settings hook - UE5 settings communication
+import { useSettings, SettingsDebugPanel } from "../features/settings";
 // Redux sync - bridges hook state to Redux store
 import { useReduxSync } from "../store/useReduxSync";
 // Session complete redirect helper
@@ -155,6 +157,80 @@ export default function StreamingApp() {
     },
     onSessionEnd: (reason) => modals.openSessionEnd(reason),
   });
+
+  // ==========================================================================
+  // Audio Stream Handler - Ensure audio tracks are included and unmuted
+  // ==========================================================================
+  useEffect(() => {
+    if (stream.isConnected && videoRef.current && stream.videoStream) {
+      const video = videoRef.current;
+
+      console.log('🔊 Audio Debug Info:');
+      console.log('  - videoStream:', stream.videoStream);
+      console.log('  - audioStream:', stream.audioStream);
+      console.log('  - video.srcObject:', video.srcObject);
+      console.log('  - video.muted:', video.muted);
+
+      // Wait for VideoStream component to set srcObject (small delay)
+      setTimeout(() => {
+        const currentStream = video.srcObject as MediaStream;
+        if (currentStream) {
+          console.log('  - Current stream audio tracks:', currentStream.getAudioTracks().length);
+          console.log('  - Current stream video tracks:', currentStream.getVideoTracks().length);
+        }
+
+        // Merge audio tracks from audioStream into videoStream if available
+        if (stream.audioStream) {
+          const audioTracks = stream.audioStream.getAudioTracks();
+          console.log('🔊 Audio tracks available from audioStream:', audioTracks.length);
+
+          // Add audio tracks to the video's srcObject if not already present
+          if (audioTracks.length > 0 && currentStream) {
+            // Check if audio tracks are already present
+            const existingAudioTracks = currentStream.getAudioTracks();
+            if (existingAudioTracks.length === 0) {
+              // Add audio tracks
+              audioTracks.forEach(track => {
+                currentStream.addTrack(track);
+                console.log('✅ Added audio track to video stream:', track.id, track.enabled);
+              });
+            } else {
+              console.log('ℹ️ Audio tracks already present in stream');
+            }
+          }
+        }
+
+        // Unmute the video element
+        video.muted = false;
+        video.volume = 1.0;
+        console.log('🔊 Video unmuted, volume set to 1.0');
+
+        // Attempt to play with audio (handles browser autoplay policy)
+        video.play().catch((err) => {
+          console.warn('⚠️ Autoplay with audio blocked by browser. User interaction required:', err);
+
+          // Add one-time click handler to unmute on user interaction
+          const enableAudio = () => {
+            video.muted = false;
+            video.volume = 1.0;
+            video.play().then(() => {
+              console.log('✅ Audio enabled after user interaction');
+            }).catch((e) => console.error('❌ Failed to enable audio:', e));
+
+            // Remove listener after first interaction
+            document.removeEventListener('click', enableAudio);
+            document.removeEventListener('touchstart', enableAudio);
+            document.removeEventListener('keydown', enableAudio);
+          };
+
+          document.addEventListener('click', enableAudio, { once: true });
+          document.addEventListener('touchstart', enableAudio, { once: true });
+          document.addEventListener('keydown', enableAudio, { once: true });
+        });
+      }, 100); // Small delay to let VideoStream component set srcObject
+    }
+  }, [stream.isConnected, stream.videoStream, stream.audioStream]);
+
   // ==========================================================================
   // Session Info - Manages session state and expiry tracking
   // ==========================================================================
@@ -298,6 +374,40 @@ export default function StreamingApp() {
   // Sync training state to Redux store
   // This allows child components to use Redux selectors instead of props
   useReduxSync(training);
+
+  // ==========================================================================
+  // Settings Hook - UE5 Settings Communication
+  // ==========================================================================
+
+  // Stable callbacks for settings hook to prevent re-renders
+  const handleSettingApplied = useCallback((settingType: string, value: string, success: boolean) => {
+    console.log(
+      success ? "✅" : "❌",
+      `Setting ${settingType}:`,
+      value,
+      success ? "applied" : "failed"
+    );
+  }, []);
+
+  const handleFpsUpdate = useCallback(() => {
+    // FPS updates are handled internally by useSettings
+  }, []);
+
+  const settings = useSettings(training.sendRawMessage, {
+    debug: true,
+    onSettingApplied: handleSettingApplied,
+    onFpsUpdate: handleFpsUpdate,
+  });
+
+  // Stable ref for handleSettingsMessage to avoid infinite loops
+  const handleSettingsMessageRef = useRef(settings.handleSettingsMessage);
+  handleSettingsMessageRef.current = settings.handleSettingsMessage;
+
+  // Subscribe to settings messages from UE5
+  useEffect(() => {
+    if (!training.lastMessage) return;
+    handleSettingsMessageRef.current(training.lastMessage);
+  }, [training.lastMessage]);
   // ==========================================================================
   // Training Persistence - Auto-save and quiz submission
   // ==========================================================================
@@ -747,6 +857,29 @@ export default function StreamingApp() {
           forceOpen={forceSidebarOpen}
           forceActiveTab={forceSidebarTab}
           onOpenChange={handleSidebarOpenChange}
+          // Settings props - connected to UE5 via useSettings hook
+          settingsState={{
+            audioEnabled: settings.settings.audioEnabled,
+            masterVolume: settings.settings.masterVolume,
+            ambientVolume: settings.settings.ambientVolume,
+            sfxVolume: settings.settings.sfxVolume,
+            graphicsQuality: settings.settings.graphicsQuality,
+            resolution: settings.settings.resolution,
+            bandwidthOption: settings.settings.bandwidthOption,
+            fpsTrackingEnabled: settings.settings.fpsTrackingEnabled,
+            currentFps: settings.settings.currentFps,
+            showFpsOverlay: settings.settings.showFpsOverlay,
+          }}
+          settingsCallbacks={{
+            setAudioEnabled: settings.setAudioEnabled,
+            setMasterVolume: settings.setMasterVolume,
+            setAmbientVolume: settings.setAmbientVolume,
+            setSfxVolume: settings.setSfxVolume,
+            setGraphicsQuality: settings.setGraphicsQuality,
+            setResolution: settings.setResolution,
+            setBandwidthOption: settings.setBandwidthOption,
+            setShowFpsOverlay: settings.setShowFpsOverlay,
+          }}
         />
       )}
       {/* Cinematic Mode Timer - Show when connected and in cinematic mode */}
@@ -870,6 +1003,10 @@ export default function StreamingApp() {
         maxRetries={RETRY_CONFIG.maxRetries}
         showRetryInfo={stream.retryCount > 0}
       />
+      {/* Settings Debug Panel - Developer tool (Ctrl+Shift+D to toggle) */}
+      {stream.isConnected && (
+        <SettingsDebugPanel sendMessage={training.sendRawMessage} />
+      )}
       {/* Video Styles */}
       <style jsx global>{`
         video {

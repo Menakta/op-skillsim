@@ -28,7 +28,6 @@ import {
   EyeOff,
   ChevronDown,
   ChevronRight,
-  ChevronLeft,
   Maximize,
   Minimize,
   Sun,
@@ -52,7 +51,7 @@ import {
 import Image from 'next/image'
 import { useTheme } from '@/app/context/ThemeContext'
 import { useFittingOptions } from '@/app/features/training'
-import type { CameraPerspective } from '@/app/lib/messageTypes'
+import type { CameraPerspective, GraphicsQuality, BandwidthOption, ResolutionPreset } from '@/app/lib/messageTypes'
 import type { TrainingState } from '@/app/hooks/useTrainingMessagesComposite'
 
 // =============================================================================
@@ -142,6 +141,32 @@ interface UnifiedSidebarProps {
   onOpenChange?: (isOpen: boolean) => void
   /** Force switch to a specific tab (e.g., 'inventory' for walkthrough) */
   forceActiveTab?: MenuTab
+
+  // Settings Props (connected to UE5 via useSettings hook)
+  /** Settings state from useSettings hook */
+  settingsState?: {
+    audioEnabled: boolean
+    masterVolume: number
+    ambientVolume: number
+    sfxVolume: number
+    graphicsQuality: GraphicsQuality
+    resolution: ResolutionPreset
+    bandwidthOption: BandwidthOption
+    fpsTrackingEnabled: boolean
+    currentFps: number
+    showFpsOverlay: boolean
+  }
+  /** Settings callbacks from useSettings hook */
+  settingsCallbacks?: {
+    setAudioEnabled: (enabled: boolean) => void
+    setMasterVolume: (volume: number) => void
+    setAmbientVolume: (volume: number) => void
+    setSfxVolume: (volume: number) => void
+    setGraphicsQuality: (quality: GraphicsQuality) => void
+    setResolution: (preset: ResolutionPreset) => void
+    setBandwidthOption: (option: BandwidthOption) => void
+    setShowFpsOverlay: (show: boolean) => void
+  }
 }
 
 // =============================================================================
@@ -216,6 +241,10 @@ function UnifiedSidebarComponent({
   forceOpen,
   onOpenChange,
   forceActiveTab,
+
+  // Settings props
+  settingsState,
+  settingsCallbacks,
 }: UnifiedSidebarProps) {
   // ==========================================================================
   // State
@@ -227,16 +256,91 @@ function UnifiedSidebarComponent({
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [isFullscreen, setIsFullscreen] = useState(false)
 
-  // Settings state
-  const [audioEnabled, setAudioEnabled] = useState(true)
-  const [audioVolume, setAudioVolume] = useState(80)
-  const [graphicsQuality, setGraphicsQuality] = useState<'low' | 'medium' | 'high' | 'ultra'>('high')
+  // Settings state - use props from useSettings hook when available, fallback to local state
+  const [localAudioEnabled, setLocalAudioEnabled] = useState(true)
+  const [localMasterVolume, setLocalMasterVolume] = useState(100)
+  const [localAmbientVolume, setLocalAmbientVolume] = useState(70)
+  const [localSfxVolume, setLocalSfxVolume] = useState(80)
+  const [localGraphicsQuality, setLocalGraphicsQuality] = useState<GraphicsQuality>('High')
+  const [localShowFps, setLocalShowFps] = useState(false)
+  const [localResolution, setLocalResolution] = useState<ResolutionPreset>('1080p')
+  const [localBandwidthOption, setLocalBandwidthOption] = useState<BandwidthOption>('Auto')
 
-  // System/Performance state (these would typically come from the streaming SDK)
-  const [showFps, setShowFps] = useState(false)
-  const [targetFps, setTargetFps] = useState(60)
-  const [resolution, setResolution] = useState<'720p' | '1080p' | '1440p' | '4k'>('1080p')
-  const [bandwidthLimit, setBandwidthLimit] = useState(0) // 0 = unlimited
+  // Use settings from props or fallback to local state
+  const audioEnabled = settingsState?.audioEnabled ?? localAudioEnabled
+  const masterVolume = settingsState ? Math.round(settingsState.masterVolume * 100) : localMasterVolume
+  const ambientVolume = settingsState ? Math.round(settingsState.ambientVolume * 100) : localAmbientVolume
+  const sfxVolume = settingsState ? Math.round(settingsState.sfxVolume * 100) : localSfxVolume
+  const graphicsQuality = settingsState?.graphicsQuality ?? localGraphicsQuality
+  const showFps = settingsState?.showFpsOverlay ?? localShowFps
+  const currentFps = settingsState?.currentFps ?? 60
+  const resolution = settingsState?.resolution ?? localResolution
+  const bandwidthOption = settingsState?.bandwidthOption ?? localBandwidthOption
+
+  // Settings handlers - use callbacks from props or fallback to local state setters
+  const handleSetAudioEnabled = useCallback((enabled: boolean) => {
+    if (settingsCallbacks?.setAudioEnabled) {
+      settingsCallbacks.setAudioEnabled(enabled)
+    } else {
+      setLocalAudioEnabled(enabled)
+    }
+  }, [settingsCallbacks])
+
+  const handleSetMasterVolume = useCallback((volume: number) => {
+    if (settingsCallbacks?.setMasterVolume) {
+      settingsCallbacks.setMasterVolume(volume / 100) // Convert to 0-1 range
+    } else {
+      setLocalMasterVolume(volume)
+    }
+  }, [settingsCallbacks])
+
+  const handleSetAmbientVolume = useCallback((volume: number) => {
+    if (settingsCallbacks?.setAmbientVolume) {
+      settingsCallbacks.setAmbientVolume(volume / 100) // Convert to 0-1 range
+    } else {
+      setLocalAmbientVolume(volume)
+    }
+  }, [settingsCallbacks])
+
+  const handleSetSfxVolume = useCallback((volume: number) => {
+    if (settingsCallbacks?.setSfxVolume) {
+      settingsCallbacks.setSfxVolume(volume / 100) // Convert to 0-1 range
+    } else {
+      setLocalSfxVolume(volume)
+    }
+  }, [settingsCallbacks])
+
+  const handleSetGraphicsQuality = useCallback((quality: GraphicsQuality) => {
+    if (settingsCallbacks?.setGraphicsQuality) {
+      settingsCallbacks.setGraphicsQuality(quality)
+    } else {
+      setLocalGraphicsQuality(quality)
+    }
+  }, [settingsCallbacks])
+
+  const handleSetShowFps = useCallback((show: boolean) => {
+    if (settingsCallbacks?.setShowFpsOverlay) {
+      settingsCallbacks.setShowFpsOverlay(show)
+    } else {
+      setLocalShowFps(show)
+    }
+  }, [settingsCallbacks])
+
+  const handleSetResolution = useCallback((res: ResolutionPreset) => {
+    if (settingsCallbacks?.setResolution) {
+      settingsCallbacks.setResolution(res)
+    } else {
+      setLocalResolution(res)
+    }
+  }, [settingsCallbacks])
+
+  const handleSetBandwidthOption = useCallback((option: BandwidthOption) => {
+    if (settingsCallbacks?.setBandwidthOption) {
+      settingsCallbacks.setBandwidthOption(option)
+    } else {
+      setLocalBandwidthOption(option)
+    }
+  }, [settingsCallbacks])
 
   const { theme, toggleTheme } = useTheme()
   const isDark = theme === 'dark'
@@ -1076,8 +1180,9 @@ function UnifiedSidebarComponent({
               <div className={`p-2 sm:p-3 rounded-lg ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
                 <h3 className={`text-[11px] sm:text-xs font-medium mb-2 sm:mb-3 ${isDark ? 'text-white/70' : 'text-gray-600'}`}>Audio</h3>
                 <div className="space-y-2 sm:space-y-3">
+                  {/* Master Mute Toggle */}
                   <button
-                    onClick={() => setAudioEnabled(!audioEnabled)}
+                    onClick={() => handleSetAudioEnabled(!audioEnabled)}
                     className={`w-full flex items-center justify-between px-2 sm:px-3 py-2 sm:py-2.5 rounded-lg transition-all ${
                       isDark
                         ? 'bg-gray-700/50 hover:bg-gray-600/50'
@@ -1092,20 +1197,57 @@ function UnifiedSidebarComponent({
                       <div className={`absolute top-0.5 w-3 h-3 sm:w-4 sm:h-4 bg-white rounded-full transition-transform shadow ${audioEnabled ? 'translate-x-4 sm:translate-x-5' : 'translate-x-0.5'}`} />
                     </div>
                   </button>
+
+                  {/* Volume Sliders - Only show when audio is enabled */}
                   {audioEnabled && (
-                    <div className="px-1">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className={`text-[10px] sm:text-xs ${isDark ? 'text-white/50' : 'text-gray-500'}`}>Volume</span>
-                        <span className={`text-[10px] sm:text-xs font-mono ${isDark ? 'text-white/70' : 'text-gray-600'}`}>{audioVolume}%</span>
+                    <div className="space-y-3 px-1">
+                      {/* Master Volume */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className={`text-[10px] sm:text-xs ${isDark ? 'text-white/50' : 'text-gray-500'}`}>Master</span>
+                          <span className={`text-[10px] sm:text-xs font-mono ${isDark ? 'text-white/70' : 'text-gray-600'}`}>{masterVolume}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={masterVolume}
+                          onChange={(e) => handleSetMasterVolume(Number(e.target.value))}
+                          className={`w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-[#39BEAE] ${isDark ? 'bg-gray-700' : 'bg-gray-300'}`}
+                        />
                       </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max="100"
-                        value={audioVolume}
-                        onChange={(e) => setAudioVolume(Number(e.target.value))}
-                        className={`w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-[#39BEAE] ${isDark ? 'bg-gray-700' : 'bg-gray-300'}`}
-                      />
+
+                      {/* Ambient Volume */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className={`text-[10px] sm:text-xs ${isDark ? 'text-white/50' : 'text-gray-500'}`}>Ambient</span>
+                          <span className={`text-[10px] sm:text-xs font-mono ${isDark ? 'text-white/70' : 'text-gray-600'}`}>{ambientVolume}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={ambientVolume}
+                          onChange={(e) => handleSetAmbientVolume(Number(e.target.value))}
+                          className={`w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-[#39BEAE] ${isDark ? 'bg-gray-700' : 'bg-gray-300'}`}
+                        />
+                      </div>
+
+                      {/* SFX Volume */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className={`text-[10px] sm:text-xs ${isDark ? 'text-white/50' : 'text-gray-500'}`}>SFX</span>
+                          <span className={`text-[10px] sm:text-xs font-mono ${isDark ? 'text-white/70' : 'text-gray-600'}`}>{sfxVolume}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={sfxVolume}
+                          onChange={(e) => handleSetSfxVolume(Number(e.target.value))}
+                          className={`w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-[#39BEAE] ${isDark ? 'bg-gray-700' : 'bg-gray-300'}`}
+                        />
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1115,11 +1257,11 @@ function UnifiedSidebarComponent({
               <div className={`p-1 sm:p-2 rounded-lg ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
                 <h3 className={`text-[11px] sm:text-xs font-medium mb-2 sm:mb-3 ${isDark ? 'text-white/70' : 'text-gray-600'}`}>Graphics Quality</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 sm:gap-1.5">
-                  {(['low', 'medium', 'high', 'ultra'] as const).map((quality) => (
+                  {(['Low', 'Medium', 'High', 'Epic'] as const).map((quality) => (
                     <button
                       key={quality}
-                      onClick={() => setGraphicsQuality(quality)}
-                      className={`px-1.5 sm:px-2 py-1.5 sm:py-2 rounded-lg text-[11px] sm:text-xs font-medium capitalize transition-all ${
+                      onClick={() => handleSetGraphicsQuality(quality)}
+                      className={`px-1.5 sm:px-2 py-1.5 sm:py-2 rounded-lg text-[11px] sm:text-xs font-medium transition-all ${
                         graphicsQuality === quality
                           ? 'bg-[#39BEAE] text-white'
                           : isDark
@@ -1162,7 +1304,7 @@ function UnifiedSidebarComponent({
               <div className={`p-2 sm:p-3 rounded-lg ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
                 <h3 className={`text-[11px] sm:text-xs font-medium mb-2 sm:mb-3 ${isDark ? 'text-white/70' : 'text-gray-600'}`}>Performance</h3>
                 <button
-                  onClick={() => setShowFps(!showFps)}
+                  onClick={() => handleSetShowFps(!showFps)}
                   className={`w-full flex items-center justify-between px-2 sm:px-3 py-2 sm:py-2.5 rounded-lg transition-all ${
                     isDark
                       ? 'bg-gray-700/50 hover:bg-gray-600/50'
@@ -1177,28 +1319,19 @@ function UnifiedSidebarComponent({
                     <div className={`absolute top-0.5 w-3 h-3 sm:w-4 sm:h-4 bg-white rounded-full transition-transform shadow ${showFps ? 'translate-x-4 sm:translate-x-5' : 'translate-x-0.5'}`} />
                   </div>
                 </button>
-              </div>
-
-              {/* Target FPS */}
-              <div className={`p-2 sm:p-3 rounded-lg ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
-                <h3 className={`text-[11px] sm:text-xs font-medium mb-2 sm:mb-3 ${isDark ? 'text-white/70' : 'text-gray-600'}`}>Target FPS</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-1.5">
-                  {[30, 60, 90, 120].map((fps) => (
-                    <button
-                      key={fps}
-                      onClick={() => setTargetFps(fps)}
-                      className={`px-1.5 sm:px-2 py-1.5 sm:py-2 rounded-lg text-[11px] sm:text-xs font-medium transition-all ${
-                        targetFps === fps
-                          ? 'bg-[#39BEAE] text-white'
-                          : isDark
-                            ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      {fps}
-                    </button>
-                  ))}
-                </div>
+                {/* Current FPS Display */}
+                {showFps && (
+                  <div className={`mt-2 px-2 py-1.5 rounded-lg ${isDark ? 'bg-gray-800/50' : 'bg-gray-100'}`}>
+                    <div className="flex items-center justify-between">
+                      <span className={`text-[10px] sm:text-xs ${isDark ? 'text-white/50' : 'text-gray-500'}`}>Current FPS</span>
+                      <span className={`text-sm sm:text-base font-mono font-bold ${
+                        currentFps >= 50 ? 'text-green-500' : currentFps >= 30 ? 'text-yellow-500' : 'text-red-500'
+                      }`}>
+                        {currentFps.toFixed(1)}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Resolution */}
@@ -1211,7 +1344,7 @@ function UnifiedSidebarComponent({
                   {(['720p', '1080p', '1440p', '4k'] as const).map((res) => (
                     <button
                       key={res}
-                      onClick={() => setResolution(res)}
+                      onClick={() => handleSetResolution(res)}
                       className={`px-1.5 sm:px-2 py-1.5 sm:py-2 rounded-lg text-[11px] sm:text-xs font-medium transition-all ${
                         resolution === res
                           ? 'bg-[#39BEAE] text-white'
@@ -1226,31 +1359,28 @@ function UnifiedSidebarComponent({
                 </div>
               </div>
 
-              {/* Bandwidth */}
+              {/* Bandwidth / Network Quality */}
               <div className={`p-2 sm:p-3 rounded-lg ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
                 <div className="flex items-center gap-1.5 sm:gap-2 mb-2 sm:mb-3">
                   <Wifi className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#39BEAE]" />
-                  <h3 className={`text-[11px] sm:text-xs font-medium ${isDark ? 'text-white/70' : 'text-gray-600'}`}>Bandwidth Limit</h3>
+                  <h3 className={`text-[11px] sm:text-xs font-medium ${isDark ? 'text-white/70' : 'text-gray-600'}`}>Network Quality</h3>
                 </div>
-                <div className="space-y-1.5 sm:space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className={`text-[10px] sm:text-xs ${isDark ? 'text-white/50' : 'text-gray-500'}`}>
-                      {bandwidthLimit === 0 ? 'Unlimited' : `${bandwidthLimit} Mbps`}
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="5"
-                    value={bandwidthLimit}
-                    onChange={(e) => setBandwidthLimit(Number(e.target.value))}
-                    className={`w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-[#39BEAE] ${isDark ? 'bg-gray-700' : 'bg-gray-300'}`}
-                  />
-                  <div className="flex justify-between text-[9px] sm:text-[10px] text-gray-500">
-                    <span>Unlimited</span>
-                    <span>100 Mbps</span>
-                  </div>
+                <div className="grid grid-cols-2 gap-1 sm:gap-1.5">
+                  {(['Auto', 'Low Quality', 'Medium Quality', 'High Quality'] as const).map((option) => (
+                    <button
+                      key={option}
+                      onClick={() => handleSetBandwidthOption(option)}
+                      className={`px-1.5 sm:px-2 py-1.5 sm:py-2 rounded-lg text-[11px] sm:text-xs font-medium transition-all ${
+                        bandwidthOption === option
+                          ? 'bg-[#39BEAE] text-white'
+                          : isDark
+                            ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {option.replace(' Quality', '')}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
