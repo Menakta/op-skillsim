@@ -1,21 +1,4 @@
 'use client'
-
-/**
- * UnifiedSidebar Component (Drawer Menu)
- *
- * A collapsible drawer-style side menu that contains all features in one place.
- * - Hidden by default, opens from left edge via arrow/handle trigger
- * - Contains: Inventory, Settings, System/Performance, and mode-specific controls
- * - Can auto-close after actions or be closed manually
- *
- * Sections:
- * - Inventory: Materials (pipes, pressure test) - Training mode only
- * - Settings: Theme, Audio, Graphics
- * - System: FPS, Resolution, Bandwidth, Performance
- * - Controls: Explosion, Waypoints, Layers, Camera (both modes)
- * - Session: Pause/Resume, Quit - Training mode only
- */
-
 import { useState, useEffect, useCallback, useRef, memo } from 'react'
 import {
   Layers,

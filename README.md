@@ -1,505 +1,410 @@
-# OP SkillSim - OPNZ Plumbing Training Platform
+# OP-Skillsim Application Context
 
-**Project Type**: Educational VR Web Application
-**Client**: Open Polytechnic New Zealand Te Pukenga
-**Technology**: Next.js 15 + PureWeb + Unreal Engine 5 + LTI 1.0
-**Status**: Production Ready
+## Overview
+**OP-Skillsim** is a Next.js 15 web application for Open Polytechnic New Zealand (Te Pukenga) that provides an interactive plumbing training simulator. It streams a real-time 3D environment from an Unreal Engine 5 (UE5) application via PureWeb SDK for immersive skill-based training.
 
 ---
 
-## Project Overview
+## Technology Stack
 
-OP SkillSim delivers browser-based VR plumbing training without requiring local UE5 installation. Students learn real-world NZS3500-compliant procedures through interactive tasks, assessments, and standards-compliant workflows. The application streams a real-time 3D environment from a UE5 application via PureWeb SDK.
+### Frontend
+- **Framework**: Next.js 15 with App Router
+- **Language**: TypeScript
+- **State Management**: Redux Toolkit + React Context
+- **Styling**: Tailwind CSS + CSS Modules
+- **Data Fetching**: TanStack Query (React Query)
+- **Fonts**: Geist Sans & Geist Mono
 
-### Key Features
+### Backend/Services
+- **Streaming**: PureWeb Platform SDK (WebRTC streaming from UE5)
+- **Database**: Supabase (PostgreSQL)
+- **Authentication**: JWT (RS256) + LTI 1.3 integration
+- **Logging**: Pino logger
 
-- **Browser-based VR**: High-performance UE5 streaming via PureWeb SDK (WebRTC)
-- **Standards Integration**: NZS3500 New Zealand plumbing compliance
-- **Educational Assessment**: Interactive Q1-Q6 knowledge validation with hints
-- **LMS Integration**: Secure LTI 1.0 launch from iQualify with OAuth 1.0a
-- **Session Resume**: Resume training from saved phase using email lookup
-- **Teacher Dashboard**: Questionnaire, fitting management, analytics, and user approval
-- **Cinematic Mode**: 3D model exploration with explosion/layer controls
-- **Real-time Communication**: Bidirectional React-UE5 message protocol
-- **Walkthrough System**: Guided tutorials for cinematic and training modes
-- **PDF Export**: Training results export with detailed quiz performance
-- **Warm Pool**: Pre-warmed environments for faster stream connections
-
----
-
-## Tech Stack
-
-| Category | Technology | Version |
-|----------|------------|---------|
-| **Framework** | Next.js | 15.x (App Router) |
-| **Language** | TypeScript | 5.x |
-| **Runtime** | React | 19.x |
-| **State Management** | Redux Toolkit + React Context | 2.x |
-| **Styling** | Tailwind CSS | 4.x |
-| **Database** | Supabase (PostgreSQL) | - |
-| **Streaming** | PureWeb Platform SDK | 5.0.5 |
-| **Authentication** | JWT (RS256) + LTI 1.0 OAuth | jose 6.x |
-| **Data Fetching** | TanStack React Query | 5.x |
-| **Charts** | Recharts | 3.x |
-| **Icons** | Lucide React | 0.561.x |
-| **Email** | Resend | 6.x |
-| **PDF Export** | jsPDF + jspdf-autotable | 4.x / 5.x |
-| **Testing** | Vitest + Happy DOM | 4.x / 20.x |
-| **Deployment** | Vercel | - |
+### Key Dependencies
+- `@pureweb/platform-sdk` & `@pureweb/platform-sdk-react`: Real-time 3D streaming
+- `@supabase/supabase-js`: Database operations
+- `jose` & `jsonwebtoken`: JWT handling
+- `jspdf` & `jspdf-autotable`: PDF export for training results
+- `recharts`: Admin dashboard charts
+- `lucide-react`: Icons
 
 ---
 
 ## Project Structure
 
 ```
-app/
-├── admin/                          # Teacher/Admin Dashboard
-│   ├── components/                 # Dashboard UI components
-│   │   ├── charts/                 # SessionsChart, PhaseDistributionChart
-│   │   ├── layout/                 # DashboardLayout, Sidebar, Navbar
-│   │   ├── modals/                 # Dialog components
-│   │   ├── notifications/          # Notification UI
-│   │   └── ui/                     # StatCard, DataTable, Badge, Pagination
-│   ├── context/                    # AdminContext (isLti state)
-│   ├── hooks/                      # useAdminQueries, useCurrentUser, useExport
-│   ├── services/                   # notification.service.ts
-│   ├── fittings/                   # Pipe fittings management
-│   ├── questionnaires/             # Q1-Q6 question management
-│   ├── results/                    # Training results viewer
-│   ├── sessions/                   # Session management
-│   ├── users/                      # User management with approval workflow
-│   ├── settings/                   # Admin settings page
-│   └── profile/                    # Admin profile management
+/app
+├── /admin                  # Teacher/Admin dashboard
+│   ├── /components         # Dashboard UI components
+│   │   ├── /charts        # SessionsChart, PhaseDistributionChart, etc.
+│   │   ├── /layout        # DashboardLayout, Sidebar, Navbar
+│   │   └── /ui            # StatCard, Card, Badge, Pagination, etc.
+│   ├── /context           # AdminContext (isLti state)
+│   ├── /hooks             # useSessions, useQuestions, useFittings, useResults
+│   ├── /questionnaires    # Questionnaire management page
+│   ├── /results           # Training results page
+│   ├── /sessions          # Session management page
+│   ├── /fittings          # Pipe fittings management page
+│   ├── layout.tsx         # Admin layout with AdminProvider
+│   └── page.tsx           # Main dashboard page
 │
-├── api/                            # Next.js API Routes (42+ routes)
-│   ├── auth/                       # Authentication (login, register, session, logout)
-│   ├── lti/                        # LTI 1.0 launch endpoint
-│   ├── training/                   # Training session management
-│   │   ├── session/                # CRUD training sessions
-│   │   ├── sessions/               # List/search sessions
-│   │   ├── progress/               # Update training progress
-│   │   ├── complete/               # Complete training session
-│   │   ├── state/                  # Save/restore training state
-│   │   ├── export/                 # Export training data for PDF
-│   │   └── phase/                  # Phase completion
-│   ├── stream/                     # PureWeb streaming
-│   │   ├── credentials/            # Stream credentials
-│   │   ├── create/                 # Create stream session
-│   │   ├── agent-token/            # Agent authentication
-│   │   ├── warm-init/              # Initialize warm pool
-│   │   └── warm-claim/             # Claim pre-warmed environment
-│   ├── admin/                      # Admin endpoints
-│   │   ├── dashboard/              # Dashboard statistics
-│   │   ├── sessions/               # All training sessions
-│   │   ├── users/                  # User management
-│   │   ├── notifications/          # Notification management
-│   │   ├── questions/              # Question CRUD
-│   │   ├── fittings/               # Fitting options CRUD
-│   │   └── results/                # Quiz results analytics
-│   ├── quiz/                       # Quiz response submission
-│   ├── questions/                  # Fetch Q1-Q6 questions
-│   ├── fittings/                   # Pipe fitting options
-│   └── walkthrough/                # Tutorial/walkthrough steps
+├── /api                    # API Routes
+│   ├── /auth
+│   │   ├── /login         # POST: Email/password login
+│   │   ├── /logout        # POST: Clear session
+│   │   ├── /register      # POST: Outsider registration
+│   │   ├── /session       # GET: Validate session
+│   │   └── /simple-login  # POST: Non-LTI authentication
+│   ├── /lti
+│   │   └── /launch        # POST: LTI 1.3 launch handler
+│   ├── /training
+│   │   ├── /session       # GET/POST/PATCH: Training session CRUD
+│   │   ├── /sessions      # GET/POST: Multiple sessions management
+│   │   ├── /progress      # PATCH: Update training progress
+│   │   ├── /complete      # POST: Complete training session
+│   │   ├── /state         # GET/PATCH: Save/restore training state
+│   │   └── /export        # GET: Export training data for PDF
+│   ├── /quiz
+│   │   └── /response      # POST: Submit quiz answers
+│   ├── /questions         # GET: Fetch question data
+│   ├── /fittings          # GET/POST/PATCH/DELETE: Pipe fittings CRUD
+│   ├── /stream
+│   │   ├── /credentials   # GET: PureWeb stream credentials
+│   │   ├── /agent-token   # POST: Create PureWeb agent token
+│   │   └── /warm-claim    # POST: Claim pre-warmed environment
+│   └── /admin
+│       ├── /dashboard     # GET: Dashboard statistics
+│       ├── /sessions      # GET: All training sessions
+│       └── /results       # GET: Training results
 │
-├── components/                     # Shared React Components
-│   ├── ControlPanel/               # Training control UI
-│   │   ├── index.tsx               # Main toolbar orchestrator
-│   │   ├── ToolBar.tsx             # Bottom toolbar with tool buttons
-│   │   ├── UnifiedSidebar.tsx      # Left sidebar (materials, controls)
-│   │   ├── TrainingTab.tsx         # Training progress display
-│   │   ├── TaskTools.tsx           # Task-specific tool options
-│   │   ├── ToolsTab.tsx            # Tool selection grid
-│   │   ├── LayersTab.tsx           # Layer visibility controls
-│   │   ├── CinematicTab.tsx        # Cinematic mode controls
-│   │   └── CameraTab.tsx           # Camera position controls
-│   ├── StreamingApp.tsx            # Main streaming app orchestrator
-│   ├── ModalContainer.tsx          # Centralized modal rendering
-│   ├── ResultExportPDF.tsx         # PDF result export
-│   └── errors/                     # Error boundaries
+├── /components             # Shared UI Components
+│   ├── StreamingApp.tsx   # Main streaming application (orchestrates everything)
+│   ├── /ControlPanel      # Tool selection UI
+│   │   ├── ToolBar.tsx    # Bottom toolbar with tool buttons
+│   │   ├── UnifiedSidebar # Left sidebar (materials, controls)
+│   │   ├── TrainingTab    # Training progress display
+│   │   └── TaskTools      # Task-specific tool options
+│   ├── /shared            # Reusable UI components
+│   │   ├── BaseModal      # Modal wrapper
+│   │   ├── Button         # Styled button
+│   │   └── ModalMessage   # Modal content
+│   ├── MessageLog.tsx     # Debug message display
+│   ├── ModalContainer.tsx # Centralized modal rendering
+│   ├── ThemeToggle.tsx    # Dark/light theme switch
+│   └── ResultExportPDF.tsx# PDF generation for results
 │
-├── features/                       # Feature Modules (Domain-driven)
-│   ├── camera/                     # Camera control hooks
-│   ├── cinematic/                  # Cinematic mode & 3D exploration
-│   ├── explosion/                  # Building explosion/assembly visualization
-│   ├── feedback/                   # Training feedback modals
-│   ├── idle/                       # Idle detection & warnings
-│   ├── layers/                     # Layer visibility controls
-│   ├── messaging/                  # PureWeb message protocol
-│   ├── onboarding/                 # User onboarding flow
-│   ├── questions/                  # Quiz/Question handling
-│   ├── streaming/                  # PureWeb SDK integration
-│   ├── training/                   # Training progress & state
-│   └── walkthrough/                # Tutorial walkthrough UI
+├── /features              # Feature Modules (Domain-driven)
+│   ├── /camera            # Camera control hooks
+│   ├── /explosion         # Building explosion/assembly
+│   ├── /feedback          # Training feedback modals
+│   │   └── TrainingCompleteModal.tsx
+│   ├── /idle              # Idle detection & warning
+│   │   └── IdleWarningModal.tsx
+│   ├── /layers            # Layer visibility control
+│   ├── /messaging         # WebRTC message bus
+│   │   └── useMessageBus.ts
+│   ├── /questions         # Quiz question handling
+│   │   ├── QuestionModal.tsx
+│   │   └── useQuestionFlow.ts
+│   ├── /training          # Core training logic
+│   │   ├── useTrainingState.ts
+│   │   └── useToolSelection.ts
+│   └── index.ts           # Feature exports
 │
-├── hooks/                          # Global React Hooks
-│   ├── useStreamConnection.ts      # PureWeb connection lifecycle
-│   ├── useTrainingMessagesComposite.ts # Composite message handler
-│   ├── useModalManager.ts          # Modal state management
-│   ├── useScreenFlow.ts            # Screen/page navigation
-│   ├── useSessionSelection.ts      # Previous session selection
-│   ├── useTrainingPersistence.ts   # Save/restore training state
-│   └── useStreamHealthMonitor.ts   # Connection health checks
+├── /hooks                  # Application Hooks
+│   ├── useStreamConnection.ts    # PureWeb SDK connection
+│   ├── useModalManager.ts        # Centralized modal state
+│   ├── useTrainingMessagesComposite.ts  # Combines all feature hooks
+│   ├── useSessionInfo.ts         # Session/auth state
+│   ├── useSessionSelection.ts    # Resume/new session flow
+│   ├── useTrainingPersistence.ts # Auto-save progress
+│   └── useScreenFlow.ts          # Screen state machine
 │
-├── lib/                            # Utility & Library Code
-│   ├── supabase/                   # Supabase clients (admin, client, server)
-│   ├── sessions/                   # SessionManager (JWT sessions)
-│   ├── events/                     # Event bus (typed emitter)
-│   ├── auth.ts                     # JWT signing/verification (RS256)
-│   ├── lti.ts                      # LTI 1.0 OAuth signature validation
-│   ├── logger.ts                   # Pino logger with structured logging
-│   ├── messageTypes.ts             # Message protocol constants
-│   └── warmPool.ts                 # PureWeb warm pool management
+├── /services              # API Service Layer
+│   ├── training-session.service.ts  # Training session operations
+│   ├── quiz.service.ts              # Quiz submission
+│   ├── stream.service.ts            # Stream credentials
+│   ├── session.service.ts           # Auth session
+│   ├── training.service.ts          # Training logic
+│   └── fitting.service.ts           # Pipe fittings data
 │
-├── services/                       # Business Logic Services
-│   ├── training.service.ts         # Training progress calculations
-│   ├── training-session.service.ts # Session database operations
-│   ├── quiz.service.ts             # Quiz response handling
-│   ├── stream.service.ts           # PureWeb streaming operations
-│   └── fitting.service.ts          # Pipe fitting operations
+├── /store                 # Redux Store
+│   ├── index.ts           # Store configuration
+│   ├── /slices
+│   │   ├── trainingSlice.ts   # Training state
+│   │   ├── uiSlice.ts         # UI state
+│   │   └── connectionSlice.ts # Connection state
+│   ├── hooks.ts           # Typed Redux hooks
+│   └── useReduxSync.ts    # Sync hooks to Redux
 │
-├── store/                          # Redux Store
-│   ├── slices/                     # Redux slices (training, ui, connection)
-│   ├── StoreProvider.tsx           # Store initialization
-│   └── selectors.ts                # Memoized selectors
+├── /config                # Configuration
+│   ├── app.config.ts      # App settings, retry config
+│   ├── tasks.config.ts    # Training task definitions
+│   ├── questions.config.ts# Question database (Q1-Q6)
+│   └── camera.config.ts   # Camera perspectives
 │
-├── types/                          # TypeScript Types
-│   ├── session.types.ts            # User/session types
-│   ├── training.types.ts           # Training domain types
-│   ├── training-session.types.ts   # Database schema types
-│   ├── messages.types.ts           # Message protocol types
-│   ├── quiz.types.ts               # Quiz/question types
-│   ├── fitting.types.ts            # Pipe fitting types
-│   └── walkthrough.types.ts        # Tutorial types
+├── /types                 # TypeScript Types
+│   ├── session.types.ts   # User/session types
+│   ├── training.types.ts  # Training state types
+│   ├── training-session.types.ts  # DB session types
+│   ├── quiz.types.ts      # Quiz data types
+│   ├── messages.types.ts  # WebRTC message types
+│   ├── ui.types.ts        # UI component types
+│   └── fitting.types.ts   # Pipe fitting types
 │
-├── config/                         # Centralized Configuration
-│   ├── tasks.config.ts             # Training tasks (6 phases)
-│   ├── questions.config.ts         # Q1-Q6 question configuration
-│   └── camera.config.ts            # Camera presets & defaults
+├── /lib                   # Utilities
+│   ├── supabase/          # Supabase client
+│   ├── database.ts        # Database helpers
+│   ├── messageTypes.ts    # Message constants
+│   ├── logger.ts          # Pino logger
+│   ├── errorUtils.ts      # Error handling
+│   ├── clearSessionData.ts# Session cleanup
+│   └── sessionCompleteRedirect.ts  # Redirect helpers
 │
-├── training-results/               # Training results page (public)
-├── session-complete/               # Session completion page
-└── login/                          # Login page
+├── /context               # React Context
+│   └── ThemeContext.tsx   # Dark/light theme
+│
+├── /providers             # Provider Components
+│   └── QueryProvider.tsx  # TanStack Query
+│
+├── layout.tsx             # Root layout
+├── page.tsx               # Home page (StreamingApp)
+├── globals.css            # Global styles
+│
+├── /login                 # Login page
+├── /register              # Registration page
+├── /pending-approval      # Pending approval page
+├── /session-complete      # Session end page
+└── /training-results      # Results display page
+
+/middleware.ts             # Route protection (RBAC)
+/auth.ts                   # JWT signing/verification
 ```
 
 ---
 
-## Training System
+## Core Features
 
-### 6-Phase Training Tasks
+### 1. Training Simulation
+- **6-Phase Training**: XRay Scanning → Excavation → Measuring → Pipe Connection → Glue Application → Pressure Testing
+- **Real-time 3D Streaming**: UE5 environment streamed via PureWeb WebRTC
+- **Interactive Tools**: Tool selection, pipe selection, pressure testing
+- **Progress Tracking**: Real-time progress saved to Supabase
 
-| Index | Tool | Task Name | Description |
-|-------|------|-----------|-------------|
-| 0 | XRay | Pipe Location Scanning | Locate underground pipes before excavation |
-| 1 | Shovel | Excavation | Dig trench to proper depth (450mm) and width (400mm) |
-| 2 | Measuring | Pipe Measuring | Measure and verify pipe slope (1:60) |
-| 3 | PipeConnection | Pipe Connection | Select and connect correct fittings |
-| 4 | Glue | Glue Application | Apply PVC cement properly |
-| 5 | PressureTester | Pressure Testing | Conduct air/water pressure test at 20 PSI |
+### 2. Quiz System
+- **6 Questions (Q1-Q6)**: Related to plumbing knowledge
+- **Categories**: Scanning, excavation, measurement, connection, testing
+- **Multiple Attempts**: Retry on wrong answers
+- **Results Tracking**: Answers, time, attempts saved per question
 
-### Quiz Questions (Q1-Q6)
+### 3. Session Management
+- **Resume/New Session**: Students can resume previous sessions or start fresh
+- **State Persistence**: Full training state saved (tool, camera, explosion, progress)
+- **Cinematic Mode**: Initial exploration mode with timer before training
+- **Idle Detection**: Auto-logout after 5 minutes of inactivity
 
-| ID | Topic | Phase |
-|----|-------|-------|
-| Q1 | XRay before excavation | After XRay |
-| Q2 | Trench depth for toilet waste | After Excavation |
-| Q3 | Trench width for 100mm pipe | After Excavation |
-| Q4 | Pipe slope ratio (1:60) | After Measuring |
-| Q5 | Maximum residential pressure | Before Pressure Test |
-| Q6 | Test PSI per NZS3500 (20 PSI) | After Pressure Test |
+### 4. Authentication
+- **LTI 1.3**: Integration with LMS (Canvas, Moodle, etc.)
+- **Simple Login**: Email/password for non-LTI users
+- **Outsider Registration**: Public registration with admin approval workflow
+- **Role-Based Access**: Student, Teacher, Admin roles
 
-### Training Data Flow
-
-```
-User completes phase → onTaskCompleted callback
-    ↓
-trainingSessionService.completePhase() → POST /api/training/phase
-    ↓
-Database: training_sessions.phases_completed incremented
-    ↓
-Training completes → useTrainingPersistence saves final data
-    ↓
-Quiz results saved to quiz_responses table
-    ↓
-/api/training/export returns data for PDF
-```
+### 5. Admin Dashboard
+- **Overview Stats**: Total sessions, questions, results
+- **Charts**: Session status, phase distribution, score distribution
+- **Student Management**: View student progress, top performers
+- **Content Management**: Questionnaires, fittings (pipe options)
 
 ---
 
-## Message Protocol
+## Data Flow
 
-Bidirectional JSON communication between React and Unreal Engine 5.
-
-### Web → UE5 Commands
-
-| Command | Format | Description |
-|---------|--------|-------------|
-| `training_control` | `start\|pause\|reset\|test` | Control training flow |
-| `start_from_task` | `0-6` | Resume from specific phase |
-| `tool_select` | `XRay\|Shovel\|Measuring\|PipeConnection\|Glue\|PressureTester` | Select tool |
-| `task_start` | `ToolName` or `ToolName:PipeType` | Start task |
-| `pipe_select` | `y-junction\|elbow\|100mm\|150mm` | Select fitting |
-| `test_plug_select` | `AirPlug\|WaterPlug\|AccessCap` | Select test plug |
-| `pressure_test_start` | `air_test\|water_test\|player_closed_q6` | Start pressure test |
-| `question_answer` | `Q1:tryCount:true/false` | Submit answer |
-| `question_hint` | `Q1` | Request hint |
-| `camera_control` | `Front\|Back\|Left\|Right\|Top\|orbit_start\|reset` | Camera control |
-| `explosion_control` | `explode\|assemble\|0-100` | Model explosion |
-| `waypoint_control` | `list\|activate:0\|deactivate` | Waypoint navigation |
-| `layer_control` | `list\|toggle:0\|show:Name\|hide:Name` | Layer visibility |
-
-### UE5 → Web Messages
-
-| Message | Format | Description |
-|---------|--------|-------------|
-| `training_progress` | `progress:taskName:phase:currentTask:totalTasks:isActive` | Progress update |
-| `tool_change` | `toolName` | Tool changed |
-| `task_completed` | `taskId` | Task finished |
-| `question_request` | `Q1-Q6` | Show question modal |
-| `pressure_test_result` | `passed:pressure:testType` | Test results |
-| `waypoint_list` | JSON array | Available waypoints |
-| `layer_list` | JSON array | Layer visibility |
-| `explosion_update` | `value:isAnimating` | Explosion state |
-| `camera_update` | `mode:perspective:distance:transitioning` | Camera state |
-
----
-
-## Authentication Flow
-
-### LTI 1.0 Launch Flow (iQualify)
-
+### Training Session Flow
 ```
-iQualify LMS → POST /api/lti/launch (OAuth 1.0a signature)
-    ↓
-Server validates signature using LTI_SHARED_SECRET
-    ↓
-Extract user info: user_id, roles, email, name, context_id
-    ↓
-SessionManager.createSession() creates/updates LTI user
-    ↓
-Generate JWT token (RS256) with role
-    ↓
-Set HTTP-only cookie with token
-    ↓
-Redirect:
-  - Students → / (training page)
-  - Teachers/Admins → /admin (dashboard)
+1. User logs in (LTI or email/password)
+2. Session created in Supabase (training_sessions table)
+3. PureWeb stream connects to UE5 instance
+4. User completes training phases with quiz questions
+5. Progress auto-saved every 5 seconds or on phase change
+6. On completion, quiz results submitted and session marked complete
+7. Results page displays summary with PDF export option
 ```
 
-### Session Resume Feature
+### Message Flow (Web ↔ UE5)
+```
+Web → UE5:
+- tool_change: Switch active tool
+- pipe_selection: Select pipe type
+- training_control: start/pause/resume/reset
+- camera_control: Set perspective/orbit
+- explosion_control: Explode/assemble building
 
-Students can resume training from their saved phase:
-
-1. On LTI launch, system checks for active sessions by email
-2. If sessions exist, shows `SessionSelectionScreen` with options:
-   - Resume existing session (skips cinematic, starts at saved phase)
-   - Start new session (shows cinematic mode first)
-3. On resume, `start_from_task:<phaseIndex>` command sent to UE5
-4. Quiz answers restored from database to in-memory state
-
-### Role-Based Access Control
-
-| Role | Access |
-|------|--------|
-| **Student** | Training interface, quiz, results |
-| **Teacher** | Dashboard, questionnaire editing, fitting management |
-| **Admin** | Full access including user management |
-
----
-
-## Admin Dashboard
-
-| Page | Features |
-|------|----------|
-| **Dashboard** | Stats overview, training analytics charts, sessions chart |
-| **Students** | Progress tracking, search, filters, pagination |
-| **Sessions** | Training sessions viewer with phase tracking |
-| **Users** | User management with approval workflow, email notifications |
-| **Questionnaires** | Q1-Q6 question editing with NZS3500 references |
-| **Fittings** | Correct/distractor fitting management |
-| **Results** | Quiz results with detailed breakdown and PDF export |
-| **Notifications** | Admin notifications for user approvals |
+UE5 → Web:
+- training_progress: Progress updates
+- task_completed: Phase completion
+- question_request: Trigger quiz question
+- tool_change_ack: Tool change confirmation
+- waypoint_list: Available camera waypoints
+```
 
 ---
 
 ## Database Schema (Supabase)
 
-### Core Tables
-
-| Table | Purpose |
-|-------|---------|
-| `user_profiles` | User accounts with roles and approval status |
-| `teacher_profiles` | Teacher permissions and settings |
-| `training_sessions` | Training progress with phase tracking |
-| `quiz_responses` | Quiz answers with question_data JSONB |
-| `questionnaires` | Q1-Q6 question definitions |
-| `fitting_options` | Pipe fitting options |
-| `admin_notifications` | Admin notification system |
-| `walkthrough_steps` | Cinematic walkthrough steps |
-| `training_walkthrough_steps` | Training mode walkthrough steps |
-
-### Training Sessions Schema
-
-```sql
-CREATE TABLE training_sessions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  session_id TEXT NOT NULL UNIQUE,
-  email TEXT,
-  student JSONB,                    -- {user_id, email, full_name, institution}
-  course_id TEXT,
-  course_name TEXT,
-  current_training_phase TEXT,      -- Phase index as string ("0"-"6")
-  overall_progress INTEGER DEFAULT 0,
-  phases_completed INTEGER DEFAULT 0,
-  total_score INTEGER DEFAULT 0,
-  total_time_spent INTEGER DEFAULT 0, -- seconds
-  status TEXT DEFAULT 'active',     -- 'active' | 'completed'
-  persisted_state JSONB,            -- Training state for resume
-  final_results JSONB,              -- Final results with quiz performance
-  start_time TIMESTAMPTZ,
-  end_time TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-```
-
-### Quiz Responses Schema
-
-```sql
-CREATE TABLE quiz_responses (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  session_id UUID REFERENCES training_sessions(id),
-  question_data JSONB,              -- {"Q1": {answer, correct, attempts, time}}
-  total_questions INTEGER,
-  correct_count INTEGER,
-  score_percentage NUMERIC,
-  answered_at TIMESTAMPTZ DEFAULT now()
-);
-```
+### Key Tables
+- `user_profiles`: User registration data, approval status
+- `sessions`: Login sessions (JWT tracking)
+- `training_sessions`: Training progress, state, results
+- `quiz_responses`: Individual quiz answers
+- `fitting_options`: Pipe types and categories
+- `questions`: Quiz question definitions
 
 ---
 
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18+ (v20 recommended)
-- npm or yarn
-- Supabase account
-- PureWeb account and credentials
-- LTI consumer credentials (for LMS integration)
-
-### Installation
-
-```bash
-# Clone repository
-git clone <repository-url>
-cd op-skillsim
-
-# Install dependencies
-npm install
-```
-
-### Generate JWT Keys
-
-```bash
-# Generate private key
-openssl genrsa -out keys/jwt_private.pem 2048
-
-# Generate public key
-openssl rsa -in keys/jwt_private.pem -pubout -out keys/jwt_public.pub
-```
-
-### Environment Variables
-
-Create `.env.local`:
+## Environment Variables
 
 ```env
-# PureWeb Configuration
-NEXT_PUBLIC_PUREWEB_PROJECT_ID=your_project_id
-NEXT_PUBLIC_PUREWEB_MODEL_ID=your_model_id
-NEXT_PUBLIC_PUREWEB_CLIENT_ID=your_client_id
-NEXT_PUBLIC_PUREWEB_CLIENT_SECRET=your_client_secret
-NEXT_PUBLIC_PUREWEB_ACCESS_TOKEN=your_access_token
-NEXT_PUBLIC_PUREWEB_API_KEY=your_api_key
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
 
-# Supabase Configuration
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+# JWT
+JWT_SECRET=
+JWT_PRIVATE_KEY_PATH=
+JWT_PUBLIC_KEY_PATH=
 
-# JWT Configuration
-JWT_SECRET=your_jwt_secret_min_32_chars
-JWT_PRIVATE_KEY_PATH=keys/jwt_private.pem
-JWT_PUBLIC_KEY_PATH=keys/jwt_public.pub
+# PureWeb
+NEXT_PUBLIC_PUREWEB_PROJECT_ID=
+NEXT_PUBLIC_PUREWEB_MODEL_ID=
+PUREWEB_PROJECT_CLIENT_ID=
+PUREWEB_PROJECT_CLIENT_SECRET=
 
-# LTI Configuration
-NEXT_PUBLIC_LTI_CONSUMER_KEY=op-skillsim-polytechnic-nz
-NEXT_PUBLIC_LTI_SHARED_SECRET=your_lti_secret
-
-# Email (Resend)
-RESEND_API_KEY=your_resend_api_key
-
-# Origin Whitelist (CORS)
-ORIGIN_WHITELIST=http://localhost:3000,https://your-domain.com
-```
-
-### Development
-
-```bash
-# Start development server
-npm run dev
-
-# Open http://localhost:3000
-```
-
-### Build & Production
-
-```bash
-# Build for production
-npm run build
-
-# Start production server
-npm start
-
-# Run tests
-npm test
-npm run test:run      # CI mode
-npm run test:coverage # Coverage report
+# LTI
+LTI_CLIENT_ID=
+LTI_PLATFORM_URL=
+LTI_DEPLOYMENT_ID=
 ```
 
 ---
 
-## Deployment (Vercel)
+## Key Hooks & Their Responsibilities
 
-1. Connect repository to Vercel
-2. Configure environment variables in Vercel dashboard
-3. Deploy (automatic on push to main)
-
-### Important Notes
-
-- Set all `NEXT_PUBLIC_*` variables for client-side access
-- Redeploy after adding new environment variables
-- Configure allowed domains for LTI in production
-- Ensure PureWeb model is active and accessible
-- Generate and upload JWT keys to Vercel
-
----
-
-## Scripts
-
-| Script | Description |
-|--------|-------------|
-| `npm run dev` | Start development server |
-| `npm run build` | Build for production |
-| `npm run start` | Start production server |
-| `npm run lint` | Run ESLint |
-| `npm test` | Run tests in watch mode |
-| `npm run test:run` | Run tests once (CI) |
-| `npm run test:coverage` | Generate coverage report |
+| Hook | Purpose |
+|------|---------|
+| `useStreamConnection` | PureWeb SDK lifecycle, reconnection |
+| `useTrainingMessagesComposite` | Combines all feature hooks for training |
+| `useTrainingState` | Training progress, phase tracking |
+| `useToolSelection` | Tool and pipe selection logic |
+| `useQuestionFlow` | Quiz question handling |
+| `useCameraControl` | Camera perspective and orbit |
+| `useExplosionControl` | Building explosion animation |
+| `useLayerControl` | Layer visibility, waypoints |
+| `useModalManager` | Centralized modal state |
+| `useSessionInfo` | Auth session, expiry tracking |
+| `useSessionSelection` | Resume/new session flow |
+| `useTrainingPersistence` | Auto-save, quiz submission |
+| `useIdleDetection` | Inactivity timeout |
 
 ---
 
-## License
+## Training Task Sequence
 
-Private - All rights reserved
-Open Polytechnic New Zealand Te Pukenga
+| # | Tool | Task Name | Description |
+|---|------|-----------|-------------|
+| 1 | XRay | Pipe Location Scanning | Use X-Ray scanner to locate pipes |
+| 2 | Shovel | Excavation | Excavate trench for installation |
+| 3 | Measuring | Pipe Measuring | Measure pipe dimensions |
+| 4 | PipeConnection | Pipe Connection | Connect pipes correctly |
+| 5 | Glue | Glue Application | Apply glue to secure connections |
+| 6 | PressureTester | Pressure Testing | Test system for leaks |
+
+---
+
+## Quiz Questions
+
+| ID | Category | Topic |
+|----|----------|-------|
+| Q1 | Scanning | Pre-excavation safety |
+| Q2 | Excavation | Minimum excavation depth |
+| Q3 | Excavation | Standard trench width |
+| Q4 | Measurement | Correct drainage slope |
+| Q5 | Testing | Maximum residential pressure |
+| Q6 | Testing | PSI level for air pressure test |
+
+---
+
+## Admin Routes & Permissions
+
+| Route | Required Role | Description |
+|-------|---------------|-------------|
+| `/admin` | teacher, admin | Dashboard overview |
+| `/admin/sessions` | teacher, admin | Session management |
+| `/admin/questionnaires` | teacher, admin | Quiz management |
+| `/admin/results` | teacher, admin | Training results |
+| `/admin/fittings` | teacher, admin | Pipe fittings |
+| `/api/admin/*` | teacher, admin | Admin API endpoints |
+
+---
+
+## Session Lifecycle
+
+```
+1. CREATED → Session started
+2. ACTIVE → Training in progress
+3. PAUSED → User paused training
+4. COMPLETED → All phases finished
+5. ABANDONED → Session expired/quit
+```
+
+---
+
+## Error Handling
+
+- **Stream Errors**: Auto-retry with exponential backoff (max 3 retries)
+- **Session Expiry**: Warning modal before timeout, redirect to login
+- **Idle Timeout**: 5-minute warning, then auto-logout
+- **API Errors**: Graceful degradation with error messages
+
+---
+
+## PDF Export
+
+Training results can be exported as PDF including:
+- Student information
+- Session details (phases, time spent)
+- Quiz results (answers, correctness, time, attempts)
+- Overall grade and score
+
+---
+
+## Theme Support
+
+- **Dark Mode**: Default, optimized for streaming
+- **Light Mode**: Alternative theme
+- Persisted via ThemeContext and localStorage
+
+---
+
+## Performance Optimizations
+
+- **Dynamic Imports**: Heavy components loaded on demand
+- **Pre-warming**: PureWeb connection pre-authenticated on mount
+- **Memoization**: `useMemo` and `useCallback` throughout
+- **Redux Toolkit**: Efficient state updates
+- **React Query**: Caching and background refetching
+
+---
+
+## Security Measures
+
+- **JWT RS256**: Asymmetric key signing
+- **RBAC Middleware**: Route-level access control
+- **Outsider Approval**: Manual admin approval for public registrations
+- **Session Tokens**: HTTP-only cookies
+- **Origin Validation**: API requests verified
+
+---
+
+*Last Updated: 2026-02-01*
