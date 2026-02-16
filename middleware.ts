@@ -19,7 +19,7 @@
 
 import { NextResponse, type NextRequest } from 'next/server'
 import { jwtVerify } from 'jose'
-import { createClient } from '@supabase/supabase-js'
+import { createServerClient } from '@supabase/ssr'
 
 const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'your-super-secret-jwt-key-min-32-chars'
@@ -50,20 +50,20 @@ async function getSessionFromToken(token: string): Promise<SessionPayload | null
   }
 }
 
-// Supabase client for middleware (lazy initialized)
-let _supabaseAdmin: ReturnType<typeof createClient> | null = null
-
+// Supabase client for middleware using SSR package (Edge Runtime compatible)
 function getSupabaseAdmin() {
-  if (!_supabaseAdmin) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    if (url && serviceRoleKey) {
-      _supabaseAdmin = createClient(url, serviceRoleKey, {
-        auth: { autoRefreshToken: false, persistSession: false },
-      })
-    }
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !serviceRoleKey) {
+    return null
   }
-  return _supabaseAdmin
+  return createServerClient(url, serviceRoleKey, {
+    cookies: {
+      // No-op cookie handlers since we're using service role key
+      getAll: () => [],
+      setAll: () => {},
+    },
+  })
 }
 
 interface UserProfile {

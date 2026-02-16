@@ -268,6 +268,6 @@ export class SettingsDebugger {
  * Quick test function for browser console
  */
 export function quickTest(sendMessageFn: (msg: string) => void) {
-  const debugger = new SettingsDebugger(sendMessageFn)
-  return debugger.testAll()
+  const settingsDebugger = new SettingsDebugger(sendMessageFn)
+  return settingsDebugger.testAll()
 }
