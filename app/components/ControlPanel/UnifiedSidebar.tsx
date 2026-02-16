@@ -53,6 +53,7 @@ import { useTheme } from '@/app/context/ThemeContext'
 import { useFittingOptions } from '@/app/features/training'
 import type { CameraPerspective, GraphicsQuality, BandwidthOption, ResolutionPreset } from '@/app/lib/messageTypes'
 import type { TrainingState } from '@/app/hooks/useTrainingMessagesComposite'
+import type { StreamQualityPreset, StreamQualityOption } from '@/app/config/streamQuality.config'
 
 // =============================================================================
 // Types
@@ -167,6 +168,11 @@ interface UnifiedSidebarProps {
     setBandwidthOption: (option: BandwidthOption) => void
     setShowFpsOverlay: (show: boolean) => void
   }
+
+  // Stream Quality Props (WebRTC stream resolution)
+  streamQuality?: StreamQualityPreset
+  streamQualityOptions?: StreamQualityOption[]
+  onStreamQualityChange?: (preset: StreamQualityPreset) => void
 }
 
 // =============================================================================
@@ -245,6 +251,11 @@ function UnifiedSidebarComponent({
   // Settings props
   settingsState,
   settingsCallbacks,
+
+  // Stream Quality props
+  streamQuality,
+  streamQualityOptions,
+  onStreamQualityChange,
 }: UnifiedSidebarProps) {
   // ==========================================================================
   // State
@@ -263,7 +274,6 @@ function UnifiedSidebarComponent({
   const [localSfxVolume, setLocalSfxVolume] = useState(80)
   const [localGraphicsQuality, setLocalGraphicsQuality] = useState<GraphicsQuality>('High')
   const [localShowFps, setLocalShowFps] = useState(false)
-  const [localResolution, setLocalResolution] = useState<ResolutionPreset>('1080p')
   const [localBandwidthOption, setLocalBandwidthOption] = useState<BandwidthOption>('Auto')
 
   // Use settings from props or fallback to local state
@@ -274,7 +284,6 @@ function UnifiedSidebarComponent({
   const graphicsQuality = settingsState?.graphicsQuality ?? localGraphicsQuality
   const showFps = settingsState?.showFpsOverlay ?? localShowFps
   const currentFps = settingsState?.currentFps ?? 60
-  const resolution = settingsState?.resolution ?? localResolution
   const bandwidthOption = settingsState?.bandwidthOption ?? localBandwidthOption
 
   // Settings handlers - use callbacks from props or fallback to local state setters
@@ -323,14 +332,6 @@ function UnifiedSidebarComponent({
       settingsCallbacks.setShowFpsOverlay(show)
     } else {
       setLocalShowFps(show)
-    }
-  }, [settingsCallbacks])
-
-  const handleSetResolution = useCallback((res: ResolutionPreset) => {
-    if (settingsCallbacks?.setResolution) {
-      settingsCallbacks.setResolution(res)
-    } else {
-      setLocalResolution(res)
     }
   }, [settingsCallbacks])
 
@@ -1334,31 +1335,6 @@ function UnifiedSidebarComponent({
                 )}
               </div>
 
-              {/* Resolution */}
-              <div className={`p-2 sm:p-3 rounded-lg ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
-                <div className="flex items-center gap-1.5 sm:gap-2 mb-2 sm:mb-3">
-                  <Monitor className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#39BEAE]" />
-                  <h3 className={`text-[11px] sm:text-xs font-medium ${isDark ? 'text-white/70' : 'text-gray-600'}`}>Resolution</h3>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-1.5">
-                  {(['720p', '1080p', '1440p', '4k'] as const).map((res) => (
-                    <button
-                      key={res}
-                      onClick={() => handleSetResolution(res)}
-                      className={`px-1.5 sm:px-2 py-1.5 sm:py-2 rounded-lg text-[11px] sm:text-xs font-medium transition-all ${
-                        resolution === res
-                          ? 'bg-[#39BEAE] text-white'
-                          : isDark
-                            ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      {res}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               {/* Bandwidth / Network Quality */}
               <div className={`p-2 sm:p-3 rounded-lg ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
                 <div className="flex items-center gap-1.5 sm:gap-2 mb-2 sm:mb-3">
@@ -1383,6 +1359,39 @@ function UnifiedSidebarComponent({
                   ))}
                 </div>
               </div>
+
+              {/* Stream Quality (WebRTC resolution - like YouTube quality) */}
+              {streamQualityOptions && streamQualityOptions.length > 0 && (
+                <div className={`p-2 sm:p-3 rounded-lg ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
+                  <div className="flex items-center gap-1.5 sm:gap-2 mb-2 sm:mb-3">
+                    <Video className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#39BEAE]" />
+                    <h3 className={`text-[11px] sm:text-xs font-medium ${isDark ? 'text-white/70' : 'text-gray-600'}`}>Stream Quality</h3>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 sm:gap-1.5">
+                    {streamQualityOptions.map((option) => (
+                      <button
+                        key={option.key}
+                        onClick={() => onStreamQualityChange?.(option.key)}
+                        className={`px-1.5 sm:px-2 py-1.5 sm:py-2 rounded-lg text-[11px] sm:text-xs font-medium transition-all ${
+                          streamQuality === option.key
+                            ? 'bg-[#39BEAE] text-white'
+                            : isDark
+                              ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                        title={option.description}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                  {streamQuality && (
+                    <p className={`mt-2 text-[9px] sm:text-[10px] ${isDark ? 'text-white/40' : 'text-gray-400'}`}>
+                      {streamQualityOptions.find(o => o.key === streamQuality)?.description}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

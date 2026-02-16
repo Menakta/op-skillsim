@@ -62,6 +62,14 @@ import { useSessionInfo } from "../hooks/useSessionInfo";
 import { useSessionSelection } from "../hooks/useSessionSelection";
 // Training persistence hook - auto-save and quiz submission
 import { useTrainingPersistence } from "../hooks/useTrainingPersistence";
+// Stream quality configuration
+import {
+  type StreamQualityPreset,
+  STREAM_QUALITY_OPTIONS,
+  getStreamQualityOption,
+  loadStreamQuality,
+  saveStreamQuality,
+} from "../config/streamQuality.config";
 // Note: useStreamHealthMonitor is available but disabled due to hot reload issues
 // import { useStreamHealthMonitor } from "../hooks/useStreamHealthMonitor";
 // =============================================================================
@@ -132,6 +140,15 @@ export default function StreamingApp() {
   // Theme context
   const { theme } = useTheme();
   const isDark = theme === "dark";
+
+  // Stream quality state - controls VideoStream Resolution prop (WebRTC only, no UE5 message)
+  const [streamQuality, setStreamQualityState] = useState<StreamQualityPreset>(() => loadStreamQuality());
+  const streamResolution = useMemo(() => getStreamQualityOption(streamQuality).resolution, [streamQuality]);
+
+  const setStreamQuality = useCallback((preset: StreamQualityPreset) => {
+    setStreamQualityState(preset);
+    saveStreamQuality(preset);
+  }, []);
 
   // Questions context - for getting total question count
   const { questionCount } = useQuestions();
@@ -880,6 +897,10 @@ export default function StreamingApp() {
             setBandwidthOption: settings.setBandwidthOption,
             setShowFpsOverlay: settings.setShowFpsOverlay,
           }}
+          // Stream Quality Props
+          streamQuality={streamQuality}
+          streamQualityOptions={STREAM_QUALITY_OPTIONS}
+          onStreamQualityChange={setStreamQuality}
         />
       )}
       {/* Cinematic Mode Timer - Show when connected and in cinematic mode */}
@@ -953,6 +974,7 @@ export default function StreamingApp() {
           UseNativeTouchEvents={true}
           UsePointerLock={false}
           PointerLockRelease={true}
+          Resolution={streamResolution}
         />
       </div>
       {/* All Modals - Centralized in ModalContainer */}
