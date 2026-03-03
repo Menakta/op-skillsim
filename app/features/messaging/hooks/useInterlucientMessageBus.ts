@@ -107,7 +107,7 @@ function jsonToStringFormat(data: unknown): string | null {
 // =============================================================================
 
 export function useInterlucientMessageBus(
-  streamRef: React.RefObject<InterlucientStreamRef>,
+  streamRef: React.RefObject<InterlucientStreamRef | null>,
   isDataChannelOpen: boolean,
   config: UseInterlucientMessageBusConfig = {}
 ): UseInterlucientMessageBusReturn {
