@@ -361,7 +361,7 @@ export default function InterlucientStreamingApp() {
             setBandwidthOption: () => {},
             setShowFpsOverlay: () => {},
           }}
-          streamQuality="balanced"
+          streamQuality="medium"
           streamQualityOptions={[]}
           onStreamQualityChange={() => {}}
         />
