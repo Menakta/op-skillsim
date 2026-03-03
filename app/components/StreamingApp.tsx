@@ -619,9 +619,14 @@ export default function StreamingApp() {
   const sessionEndActions = useMemo(
     () => ({
       login: () => {
+        // Use the actual session end reason from modal state (disconnected, kicked, etc.)
+        // instead of always saying "logged_out"
+        // Map 'inactive' to 'idle' for consistency with session-complete page
+        const modalReason = modals.sessionEndReason || "other";
+        const actualReason = modalReason === "inactive" ? "idle" : modalReason;
         modals.closeModal("sessionEnd");
         redirectToSessionComplete({
-          reason: "logged_out",
+          reason: actualReason as 'expired' | 'idle' | 'logged_out' | 'disconnected' | 'other',
           role: userRole,
           progress: training.state.progress,
           phasesCompleted: training.state.currentTaskIndex,
@@ -660,6 +665,7 @@ export default function StreamingApp() {
     }),
     [
       modals,
+      modals.sessionEndReason,
       userRole,
       training.state.progress,
       training.state.currentTaskIndex,

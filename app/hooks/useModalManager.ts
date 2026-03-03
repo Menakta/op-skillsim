@@ -40,7 +40,7 @@ export interface PhaseSuccessData {
 }
 
 export interface SessionEndData {
-  reason: 'expired' | 'logged_out' | 'inactive' | 'kicked' | 'other'
+  reason: 'expired' | 'logged_out' | 'inactive' | 'kicked' | 'disconnected' | 'other'
 }
 
 export interface ErrorData {

@@ -13,6 +13,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@interlucent/admission-sdk": "^1.0.2",
     "@pureweb/platform-admin-sdk": "^5.0.5",
     "@pureweb/platform-sdk": "^5.0.5",
     "@pureweb/platform-sdk-react": "^5.0.5",

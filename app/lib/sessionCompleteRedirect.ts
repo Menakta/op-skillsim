@@ -9,7 +9,7 @@
 // Types
 // =============================================================================
 
-export type SessionEndReason = 'completed' | 'expired' | 'idle' | 'quit' | 'logged_out' | 'other'
+export type SessionEndReason = 'completed' | 'expired' | 'idle' | 'quit' | 'logged_out' | 'disconnected' | 'other'
 export type UserRole = 'student' | 'teacher' | 'admin'
 
 export interface SessionCompleteParams {

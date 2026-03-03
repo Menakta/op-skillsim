@@ -34,7 +34,7 @@ export interface UseStreamConnectionConfig {
   streamStarted: boolean
   onError?: (error: string) => void
   onConnected?: (isFirstConnection: boolean) => void
-  onSessionEnd?: (reason: 'expired' | 'logged_out' | 'inactive' | 'kicked' | 'other') => void
+  onSessionEnd?: (reason: 'expired' | 'logged_out' | 'inactive' | 'kicked' | 'disconnected' | 'other') => void
 }
 
 export interface UseStreamConnectionReturn {
@@ -404,16 +404,26 @@ export function useStreamConnection(config: UseStreamConnectionConfig): UseStrea
        streamerStatus === StreamerStatus.Completed ||
        streamerStatus === StreamerStatus.Withdrawn)
     ) {
-      console.log('🔌 Session ended with status:', streamerStatus)
+      console.log('🔌 Stream disconnected with status:', streamerStatus)
 
       // Determine the reason based on status
-      let reason: 'expired' | 'logged_out' | 'inactive' | 'kicked' | 'other' = 'other'
-      if (streamerStatus === StreamerStatus.Closed) {
-        reason = 'logged_out'
-      } else if (streamerStatus === StreamerStatus.Withdrawn) {
+      // IMPORTANT: Stream closures are NOT the same as user logout!
+      // - 'disconnected': Stream connection lost (network issues, server restart, etc.)
+      // - 'kicked': User was forcibly removed (Withdrawn status)
+      // - 'other': Unknown reason
+      let reason: 'expired' | 'logged_out' | 'inactive' | 'kicked' | 'disconnected' | 'other' = 'other'
+
+      if (streamerStatus === StreamerStatus.Withdrawn) {
+        // User was kicked/withdrawn - this is a deliberate action
         reason = 'kicked'
-      } else if (streamerStatus === StreamerStatus.Completed) {
-        reason = 'logged_out'
+      } else if (
+        streamerStatus === StreamerStatus.Closed ||
+        streamerStatus === StreamerStatus.Disconnected ||
+        streamerStatus === StreamerStatus.Completed
+      ) {
+        // Stream closed/disconnected - this is a connection issue, NOT a logout
+        // Don't confuse users by saying "You have been logged out"
+        reason = 'disconnected'
       }
 
       onSessionEnd?.(reason)

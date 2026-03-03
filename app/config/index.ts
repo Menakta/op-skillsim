@@ -57,3 +57,21 @@ export {
 } from './camera.config'
 
 export type { CameraPerspective, CameraMode, PerspectiveInfo } from './camera.config'
+
+// Streaming Provider Configuration
+export {
+  DEFAULT_STREAMING_PROVIDER,
+  getStreamingProvider,
+  setStreamingProvider,
+  clearStreamingProvider,
+  isInterlucent,
+  isPureWeb,
+  INTERLUCENT_CONFIG,
+  PUREWEB_CONFIG as PUREWEB_STREAMING_CONFIG,
+} from './streaming.config'
+
+export type {
+  StreamingProvider,
+  InterlucientConfig,
+  PureWebConfig,
+} from './streaming.config'

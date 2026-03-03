@@ -17,7 +17,7 @@
 import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
-import { CheckCircle, Clock, LogOut, UserX, AlertCircle } from 'lucide-react'
+import { CheckCircle, Clock, LogOut, UserX, AlertCircle, WifiOff } from 'lucide-react'
 import { completeSessionCleanup } from '@/app/lib/clearSessionData'
 import { useTheme } from '../context/ThemeContext'
 
@@ -25,7 +25,7 @@ import { useTheme } from '../context/ThemeContext'
 // Types
 // =============================================================================
 
-type SessionEndReason = 'completed' | 'expired' | 'idle' | 'quit' | 'logged_out' | 'other'
+type SessionEndReason = 'completed' | 'expired' | 'idle' | 'quit' | 'logged_out' | 'disconnected' | 'other'
 type UserRole = 'student' | 'teacher' | 'admin'
 
 interface SessionCompleteData {
@@ -83,6 +83,13 @@ const REASON_CONFIG: Record<SessionEndReason, {
     studentMessage: 'You have been logged out. Thank you for using OP SkillSim.',
     staffMessage: 'You have been logged out. Thank you for using OP SkillSim.',
     color: 'gray',
+  },
+  disconnected: {
+    icon: <WifiOff size={48} className="text-amber-400" />,
+    title: 'Connection Lost',
+    studentMessage: 'The stream connection was lost. Your progress has been saved and you can resume later.',
+    staffMessage: 'The stream connection was lost. Please start a new session to continue.',
+    color: 'amber',
   },
   other: {
     icon: <AlertCircle size={48} className="text-gray-400" />,

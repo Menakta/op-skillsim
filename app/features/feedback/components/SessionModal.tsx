@@ -8,7 +8,7 @@
  */
 
 import Image from 'next/image'
-import { LogOut, Clock } from "lucide-react"
+import { LogOut, Clock, WifiOff } from "lucide-react"
 import { BaseModal, ModalMessage, ModalFooter } from '@/app/components/shared'
 import { Button } from '@/app/components/shared'
 
@@ -31,7 +31,7 @@ interface SessionModalProps {
   isOpen: boolean
   title?: string
   message?: string
-  reason?: 'expired' | 'logged_out' | 'inactive' | 'kicked' | 'other'
+  reason?: 'expired' | 'logged_out' | 'inactive' | 'kicked' | 'disconnected' | 'other'
   onLogin: () => void
   onClose?: () => void
   loginButtonText?: string
@@ -56,9 +56,17 @@ const REASON_CONFIG = {
     icon: LogOut,
     iconColor: '#39BEAE',
     useOffButton: true,
-    defaultTitle: 'Session Ended',
+    defaultTitle: 'Logged Out',
+    defaultMessage: 'Logged Out',
+    defaultText: 'You have been logged out. Thank you for using OP SkillSim.'
+  },
+  disconnected: {
+    icon: WifiOff,
+    iconColor: '#F59E0B',
+    useOffButton: false,
+    defaultTitle: 'Connection Lost',
     defaultMessage: 'Disconnected',
-    defaultText: 'Your session has ended. Please log in again to continue.'
+    defaultText: 'The stream connection was lost. Your progress has been saved. Please start a new session to continue.'
   },
   inactive: {
     icon: Clock,
