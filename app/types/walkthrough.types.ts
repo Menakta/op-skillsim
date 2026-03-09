@@ -57,6 +57,8 @@ export interface CinematicWalkthroughProps {
   onOpenSidebar?: () => void
   /** Callback when sidebar should be closed */
   onCloseSidebar?: () => void
+  /** Whether this is an LTI session - if true, always show walkthrough */
+  isLtiSession?: boolean
 }
 
 export interface TrainingWalkthroughProps {
@@ -66,4 +68,6 @@ export interface TrainingWalkthroughProps {
   onOpenSidebar?: () => void
   /** Callback when sidebar should be closed */
   onCloseSidebar?: () => void
+  /** Whether this is an LTI session - if true, always show walkthrough */
+  isLtiSession?: boolean
 }

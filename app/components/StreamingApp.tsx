@@ -926,6 +926,7 @@ export default function StreamingApp() {
           onSkip={handleCinematicSkip}
           onOpenSidebar={handleOpenSidebar}
           onCloseSidebar={handleCloseSidebar}
+          isLtiSession={isLtiSession}
         />
       )}
       {/* Training Mode Walkthrough - Show in training mode when transitioning from cinematic */}
@@ -935,6 +936,7 @@ export default function StreamingApp() {
           onSkip={handleTrainingWalkthroughSkip}
           onOpenSidebar={handleTrainingOpenSidebar}
           onCloseSidebar={handleTrainingCloseSidebar}
+          isLtiSession={isLtiSession}
         />
       )}
       {/* Control Panel (ToolBar) - Only show when stream is connected and NOT in cinematic mode */}

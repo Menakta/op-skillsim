@@ -21,6 +21,8 @@ interface UseWalkthroughOptions {
   onComplete?: () => void
   /** Callback when walkthrough is skipped */
   onSkip?: () => void
+  /** Whether this is an LTI session - if true, always show walkthrough (clear localStorage) */
+  isLtiSession?: boolean
 }
 
 interface UseWalkthroughReturn {
@@ -63,23 +65,35 @@ const WALKTHROUGH_COMPLETED_KEY = 'op-skillsim-cinematic-walkthrough-completed'
 // =============================================================================
 
 export function useWalkthrough(options: UseWalkthroughOptions = {}): UseWalkthroughReturn {
-  const { autoFetch = true, onComplete, onSkip } = options
+  const { autoFetch = true, onComplete, onSkip, isLtiSession } = options
 
   const [steps, setSteps] = useState<WalkthroughStep[]>([])
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [isComplete, setIsComplete] = useState(false)
 
-  // Check if walkthrough was already completed
+  // For LTI sessions, always clear the walkthrough completed state
+  // This ensures the walkthrough shows on every new LTI launch
+  useEffect(() => {
+    if (typeof window !== 'undefined' && isLtiSession) {
+      localStorage.removeItem(WALKTHROUGH_COMPLETED_KEY)
+    }
+  }, [isLtiSession])
+
+  // Check if walkthrough was already completed (only for non-LTI sessions)
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      // Skip the completion check if it's an LTI session (we just cleared it above)
+      if (isLtiSession) {
+        return
+      }
       const completed = localStorage.getItem(WALKTHROUGH_COMPLETED_KEY)
       if (completed === 'true') {
         setIsComplete(true)
         setIsLoading(false)
       }
     }
-  }, [])
+  }, [isLtiSession])
 
   // Fetch steps from API
   const fetchSteps = useCallback(async () => {

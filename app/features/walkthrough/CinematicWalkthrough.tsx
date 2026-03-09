@@ -20,6 +20,7 @@ export function CinematicWalkthrough({
   onSkip,
   onOpenSidebar,
   onCloseSidebar,
+  isLtiSession,
 }: CinematicWalkthroughProps) {
   const {
     steps,
@@ -33,6 +34,7 @@ export function CinematicWalkthrough({
     autoFetch: true,
     onComplete,
     onSkip,
+    isLtiSession,
   })
 
   return (

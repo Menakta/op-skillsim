@@ -20,6 +20,7 @@ export function TrainingModeWalkthrough({
   onSkip,
   onOpenSidebar,
   onCloseSidebar,
+  isLtiSession,
 }: TrainingWalkthroughProps) {
   const {
     steps,
@@ -33,6 +34,7 @@ export function TrainingModeWalkthrough({
     autoFetch: true,
     onComplete,
     onSkip,
+    isLtiSession,
   })
 
   return (
