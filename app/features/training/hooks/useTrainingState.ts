@@ -320,24 +320,33 @@ export function useTrainingState(
     eventBus.emit('training:started', { taskIndex: 0 })
   }, [messageBus])
 
-  const pauseTraining = useCallback(async () => {
-    // Save time spent before pausing
+  const pauseTraining = useCallback(() => {
+    console.log('⏸️ Pausing training - sending pause command to UE5')
+
+    // Send pause message to UE5 IMMEDIATELY (don't wait for async operations)
+    messageBus.sendMessage(WEB_TO_UE_MESSAGES.TRAINING_CONTROL, 'pause')
+
+    // Update local state
+    setState(prev => ({ ...prev, isActive: false }))
+    eventBus.emit('training:paused', { taskIndex: state.currentTaskIndex })
+
+    // Save time spent asynchronously (non-blocking)
     if (sessionStartTimeRef.current) {
       const timeSpentMs = Date.now() - sessionStartTimeRef.current
-      await trainingSessionService.recordTimeSpent(timeSpentMs)
+      trainingSessionService.recordTimeSpent(timeSpentMs).catch(err => {
+        console.warn('Failed to record time spent on pause:', err)
+      })
     }
-
-    // Save current state (session remains 'active' - user can resume)
-    setState(prev => ({ ...prev, isActive: false }))
-
-    messageBus.sendMessage(WEB_TO_UE_MESSAGES.TRAINING_CONTROL, 'pause')
-    eventBus.emit('training:paused', { taskIndex: state.currentTaskIndex })
   }, [messageBus, state.currentTaskIndex])
 
   const resumeTraining = useCallback(() => {
-    console.log('▶️ Resuming training')
-    setState(prev => ({ ...prev, isActive: true }))
+    console.log('▶️ Resuming training - sending resume command to UE5')
+
+    // Send resume message to UE5 IMMEDIATELY
     messageBus.sendMessage(WEB_TO_UE_MESSAGES.TRAINING_CONTROL, 'resume')
+
+    // Update local state
+    setState(prev => ({ ...prev, isActive: true }))
     eventBus.emit('training:resumed', { taskIndex: state.currentTaskIndex })
   }, [messageBus, state.currentTaskIndex])
 
