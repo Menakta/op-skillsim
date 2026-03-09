@@ -880,6 +880,8 @@ export default function StreamingApp() {
           forceOpen={forceSidebarOpen}
           forceActiveTab={forceSidebarTab}
           onOpenChange={handleSidebarOpenChange}
+          // Lock controls during walkthrough to prevent UE5 state changes
+          controlsLocked={showCinematicWalkthrough || showTrainingWalkthrough}
           // Settings props - connected to UE5 via useSettings hook
           settingsState={{
             audioEnabled: settings.settings.audioEnabled,

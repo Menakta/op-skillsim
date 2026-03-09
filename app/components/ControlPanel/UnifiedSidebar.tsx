@@ -125,6 +125,8 @@ interface UnifiedSidebarProps {
   onOpenChange?: (isOpen: boolean) => void
   /** Force switch to a specific tab (e.g., 'inventory' for walkthrough) */
   forceActiveTab?: MenuTab
+  /** Lock controls during cinematic walkthrough/onboarding (prevents UE5 state changes) */
+  controlsLocked?: boolean
 
   // Settings Props (connected to UE5 via useSettings hook)
   /** Settings state from useSettings hook */
@@ -230,6 +232,7 @@ function UnifiedSidebarComponent({
   forceOpen,
   onOpenChange,
   forceActiveTab,
+  controlsLocked = false,
 
   // Settings props
   settingsState,
@@ -840,6 +843,13 @@ function UnifiedSidebarComponent({
               ============================================================ */}
           {activeTab === 'controls' && isCinematiceMode && (
             <div className="p-2 space-y-1">
+              {/* Locked Controls Warning */}
+              {controlsLocked && (
+                <div className={`mb-2 p-2 rounded-lg text-xs text-center ${isDark ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-700'}`}>
+                  Controls locked during walkthrough
+                </div>
+              )}
+
               {/* Explosion Section */}
               <AccordionSection
                 title="Building Explosion"
@@ -848,7 +858,7 @@ function UnifiedSidebarComponent({
                 onToggle={() => toggleSection('explosion')}
                 isDark={isDark}
               >
-                <div className="space-y-3">
+                <div className={`space-y-3 ${controlsLocked ? 'opacity-50 pointer-events-none' : ''}`}>
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <label className={`text-xs ${isDark ? 'text-white/70' : 'text-gray-600'}`}>Level</label>
@@ -859,15 +869,24 @@ function UnifiedSidebarComponent({
                       min="0"
                       max="100"
                       value={explosionValue}
-                      onChange={(e) => onExplosionValueChange(Number(e.target.value))}
-                      className={`w-full h-2 rounded-lg appearance-none cursor-pointer accent-[#39BEAE] ${isDark ? 'bg-gray-700' : 'bg-gray-300'}`}
+                      onChange={(e) => !controlsLocked && onExplosionValueChange(Number(e.target.value))}
+                      disabled={controlsLocked}
+                      className={`w-full h-2 rounded-lg appearance-none cursor-pointer accent-[#39BEAE] ${isDark ? 'bg-gray-700' : 'bg-gray-300'} ${controlsLocked ? 'cursor-not-allowed' : ''}`}
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    <button onClick={onExplode} className="px-3 py-2 bg-[#39BEAE] hover:bg-[#2ea89a] text-white rounded-lg text-xs font-medium transition-all">
+                    <button
+                      onClick={() => !controlsLocked && onExplode()}
+                      disabled={controlsLocked}
+                      className={`px-3 py-2 bg-[#39BEAE] text-white rounded-lg text-xs font-medium transition-all ${controlsLocked ? 'cursor-not-allowed' : 'hover:bg-[#2ea89a]'}`}
+                    >
                       Explode
                     </button>
-                    <button onClick={onAssemble} className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${isDark ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}>
+                    <button
+                      onClick={() => !controlsLocked && onAssemble()}
+                      disabled={controlsLocked}
+                      className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${isDark ? 'bg-gray-700 text-white' : 'bg-gray-200 text-gray-800'} ${controlsLocked ? 'cursor-not-allowed' : isDark ? 'hover:bg-gray-600' : 'hover:bg-gray-300'}`}
+                    >
                       Assemble
                     </button>
                   </div>
@@ -891,29 +910,35 @@ function UnifiedSidebarComponent({
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
-                      onRefreshWaypoints()
+                      if (!controlsLocked) onRefreshWaypoints()
                     }}
+                    disabled={controlsLocked}
                     className={`p-1 rounded transition-colors ${
-                      isDark
-                        ? 'text-gray-400 hover:text-white hover:bg-white/10'
-                        : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200'
+                      controlsLocked
+                        ? 'opacity-50 cursor-not-allowed'
+                        : isDark
+                          ? 'text-gray-400 hover:text-white hover:bg-white/10'
+                          : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200'
                     }`}
-                    title="Refresh waypoints"
+                    title={controlsLocked ? 'Locked during walkthrough' : 'Refresh waypoints'}
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
                   </button>
                 }
               >
-                <div className="space-y-2">
+                <div className={`space-y-2 ${controlsLocked ? 'opacity-50 pointer-events-none' : ''}`}>
                   {waypoints.length === 0 ? (
                     <div className={`text-center py-3 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
                       <p className="text-xs">No waypoints loaded</p>
                       <button
-                        onClick={onRefreshWaypoints}
+                        onClick={() => !controlsLocked && onRefreshWaypoints()}
+                        disabled={controlsLocked}
                         className={`mt-2 text-xs flex items-center gap-1 mx-auto px-2 py-1 rounded transition-colors ${
-                          isDark
-                            ? 'text-[#39BEAE] hover:bg-[#39BEAE]/10'
-                            : 'text-[#39BEAE] hover:bg-[#39BEAE]/10'
+                          controlsLocked
+                            ? 'opacity-50 cursor-not-allowed'
+                            : isDark
+                              ? 'text-[#39BEAE] hover:bg-[#39BEAE]/10'
+                              : 'text-[#39BEAE] hover:bg-[#39BEAE]/10'
                         }`}
                       >
                         <RefreshCw className="w-3 h-3" />
@@ -926,15 +951,22 @@ function UnifiedSidebarComponent({
                         <div className="p-2 bg-[#39BEAE]/20 rounded-lg border border-[#39BEAE]/30">
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-[#39BEAE] font-medium text-xs">Active: {activeWaypointName}</span>
-                            <button onClick={onDeactivateWaypoint} className="p-1 text-gray-400 hover:text-red-400 rounded"><X className="w-3 h-3" /></button>
+                            <button
+                              onClick={() => !controlsLocked && onDeactivateWaypoint()}
+                              disabled={controlsLocked}
+                              className={`p-1 text-gray-400 rounded ${controlsLocked ? 'cursor-not-allowed' : 'hover:text-red-400'}`}
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
                           </div>
                           <input
                             type="range"
                             min="0"
                             max="100"
                             value={waypointProgress}
-                            onChange={(e) => onWaypointProgressChange?.(Number(e.target.value))}
-                            className={`w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-[#39BEAE] ${isDark ? 'bg-gray-700' : 'bg-gray-300'}`}
+                            onChange={(e) => !controlsLocked && onWaypointProgressChange?.(Number(e.target.value))}
+                            disabled={controlsLocked}
+                            className={`w-full h-1.5 rounded-lg appearance-none accent-[#39BEAE] ${isDark ? 'bg-gray-700' : 'bg-gray-300'} ${controlsLocked ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                           />
                         </div>
                       )}
@@ -942,12 +974,13 @@ function UnifiedSidebarComponent({
                         {waypoints.map((waypoint) => (
                           <button
                             key={waypoint.index}
-                            onClick={() => activeWaypointIndex === waypoint.index ? onDeactivateWaypoint() : onActivateWaypoint(waypoint.index)}
+                            onClick={() => !controlsLocked && (activeWaypointIndex === waypoint.index ? onDeactivateWaypoint() : onActivateWaypoint(waypoint.index))}
+                            disabled={controlsLocked}
                             className={`w-full px-2.5 py-1.5 rounded-lg text-left text-xs transition-all ${
                               activeWaypointIndex === waypoint.index
                                 ? 'bg-[#39BEAE] text-white'
                                 : isDark ? 'bg-gray-800/50 text-gray-300 hover:bg-gray-700/50' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
+                            } ${controlsLocked ? 'cursor-not-allowed' : ''}`}
                           >
                             {waypoint.name}
                           </button>
@@ -958,6 +991,7 @@ function UnifiedSidebarComponent({
                 </div>
               </AccordionSection>
 
+              {/* Layers Section */}
               {/* Layers Section */}
               <AccordionSection
                 title="Layers"
@@ -975,29 +1009,35 @@ function UnifiedSidebarComponent({
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
-                      onRefreshLayers()
+                      if (!controlsLocked) onRefreshLayers()
                     }}
+                    disabled={controlsLocked}
                     className={`p-1 rounded transition-colors ${
-                      isDark
-                        ? 'text-gray-400 hover:text-white hover:bg-white/10'
-                        : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200'
+                      controlsLocked
+                        ? 'opacity-50 cursor-not-allowed'
+                        : isDark
+                          ? 'text-gray-400 hover:text-white hover:bg-white/10'
+                          : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200'
                     }`}
-                    title="Refresh layers"
+                    title={controlsLocked ? 'Locked during walkthrough' : 'Refresh layers'}
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
                   </button>
                 }
               >
-                <div className="space-y-2">
+                <div className={`space-y-2 ${controlsLocked ? 'opacity-50 pointer-events-none' : ''}`}>
                   {mainGroups.length === 0 ? (
                     <div className={`text-center py-3 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
                       <p className="text-xs">No layers loaded</p>
                       <button
-                        onClick={onRefreshLayers}
+                        onClick={() => !controlsLocked && onRefreshLayers()}
+                        disabled={controlsLocked}
                         className={`mt-2 text-xs flex items-center gap-1 mx-auto px-2 py-1 rounded transition-colors ${
-                          isDark
-                            ? 'text-[#39BEAE] hover:bg-[#39BEAE]/10'
-                            : 'text-[#39BEAE] hover:bg-[#39BEAE]/10'
+                          controlsLocked
+                            ? 'opacity-50 cursor-not-allowed'
+                            : isDark
+                              ? 'text-[#39BEAE] hover:bg-[#39BEAE]/10'
+                              : 'text-[#39BEAE] hover:bg-[#39BEAE]/10'
                         }`}
                       >
                         <RefreshCw className="w-3 h-3" />
@@ -1007,10 +1047,18 @@ function UnifiedSidebarComponent({
                   ) : (
                     <>
                       <div className="flex gap-2">
-                        <button onClick={onShowAllLayers} className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium ${isDark ? 'bg-gray-700/50 hover:bg-gray-600/50 text-gray-300' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'}`}>
+                        <button
+                          onClick={() => !controlsLocked && onShowAllLayers()}
+                          disabled={controlsLocked}
+                          className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium ${isDark ? 'bg-gray-700/50 text-gray-300' : 'bg-gray-100 text-gray-600'} ${controlsLocked ? 'cursor-not-allowed' : isDark ? 'hover:bg-gray-600/50' : 'hover:bg-gray-200'}`}
+                        >
                           <Eye className="w-3 h-3" /> Show
                         </button>
-                        <button onClick={onHideAllLayers} className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium ${isDark ? 'bg-gray-700/50 hover:bg-gray-600/50 text-gray-300' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'}`}>
+                        <button
+                          onClick={() => !controlsLocked && onHideAllLayers()}
+                          disabled={controlsLocked}
+                          className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium ${isDark ? 'bg-gray-700/50 text-gray-300' : 'bg-gray-100 text-gray-600'} ${controlsLocked ? 'cursor-not-allowed' : isDark ? 'hover:bg-gray-600/50' : 'hover:bg-gray-200'}`}
+                        >
                           <EyeOff className="w-3 h-3" /> Hide
                         </button>
                       </div>
@@ -1028,12 +1076,13 @@ function UnifiedSidebarComponent({
                                   </button>
                                 ) : <div className="w-4" />}
                                 <button
-                                  onClick={() => onToggleMainGroup(group.name)}
+                                  onClick={() => !controlsLocked && onToggleMainGroup(group.name)}
+                                  disabled={controlsLocked}
                                   className={`flex-1 flex items-center gap-1.5 px-2 py-1 rounded-lg text-left text-xs ${
                                     group.visible
                                       ? isDark ? 'bg-[#39BEAE]/20 text-white' : 'bg-[#39BEAE]/20 text-gray-900'
                                       : isDark ? 'bg-gray-800/30 text-gray-400 hover:bg-gray-700/50' : 'bg-gray-100/50 text-gray-500 hover:bg-gray-200/50'
-                                  }`}
+                                  } ${controlsLocked ? 'cursor-not-allowed' : ''}`}
                                 >
                                   {group.visible ? <Eye className="w-3 h-3 text-[#39BEAE]" /> : <EyeOff className="w-3 h-3" />}
                                   <span className="truncate">{group.name}</span>
@@ -1044,12 +1093,13 @@ function UnifiedSidebarComponent({
                                   {children.map((child) => (
                                     <button
                                       key={`${child.parentName}-${child.childIndex}`}
-                                      onClick={() => onToggleChildGroup(child.parentName!, child.childIndex!)}
+                                      onClick={() => !controlsLocked && onToggleChildGroup(child.parentName!, child.childIndex!)}
+                                      disabled={controlsLocked}
                                       className={`w-full flex items-center gap-1.5 px-2 py-1 rounded-lg text-left text-xs ${
                                         child.visible
                                           ? isDark ? 'bg-[#39BEAE]/10 text-white' : 'bg-[#39BEAE]/10 text-gray-900'
                                           : isDark ? 'bg-gray-800/20 text-gray-500 hover:bg-gray-700/30' : 'bg-gray-100/30 text-gray-500 hover:bg-gray-200/30'
-                                      }`}
+                                      } ${controlsLocked ? 'cursor-not-allowed' : ''}`}
                                     >
                                       {child.visible ? <Eye className="w-2.5 h-2.5 text-[#39BEAE]" /> : <EyeOff className="w-2.5 h-2.5" />}
                                       <span className="truncate">{child.name}</span>
@@ -1067,7 +1117,6 @@ function UnifiedSidebarComponent({
               </AccordionSection>
 
               {/* Camera Section */}
-              {/* Camera Section */}
               <AccordionSection
                 title="Camera"
                 icon={<Camera className="w-4 h-4" />}
@@ -1075,7 +1124,7 @@ function UnifiedSidebarComponent({
                 onToggle={() => toggleSection('camera')}
                 isDark={isDark}
               >
-                <div className="space-y-3">
+                <div className={`space-y-3 ${controlsLocked ? 'opacity-50 pointer-events-none' : ''}`}>
                   <div>
                     <label className={`text-xs mb-2 block ${isDark ? 'text-white/70' : 'text-gray-600'}`}>View</label>
                     {/* Responsive grid: 2 cols on mobile, 3 cols on tablet+desktop */}
@@ -1085,14 +1134,15 @@ function UnifiedSidebarComponent({
                         return (
                           <button
                             key={cam.id}
-                            onClick={() => onSetCameraPerspective(cam.id)}
+                            onClick={() => !controlsLocked && onSetCameraPerspective(cam.id)}
+                            disabled={controlsLocked}
                             className={`px-1.5 sm:px-2 py-1.5 rounded-lg text-[11px] sm:text-xs font-medium transition-all ${
                               isActive
                                 ? 'bg-[#39BEAE] text-white ring-2 ring-[#39BEAE]/50 ring-offset-1 ring-offset-transparent'
                                 : isDark
                                   ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50'
                                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                            }`}
+                            } ${controlsLocked ? 'cursor-not-allowed' : ''}`}
                           >
                             {cam.label}
                           </button>
@@ -1102,25 +1152,27 @@ function UnifiedSidebarComponent({
                   </div>
                   <div className="flex gap-1.5 sm:gap-2">
                     <button
-                      onClick={onToggleAutoOrbit}
+                      onClick={() => !controlsLocked && onToggleAutoOrbit()}
+                      disabled={controlsLocked}
                       className={`flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[11px] sm:text-xs font-medium transition-all ${
                         isOrbitActive
                           ? 'bg-[#df5e5e] text-white'
                           : isDark
                             ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50'
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
+                      } ${controlsLocked ? 'cursor-not-allowed' : ''}`}
                     >
                       <Video className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                       {isOrbitActive ? 'Stop' : 'Orbit'}
                     </button>
                     <button
-                      onClick={onResetCamera}
+                      onClick={() => !controlsLocked && onResetCamera()}
+                      disabled={controlsLocked}
                       className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[11px] sm:text-xs font-medium transition-all ${
                         isDark
                           ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50'
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
+                      } ${controlsLocked ? 'cursor-not-allowed' : ''}`}
                     >
                       <Home className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                       Reset
