@@ -814,7 +814,7 @@ function UnifiedSidebarComponent({
                     Air Plug
                   </button>
                   <button
-                    onClick={() => isPressureTestEnabled && trainingState?.airPlugSelected && handleActionWithAutoClose(() => onSelectPressureTest?.('conduct-test'))}
+                    onClick={() => isPressureTestEnabled && trainingState?.airPlugSelected && handleActionWithAutoClose(() => onSelectPressureTest?.('conduct-test'), true)}
                     disabled={!isPressureTestEnabled || !trainingState?.airPlugSelected}
                     className={`flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-2.5 rounded-lg text-[11px] sm:text-xs font-medium transition-all ${
                       !isPressureTestEnabled
