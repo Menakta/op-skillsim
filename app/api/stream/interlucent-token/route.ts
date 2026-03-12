@@ -21,6 +21,7 @@ import { AdmissionClient } from '@interlucent/admission-sdk'
 const INTERLUCENT_SECRET_KEY = process.env.INTERLUCENT_SECRET_KEY
 const INTERLUCENT_PUBLISHABLE_TOKEN = process.env.INTERLUCENT_PUBLISHABLE_TOKEN
 const INTERLUCENT_APP_ID = process.env.NEXT_PUBLIC_INTERLUCENT_APP_ID || ''
+const INTERLUCENT_APP_VERSION = process.env.NEXT_PUBLIC_INTERLUCENT_APP_VERSION || ''
 
 // Mode detection
 const USE_DIRECT_TOKEN = !!INTERLUCENT_PUBLISHABLE_TOKEN
@@ -85,7 +86,7 @@ export async function POST(request: Request) {
     const {
       userId,
       appId = INTERLUCENT_APP_ID,
-      appVersion,
+      appVersion = INTERLUCENT_APP_VERSION,
       queueWaitTolerance = 45,
       swiftJobRequest = true,
     } = body
@@ -96,6 +97,7 @@ export async function POST(request: Request) {
     console.log('🔑 Interlucent token request:', {
       userId: effectiveUserId,
       appId: appId || '(not set)',
+      appVersion: appVersion || '(latest)',
       mode: USE_DIRECT_TOKEN ? 'direct' : USE_SDK ? 'sdk' : 'mock',
     })
 
@@ -122,17 +124,18 @@ export async function POST(request: Request) {
         const client = await AdmissionClient.create(INTERLUCENT_SECRET_KEY)
 
         // Build token using actual SDK API
+        // Using resilient settings for stable connections
         let tokenBuilder = client
           .createToken()
           .withApplication(appId)
-          .withQueueWaitTolerance(queueWaitTolerance)
-          .withRendezvousTolerance(30)
-          .withFlexiblePresenceAllowance(120)
-          .withLingerTolerance(30)
-          .withWebRtcNegotiationTolerance(15)
+          .withQueueWaitTolerance(120) // 2 min for GPU availability (cold start)
+          .withRendezvousTolerance(60) // 1 min for GPU worker connection
+          .withFlexiblePresenceAllowance(300) // 5 min reconnection grace period
+          .withLingerTolerance(60) // 1 min - keep worker alive if browser drops
+          .withWebRtcNegotiationTolerance(30) // 30s for WebRTC setup
           .withSwiftJobRequest(swiftJobRequest)
           .withReference(`session-${effectiveUserId}-${Date.now()}`)
-          .expiresIn(expiresIn)
+          .expiresIn(600) // 10 min token validity
 
         // Add version if specified
         if (appVersion) {

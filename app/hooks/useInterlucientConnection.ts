@@ -322,16 +322,10 @@ export function useInterlucientConnection(
   )
 
   // =========================================================================
-  // Auto-play when token is set
+  // Note: play() is called from InterlucientStreamingApp.tsx after token is set
+  // We don't auto-play here to avoid duplicate calls and to ensure it's triggered
+  // from user gesture context for browser autoplay policy
   // =========================================================================
-
-  useEffect(() => {
-    if (admissionToken && streamRef.current && interlucientStatus === 'connected') {
-      // Token is set and we're connected to signaling - play to request GPU
-      console.log('🚀 Auto-playing after token set')
-      play()
-    }
-  }, [admissionToken, interlucientStatus, play])
 
   // =========================================================================
   // Return

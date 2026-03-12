@@ -205,15 +205,42 @@ export default function InterlucientStreamingApp() {
     // We'll call it after token is fetched and set
   }, [])
 
-  // Call play() when token is ready and we've started
+  // Track if we've already called play() to avoid calling it during recovery
+  const hasCalledPlayRef = useRef(false)
+
+  // Call play() when token is ready and we've started - but only ONCE
   useEffect(() => {
-    if (streamStarted && connection.admissionToken && connection.streamRef.current) {
-      console.log('🎮 Calling play() after token ready')
+    // Only call play() if:
+    // 1. Stream has started (user clicked start)
+    // 2. We have a token
+    // 3. The stream ref is available
+    // 4. We haven't already called play()
+    // 5. We're in a state where play() is appropriate (idle or connected, not recovering)
+    const status = connection.interlucientStatus
+    const shouldCallPlay =
+      streamStarted &&
+      connection.admissionToken &&
+      connection.streamRef.current &&
+      !hasCalledPlayRef.current &&
+      (status === 'idle' || status === 'connected' || status === null)
+
+    if (shouldCallPlay) {
+      console.log('🎮 Calling play() after token ready (initial connection)')
+      hasCalledPlayRef.current = true
       connection.play().catch((err) => {
         console.error('Play failed:', err)
+        // Reset so we can try again if user retries
+        hasCalledPlayRef.current = false
       })
     }
-  }, [streamStarted, connection.admissionToken, connection])
+  }, [streamStarted, connection.admissionToken, connection.interlucientStatus, connection])
+
+  // Reset the play flag when stream is stopped/reset
+  useEffect(() => {
+    if (!streamStarted) {
+      hasCalledPlayRef.current = false
+    }
+  }, [streamStarted])
 
   // =========================================================================
   // Loading Status
@@ -282,12 +309,15 @@ export default function InterlucientStreamingApp() {
           admissionToken={connection.admissionToken || undefined}
           controls={false} // We use custom overlay
           reconnectMode="recover"
-          reconnectAttempts={3}
+          reconnectAttempts={-1} // Unlimited retries for testing
           reconnectStrategy="exponential-backoff"
-          queueWaitTolerance={45}
-          webrtcNegotiationTolerance={10}
+          queueWaitTolerance={120} // 2 min for GPU availability
+          webrtcNegotiationTolerance={30} // 30s for WebRTC setup
           swiftJobRequest={true}
-          flexiblePresenceAllowance={120}
+          flexiblePresenceAllowance={300} // 5 min reconnection grace
+          rendezvousTolerance={60} // 1 min for GPU worker connection
+          lingerTolerance={60} // 1 min - keep worker alive if browser drops
+          forceTurn={true} // Force TURN relay to avoid firewall issues
           onStatusChange={connection.handleStatusChange}
           onDataChannelOpen={connection.handleDataChannelOpen}
           onMessage={messageBus.handleIncomingMessage}

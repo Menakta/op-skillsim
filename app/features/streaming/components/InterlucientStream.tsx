@@ -303,13 +303,27 @@ export const InterlucientStream = forwardRef<InterlucientStreamRef, Interlucient
 
         // Log additional debug info
         if (ps) {
-          console.log('📡 Debug info:', {
+          const debugInfo = {
             status: ps.status,
             sessionId: ps.sessionId,
             agentId: ps.agentId,
             isAdmitted: ps.isAdmitted,
             failureReason: ps.failureReason,
-          })
+            streamStartedAt: ps.streamStartedAt,
+            lastUserInteraction: ps.lastUserInteraction,
+          }
+          console.log('📡 Debug info:', debugInfo)
+
+          // Warn if streaming but not admitted (unusual)
+          if (newStatus === 'streaming' && !ps.isAdmitted) {
+            console.warn('⚠️ Streaming but isAdmitted is false - token may not be fully validated')
+          }
+
+          // Log time spent streaming before interruption
+          if (newStatus === 'interrupted' && ps.streamStartedAt) {
+            const streamDuration = Date.now() - ps.streamStartedAt
+            console.log(`⏱️ Stream was active for ${streamDuration}ms before interruption`)
+          }
         }
 
         onStatusChangeRef.current?.(newStatus, oldStatus)
