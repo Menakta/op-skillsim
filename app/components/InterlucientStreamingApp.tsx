@@ -28,8 +28,10 @@ import { useQuestions } from '../features/questions'
 import {
   LoadingScreen,
   StarterScreen,
+  CinematicTimer,
   type LoadingStep,
 } from '../features'
+import { useSettings } from '../features/settings'
 import { useIdleDetection } from '../features/idle'
 import { TASK_SEQUENCE, RETRY_CONFIG } from '../config'
 import { useTheme } from '../context/ThemeContext'
@@ -262,11 +264,34 @@ export default function InterlucientStreamingApp() {
   })
 
   // =========================================================================
+  // Settings Hook (sends UE5 messages for FPS, audio, etc.)
+  // =========================================================================
+
+  const settings = useSettings(messageBus.sendRawMessage, {
+    debug: true,
+    onSettingApplied: (settingType, value, success) => {
+      console.log(success ? '✅' : '❌', `Setting ${settingType}: ${value}`)
+    },
+    onFpsUpdate: (fps) => {
+      console.log('📊 FPS:', fps.toFixed(1))
+    },
+  })
+
+  // Subscribe to settings messages from UE5 (fps_update, setting_applied, etc.)
+  useEffect(() => {
+    const unsubscribe = messageBus.onMessage((message) => {
+      settings.handleSettingsMessage(message)
+    })
+    return unsubscribe
+  }, [messageBus, settings])
+
+  // =========================================================================
   // Demo Training State (simplified for now)
   // =========================================================================
 
   const [explosionValue, setExplosionValue] = useState(0)
   const [selectedTool, setSelectedTool] = useState<string>('None')
+  const [transportType, setTransportType] = useState<'relay' | 'direct' | null>(null)
 
   // Demo message handlers
   const handleSelectTool = useCallback((tool: string) => {
@@ -277,6 +302,32 @@ export default function InterlucientStreamingApp() {
   const handleSetExplosion = useCallback((value: number) => {
     setExplosionValue(value)
     messageBus.sendMessage('explosion_control', String(value))
+  }, [messageBus])
+
+  // =========================================================================
+  // Training Mode Handlers
+  // =========================================================================
+
+  const handleSkipToTraining = useCallback(() => {
+    console.log('🎮 Transitioning from Cinematic to Training mode')
+    setIsCinematicMode(false)
+    // Send training start command to UE5
+    messageBus.sendMessage('training_control', 'start')
+  }, [messageBus])
+
+  const handleStartTraining = useCallback(() => {
+    console.log('🎮 Starting training')
+    messageBus.sendMessage('training_control', 'start')
+  }, [messageBus])
+
+  const handlePauseTraining = useCallback(() => {
+    console.log('⏸️ Pausing training')
+    messageBus.sendMessage('training_control', 'pause')
+  }, [messageBus])
+
+  const handleResumeTraining = useCallback(() => {
+    console.log('▶️ Resuming training')
+    messageBus.sendMessage('training_control', 'resume')
   }, [messageBus])
 
   // =========================================================================
@@ -317,14 +368,27 @@ export default function InterlucientStreamingApp() {
           flexiblePresenceAllowance={300} // 5 min reconnection grace
           rendezvousTolerance={60} // 1 min for GPU worker connection
           lingerTolerance={60} // 1 min - keep worker alive if browser drops
-          forceTurn={true} // Force TURN relay to avoid firewall issues
+          forceRelay={false} // Disabled for testing - try direct P2P connection
           onStatusChange={connection.handleStatusChange}
           onDataChannelOpen={connection.handleDataChannelOpen}
           onMessage={messageBus.handleIncomingMessage}
           onSessionEnded={connection.handleSessionEnded}
           onError={connection.handleError}
+          onTransportSelected={(turnUsed) => {
+            console.log(turnUsed ? '🔄 Transport: RELAY (TURN over TLS)' : '🔗 Transport: DIRECT (P2P)')
+            setTransportType(turnUsed ? 'relay' : 'direct')
+          }}
         />
       </div>
+
+      {/* Cinematic Mode Timer - Show when connected and in cinematic mode */}
+      {connection.isConnected && isCinematicMode && (
+        <CinematicTimer
+          duration={7200} // 2 hours
+          onSkipToTraining={handleSkipToTraining}
+          isActive={isCinematicMode}
+        />
+      )}
 
       {/* Unified Sidebar - Show when connected */}
       {connection.isConnected && (
@@ -355,10 +419,10 @@ export default function InterlucientStreamingApp() {
           onToggleChildGroup={() => {}}
           onShowAllLayers={() => messageBus.sendMessage('hierarchical_control', 'show_all')}
           onHideAllLayers={() => messageBus.sendMessage('hierarchical_control', 'hide_all')}
-          // Training controls (placeholder)
+          // Training controls
           isPaused={false}
-          onPause={() => messageBus.sendMessage('training_control', 'pause')}
-          onResume={() => messageBus.sendMessage('training_control', 'start')}
+          onPause={handlePauseTraining}
+          onResume={handleResumeTraining}
           onQuit={() => console.log('Quit clicked')}
           // Stream health
           onReconnectStream={connection.reconnect}
@@ -368,28 +432,28 @@ export default function InterlucientStreamingApp() {
           trainingState={{} as any}
           onSelectPipe={() => {}}
           onSelectPressureTest={() => {}}
-          // Settings (placeholder)
+          // Settings - connected to UE5 via useSettings hook
           settingsState={{
-            audioEnabled: true,
-            masterVolume: 1,
-            ambientVolume: 1,
-            sfxVolume: 1,
-            graphicsQuality: 'High',
-            resolution: '1080p',
-            bandwidthOption: 'Auto',
-            fpsTrackingEnabled: false,
-            currentFps: 0,
-            showFpsOverlay: false,
+            audioEnabled: settings.settings.audioEnabled,
+            masterVolume: settings.settings.masterVolume,
+            ambientVolume: settings.settings.ambientVolume,
+            sfxVolume: settings.settings.sfxVolume,
+            graphicsQuality: settings.settings.graphicsQuality,
+            resolution: settings.settings.resolution,
+            bandwidthOption: settings.settings.bandwidthOption,
+            fpsTrackingEnabled: settings.settings.fpsTrackingEnabled,
+            currentFps: settings.settings.currentFps,
+            showFpsOverlay: settings.settings.showFpsOverlay,
           }}
           settingsCallbacks={{
-            setAudioEnabled: () => {},
-            setMasterVolume: () => {},
-            setAmbientVolume: () => {},
-            setSfxVolume: () => {},
-            setGraphicsQuality: () => {},
-            setResolution: () => {},
-            setBandwidthOption: () => {},
-            setShowFpsOverlay: () => {},
+            setAudioEnabled: settings.setAudioEnabled,
+            setMasterVolume: settings.setMasterVolume,
+            setAmbientVolume: settings.setAmbientVolume,
+            setSfxVolume: settings.setSfxVolume,
+            setGraphicsQuality: settings.setGraphicsQuality,
+            setResolution: settings.setResolution,
+            setBandwidthOption: settings.setBandwidthOption,
+            setShowFpsOverlay: settings.setShowFpsOverlay,
           }}
           streamQuality="medium"
           streamQualityOptions={[]}
@@ -441,14 +505,49 @@ export default function InterlucientStreamingApp() {
         showRetryInfo={false}
       />
 
-      {/* Mode Toggle Button (for testing) */}
+      {/* Mode Controls (for testing) */}
       {connection.isConnected && (
-        <button
-          onClick={() => setIsCinematicMode(!isCinematicMode)}
-          className="fixed bottom-4 right-4 z-50 px-4 py-2 bg-purple-600 text-white rounded-lg shadow-lg hover:bg-purple-700"
-        >
-          Mode: {isCinematicMode ? 'Cinematic' : 'Training'}
-        </button>
+        <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+          {/* Mode indicator */}
+          <div className="px-4 py-2 bg-gray-800/90 text-white rounded-lg text-center text-sm">
+            Mode: <span className={isCinematicMode ? 'text-blue-400' : 'text-green-400'}>
+              {isCinematicMode ? 'Cinematic' : 'Training'}
+            </span>
+          </div>
+
+          {/* Start Training Button (in cinematic mode) */}
+          {isCinematicMode && (
+            <button
+              onClick={handleSkipToTraining}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg shadow-lg hover:bg-green-700 font-medium"
+            >
+              ▶ Start Training
+            </button>
+          )}
+
+          {/* Toggle Mode Button (for debugging) */}
+          <button
+            onClick={() => {
+              if (isCinematicMode) {
+                handleSkipToTraining()
+              } else {
+                setIsCinematicMode(true)
+              }
+            }}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg shadow-lg hover:bg-purple-700 text-sm"
+          >
+            Switch to {isCinematicMode ? 'Training' : 'Cinematic'}
+          </button>
+
+          {/* Transport Type Indicator */}
+          {transportType && (
+            <div className={`px-4 py-2 rounded-lg text-white text-sm text-center ${
+              transportType === 'relay' ? 'bg-orange-600/90' : 'bg-blue-600/90'
+            }`}>
+              {transportType === 'relay' ? '🔄 RELAY' : '🔗 DIRECT'}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Connection Error Modal */}
