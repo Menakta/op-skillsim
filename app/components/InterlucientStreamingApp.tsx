@@ -3,14 +3,8 @@
 /**
  * InterlucientStreamingApp - Parallel Implementation for Interlucent Pixel Streaming
  *
- * This component mirrors StreamingApp.tsx but uses Interlucent instead of PureWeb.
- * It reuses most of the existing training/messaging logic but swaps the streaming layer.
- *
- * Key differences from StreamingApp:
- * - Uses <InterlucientStream> instead of <VideoStream>
- * - Uses useInterlucientConnection instead of useStreamConnection
- * - Uses useInterlucientMessageBus for backward-compatible messaging
- * - Simpler connection flow (token-based vs multi-step PureWeb init)
+ * This component uses Interlucent for pixel streaming.
+ * Simplified version without message passing hooks.
  */
 
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
@@ -20,46 +14,22 @@ import dynamic from 'next/dynamic'
 import { InterlucientStream } from '@/app/features/streaming/components/InterlucientStream'
 import type { InterlucientStreamRef } from '@/app/features/streaming/components/InterlucientStream'
 import { useInterlucientConnection } from '@/app/hooks/useInterlucientConnection'
-import { useInterlucientMessageBus } from '@/app/features/messaging/hooks/useInterlucientMessageBus'
 import type { InterlucientStatus } from '@/app/types/interlucent.types'
 
-// Shared imports (same as StreamingApp)
-import { useQuestions } from '../features/questions'
+// Shared imports
 import {
   LoadingScreen,
   StarterScreen,
-  CinematicTimer,
   type LoadingStep,
 } from '../features'
-import { useSettings } from '../features/settings'
 import { useIdleDetection } from '../features/idle'
-import { TASK_SEQUENCE, RETRY_CONFIG } from '../config'
+import { RETRY_CONFIG } from '../config'
 import { useTheme } from '../context/ThemeContext'
-
-// =============================================================================
-// Dynamic Imports
-// =============================================================================
-
-const ControlPanel = dynamic(() => import('../components/ControlPanel'), {
-  ssr: false,
-  loading: () => null,
-})
-
-const UnifiedSidebar = dynamic(
-  () => import('../components/ControlPanel/UnifiedSidebar'),
-  { ssr: false, loading: () => null }
-)
-
-const MessageLog = dynamic(() => import('../components/MessageLog'), {
-  ssr: false,
-  loading: () => null,
-})
 
 // =============================================================================
 // Configuration
 // =============================================================================
 
-// Interlucent app configuration (from environment)
 const INTERLUCENT_APP_ID = process.env.NEXT_PUBLIC_INTERLUCENT_APP_ID
 const INTERLUCENT_APP_VERSION = process.env.NEXT_PUBLIC_INTERLUCENT_APP_VERSION
 
@@ -83,7 +53,6 @@ function getLoadingStatus(params: LoadingStatusParams): {
     return { message: 'Authenticating...', step: 'initializing' }
   }
 
-  // Map Interlucent status to loading steps
   switch (interlucientStatus) {
     case 'idle':
       return { message: 'Ready to connect', step: 'initializing' }
@@ -134,25 +103,18 @@ export default function InterlucientStreamingApp() {
   const isDark = theme === 'dark'
 
   // =========================================================================
-  // Questions
-  // =========================================================================
-
-  const { questionCount } = useQuestions()
-
-  // =========================================================================
-  // Screen Flow State (simplified)
+  // Screen Flow State
   // =========================================================================
 
   const [showStarterScreen, setShowStarterScreen] = useState(true)
   const [showLoadingScreen, setShowLoadingScreen] = useState(false)
   const [streamStarted, setStreamStarted] = useState(false)
-  const [isCinematicMode, setIsCinematicMode] = useState(true)
+  const [transportType, setTransportType] = useState<'relay' | 'direct' | null>(null)
 
   // =========================================================================
   // Interlucent Connection
   // =========================================================================
 
-  // Error state for displaying to user
   const [connectionError, setConnectionError] = useState<string | null>(null)
 
   const connection = useInterlucientConnection({
@@ -179,19 +141,9 @@ export default function InterlucientStreamingApp() {
       console.log('🔌 Session ended:', reason)
     },
     onDataChannelOpen: () => {
-      console.log('📡 Data channel open - ready to communicate with UE5')
+      console.log('📡 Data channel open')
     },
   })
-
-  // =========================================================================
-  // Message Bus (backward compatible with string format)
-  // =========================================================================
-
-  const messageBus = useInterlucientMessageBus(
-    connection.streamRef,
-    connection.isDataChannelOpen,
-    { debug: true }
-  )
 
   // =========================================================================
   // Start Stream Handler
@@ -202,22 +154,13 @@ export default function InterlucientStreamingApp() {
     setShowStarterScreen(false)
     setShowLoadingScreen(true)
     setStreamStarted(true)
-
-    // play() must be called from user gesture for browser autoplay policy
-    // We'll call it after token is fetched and set
   }, [])
 
-  // Track if we've already called play() to avoid calling it during recovery
+  // Track if we've already called play()
   const hasCalledPlayRef = useRef(false)
 
-  // Call play() when token is ready and we've started - but only ONCE
+  // Call play() when token is ready
   useEffect(() => {
-    // Only call play() if:
-    // 1. Stream has started (user clicked start)
-    // 2. We have a token
-    // 3. The stream ref is available
-    // 4. We haven't already called play()
-    // 5. We're in a state where play() is appropriate (idle or connected, not recovering)
     const status = connection.interlucientStatus
     const shouldCallPlay =
       streamStarted &&
@@ -227,17 +170,16 @@ export default function InterlucientStreamingApp() {
       (status === 'idle' || status === 'connected' || status === null)
 
     if (shouldCallPlay) {
-      console.log('🎮 Calling play() after token ready (initial connection)')
+      console.log('🎮 Calling play() after token ready')
       hasCalledPlayRef.current = true
       connection.play().catch((err) => {
         console.error('Play failed:', err)
-        // Reset so we can try again if user retries
         hasCalledPlayRef.current = false
       })
     }
   }, [streamStarted, connection.admissionToken, connection.interlucientStatus, connection])
 
-  // Reset the play flag when stream is stopped/reset
+  // Reset play flag when stream stops
   useEffect(() => {
     if (!streamStarted) {
       hasCalledPlayRef.current = false
@@ -259,76 +201,9 @@ export default function InterlucientStreamingApp() {
   // =========================================================================
 
   const { isIdle, resetIdle } = useIdleDetection({
-    idleTimeout: 5 * 60 * 1000, // 5 minutes
+    idleTimeout: 5 * 60 * 1000,
     enabled: connection.isConnected,
   })
-
-  // =========================================================================
-  // Settings Hook (sends UE5 messages for FPS, audio, etc.)
-  // =========================================================================
-
-  const settings = useSettings(messageBus.sendRawMessage, {
-    debug: true,
-    onSettingApplied: (settingType, value, success) => {
-      console.log(success ? '✅' : '❌', `Setting ${settingType}: ${value}`)
-    },
-    onFpsUpdate: (fps) => {
-      console.log('📊 FPS:', fps.toFixed(1))
-    },
-  })
-
-  // Subscribe to settings messages from UE5 (fps_update, setting_applied, etc.)
-  useEffect(() => {
-    const unsubscribe = messageBus.onMessage((message) => {
-      settings.handleSettingsMessage(message)
-    })
-    return unsubscribe
-  }, [messageBus, settings])
-
-  // =========================================================================
-  // Demo Training State (simplified for now)
-  // =========================================================================
-
-  const [explosionValue, setExplosionValue] = useState(0)
-  const [selectedTool, setSelectedTool] = useState<string>('None')
-  const [transportType, setTransportType] = useState<'relay' | 'direct' | null>(null)
-
-  // Demo message handlers
-  const handleSelectTool = useCallback((tool: string) => {
-    setSelectedTool(tool)
-    messageBus.sendMessage('tool_select', tool)
-  }, [messageBus])
-
-  const handleSetExplosion = useCallback((value: number) => {
-    setExplosionValue(value)
-    messageBus.sendMessage('explosion_control', String(value))
-  }, [messageBus])
-
-  // =========================================================================
-  // Training Mode Handlers
-  // =========================================================================
-
-  const handleSkipToTraining = useCallback(() => {
-    console.log('🎮 Transitioning from Cinematic to Training mode')
-    setIsCinematicMode(false)
-    // Send training start command to UE5
-    messageBus.sendMessage('training_control', 'start')
-  }, [messageBus])
-
-  const handleStartTraining = useCallback(() => {
-    console.log('🎮 Starting training')
-    messageBus.sendMessage('training_control', 'start')
-  }, [messageBus])
-
-  const handlePauseTraining = useCallback(() => {
-    console.log('⏸️ Pausing training')
-    messageBus.sendMessage('training_control', 'pause')
-  }, [messageBus])
-
-  const handleResumeTraining = useCallback(() => {
-    console.log('▶️ Resuming training')
-    messageBus.sendMessage('training_control', 'resume')
-  }, [messageBus])
 
   // =========================================================================
   // Force dark background
@@ -358,137 +233,33 @@ export default function InterlucientStreamingApp() {
         <InterlucientStream
           ref={connection.streamRef}
           admissionToken={connection.admissionToken || undefined}
-          controls={false} // We use custom overlay
+          controls={false}
           reconnectMode="recover"
-          reconnectAttempts={-1} // Unlimited retries for testing
+          reconnectAttempts={-1}
           reconnectStrategy="exponential-backoff"
-          queueWaitTolerance={120} // 2 min for GPU availability
-          webrtcNegotiationTolerance={30} // 30s for WebRTC setup
+          queueWaitTolerance={120}
+          webrtcNegotiationTolerance={30}
           swiftJobRequest={true}
-          flexiblePresenceAllowance={300} // 5 min reconnection grace
-          rendezvousTolerance={60} // 1 min for GPU worker connection
-          lingerTolerance={60} // 1 min - keep worker alive if browser drops
-          forceRelay={false} // Disabled for testing - try direct P2P connection
+          flexiblePresenceAllowance={300}
+          rendezvousTolerance={60}
+          lingerTolerance={60}
+          forceRelay={false}
           onStatusChange={connection.handleStatusChange}
           onDataChannelOpen={connection.handleDataChannelOpen}
-          onMessage={messageBus.handleIncomingMessage}
           onSessionEnded={connection.handleSessionEnded}
           onError={connection.handleError}
           onTransportSelected={(turnUsed) => {
-            console.log(turnUsed ? '🔄 Transport: RELAY (TURN over TLS)' : '🔗 Transport: DIRECT (P2P)')
+            console.log(turnUsed ? '🔄 Transport: RELAY' : '🔗 Transport: DIRECT')
             setTransportType(turnUsed ? 'relay' : 'direct')
           }}
         />
       </div>
 
-      {/* Cinematic Mode Timer - Show when connected and in cinematic mode */}
-      {connection.isConnected && isCinematicMode && (
-        <CinematicTimer
-          duration={7200} // 2 hours
-          onSkipToTraining={handleSkipToTraining}
-          isActive={isCinematicMode}
-        />
-      )}
-
-      {/* Unified Sidebar - Show when connected */}
-      {connection.isConnected && (
-        <UnifiedSidebar
-          mode={isCinematicMode ? 'cinematic' : 'training'}
-          isVisible={true}
-          // Explosion Controls
-          explosionValue={explosionValue}
-          onExplosionValueChange={handleSetExplosion}
-          onExplode={() => messageBus.sendMessage('explosion_control', 'explode')}
-          onAssemble={() => messageBus.sendMessage('explosion_control', 'assemble')}
-          // Placeholder props (would be connected to real hooks)
-          waypoints={[]}
-          activeWaypointIndex={-1}
-          activeWaypointName=""
-          onRefreshWaypoints={() => messageBus.sendMessage('waypoint_control', 'list')}
-          onActivateWaypoint={() => {}}
-          onDeactivateWaypoint={() => {}}
-          onWaypointProgressChange={() => {}}
-          cameraPerspective="IsometricNE"
-          cameraMode="Manual"
-          onSetCameraPerspective={(p) => messageBus.sendMessage('camera_control', p)}
-          onToggleAutoOrbit={() => messageBus.sendMessage('camera_control', 'orbit_start')}
-          onResetCamera={() => messageBus.sendMessage('camera_control', 'reset')}
-          hierarchicalGroups={[]}
-          onRefreshLayers={() => messageBus.sendMessage('hierarchical_control', 'list')}
-          onToggleMainGroup={() => {}}
-          onToggleChildGroup={() => {}}
-          onShowAllLayers={() => messageBus.sendMessage('hierarchical_control', 'show_all')}
-          onHideAllLayers={() => messageBus.sendMessage('hierarchical_control', 'hide_all')}
-          // Training controls
-          isPaused={false}
-          onPause={handlePauseTraining}
-          onResume={handleResumeTraining}
-          onQuit={() => console.log('Quit clicked')}
-          // Stream health
-          onReconnectStream={connection.reconnect}
-          isReconnecting={connection.isRetrying}
-          streamHealthStatus="healthy"
-          // Placeholder for training state
-          trainingState={{} as any}
-          onSelectPipe={() => {}}
-          onSelectPressureTest={() => {}}
-          // Settings - connected to UE5 via useSettings hook
-          settingsState={{
-            audioEnabled: settings.settings.audioEnabled,
-            masterVolume: settings.settings.masterVolume,
-            ambientVolume: settings.settings.ambientVolume,
-            sfxVolume: settings.settings.sfxVolume,
-            graphicsQuality: settings.settings.graphicsQuality,
-            resolution: settings.settings.resolution,
-            bandwidthOption: settings.settings.bandwidthOption,
-            fpsTrackingEnabled: settings.settings.fpsTrackingEnabled,
-            currentFps: settings.settings.currentFps,
-            showFpsOverlay: settings.settings.showFpsOverlay,
-          }}
-          settingsCallbacks={{
-            setAudioEnabled: settings.setAudioEnabled,
-            setMasterVolume: settings.setMasterVolume,
-            setAmbientVolume: settings.setAmbientVolume,
-            setSfxVolume: settings.setSfxVolume,
-            setGraphicsQuality: settings.setGraphicsQuality,
-            setResolution: settings.setResolution,
-            setBandwidthOption: settings.setBandwidthOption,
-            setShowFpsOverlay: settings.setShowFpsOverlay,
-          }}
-          streamQuality="medium"
-          streamQualityOptions={[]}
-          onStreamQualityChange={() => {}}
-        />
-      )}
-
-      {/* Control Panel - Show when connected and NOT in cinematic mode */}
-      {connection.isConnected && !isCinematicMode && (
-        <ControlPanel
-          isDark={isDark}
-          onSelectTool={handleSelectTool}
-          onSelectPipe={() => {}}
-          onSelectPressureTest={() => {}}
-        />
-      )}
-
-      {/* Message Log - Show when connected */}
-      {connection.isConnected && (
-        <MessageLog
-          messages={messageBus.messageLog}
-          lastMessage={messageBus.lastMessage}
-          onClear={messageBus.clearLog}
-          onSendTest={(msg) => messageBus.sendRawMessage(msg)}
-          isConnected={connection.isDataChannelOpen}
-          connectionStatus={connection.isConnected ? 'connected' : 'connecting'}
-          isDark={isDark}
-        />
-      )}
-
       {/* Starter Screen */}
       <StarterScreen
         isOpen={showStarterScreen}
         title="Interlucent Streaming"
-        subtitle="Click the button below to begin (Interlucent mode)"
+        subtitle="Click the button below to begin"
         onStart={handleStartStream}
         buttonText="Start"
       />
@@ -497,7 +268,7 @@ export default function InterlucientStreamingApp() {
       <LoadingScreen
         isOpen={showLoadingScreen && !connection.isConnected}
         title="Please Wait!"
-        subtitle="Session is loading (Interlucent)"
+        subtitle="Session is loading"
         statusMessage={loadingStatus.message}
         currentStep={loadingStatus.step}
         retryCount={0}
@@ -505,48 +276,14 @@ export default function InterlucientStreamingApp() {
         showRetryInfo={false}
       />
 
-      {/* Mode Controls (for testing) */}
-      {connection.isConnected && (
-        <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
-          {/* Mode indicator */}
-          <div className="px-4 py-2 bg-gray-800/90 text-white rounded-lg text-center text-sm">
-            Mode: <span className={isCinematicMode ? 'text-blue-400' : 'text-green-400'}>
-              {isCinematicMode ? 'Cinematic' : 'Training'}
-            </span>
+      {/* Transport Type Indicator */}
+      {connection.isConnected && transportType && (
+        <div className="fixed bottom-4 right-4 z-50">
+          <div className={`px-4 py-2 rounded-lg text-white text-sm text-center ${
+            transportType === 'relay' ? 'bg-orange-600/90' : 'bg-blue-600/90'
+          }`}>
+            {transportType === 'relay' ? '🔄 RELAY' : '🔗 DIRECT'}
           </div>
-
-          {/* Start Training Button (in cinematic mode) */}
-          {isCinematicMode && (
-            <button
-              onClick={handleSkipToTraining}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg shadow-lg hover:bg-green-700 font-medium"
-            >
-              ▶ Start Training
-            </button>
-          )}
-
-          {/* Toggle Mode Button (for debugging) */}
-          <button
-            onClick={() => {
-              if (isCinematicMode) {
-                handleSkipToTraining()
-              } else {
-                setIsCinematicMode(true)
-              }
-            }}
-            className="px-4 py-2 bg-purple-600 text-white rounded-lg shadow-lg hover:bg-purple-700 text-sm"
-          >
-            Switch to {isCinematicMode ? 'Training' : 'Cinematic'}
-          </button>
-
-          {/* Transport Type Indicator */}
-          {transportType && (
-            <div className={`px-4 py-2 rounded-lg text-white text-sm text-center ${
-              transportType === 'relay' ? 'bg-orange-600/90' : 'bg-blue-600/90'
-            }`}>
-              {transportType === 'relay' ? '🔄 RELAY' : '🔗 DIRECT'}
-            </div>
-          )}
         </div>
       )}
 
@@ -597,7 +334,6 @@ export default function InterlucientStreamingApp() {
           <div>Connected: {connection.isConnected ? '✅' : '❌'}</div>
           <div>Data Channel: {connection.isDataChannelOpen ? '✅' : '❌'}</div>
           <div>Token: {connection.admissionToken ? '✅' : '❌'}</div>
-          <div>Token Mode: {connection.admissionToken?.startsWith('eyJ') ? 'JWT' : 'mock'}</div>
           <div>Session: {connection.sessionId || 'none'}</div>
           {connection.failureReason && (
             <div className="text-red-400 mt-2">Error: {connection.failureReason}</div>
