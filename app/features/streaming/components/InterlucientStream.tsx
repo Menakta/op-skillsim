@@ -34,7 +34,7 @@ import type {
 // Constants
 // =============================================================================
 
-const CDN_URL = 'https://cdn.interlucent.ai/dev/pixel-stream/0.0.66/pixel-stream.iife.min.js'
+const CDN_URL = 'https://cdn.interlucent.ai/dev/pixel-stream/0.0.73/pixel-stream.iife.min.js'
 
 // =============================================================================
 // Props Interface
@@ -74,8 +74,8 @@ export interface InterlucientStreamProps {
   /** Enable swift job request for faster startup */
   swiftJobRequest?: boolean
 
-  /** Force TURN relay mode */
-  forceTurn?: boolean
+  /** Force relay mode - routes all traffic through TURN over TLS (port 443) to bypass DPI */
+  forceRelay?: boolean
 
   /** Flexible presence allowance in seconds */
   flexiblePresenceAllowance?: number
@@ -111,6 +111,9 @@ export interface InterlucientStreamProps {
   /** Called when connection fails */
   onError?: (error: string) => void
 
+  /** Called when transport is selected (relay vs direct) */
+  onTransportSelected?: (turnUsed: boolean) => void
+
   // =========================================================================
   // Styling
   // =========================================================================
@@ -139,14 +142,20 @@ export interface InterlucientStreamRef {
   /** Stop the session */
   stop: (reason?: string) => void
 
-  /** Send UI interaction to UE5 (JSON format) */
+  /** Send UI interaction to UE5 (JSON format) - Interlucent native */
   sendUIInteraction: (payload: Record<string, unknown>) => void
 
   /** Send command to UE5 (UE 5.4+) */
   sendCommand: (command: Record<string, unknown>) => void
 
-  /** Send message in string format (backward compatible with PureWeb) */
+  /** Send JSON payload to UE5 - preferred method */
+  sendJsonMessage: (payload: Record<string, unknown>) => void
+
+  /** @deprecated Use sendJsonMessage or messageBus.sendMessage instead */
   sendStringMessage: (message: string) => void
+
+  /** @deprecated Use sendJsonMessage instead */
+  sendStringMessageAlt: (message: string, format: 'descriptor' | 'command' | 'raw') => void
 
   /** Get current status */
   getStatus: () => InterlucientStatus | null
@@ -179,7 +188,7 @@ export const InterlucientStream = forwardRef<InterlucientStreamRef, Interlucient
       queueWaitTolerance = 45,
       webrtcNegotiationTolerance = 10,
       swiftJobRequest = true,
-      forceTurn = false,
+      forceRelay = false,
       flexiblePresenceAllowance = 120,
       lingerTolerance,
       rendezvousTolerance,
@@ -190,6 +199,7 @@ export const InterlucientStream = forwardRef<InterlucientStreamRef, Interlucient
       onSessionEnded,
       onStreamStart,
       onError,
+      onTransportSelected,
       className = '',
       style,
       children,
@@ -218,6 +228,7 @@ export const InterlucientStream = forwardRef<InterlucientStreamRef, Interlucient
     const onSessionEndedRef = useRef(onSessionEnded)
     const onStreamStartRef = useRef(onStreamStart)
     const onErrorRef = useRef(onError)
+    const onTransportSelectedRef = useRef(onTransportSelected)
 
     // Update refs when callbacks change
     useEffect(() => { onStatusChangeRef.current = onStatusChange }, [onStatusChange])
@@ -227,6 +238,7 @@ export const InterlucientStream = forwardRef<InterlucientStreamRef, Interlucient
     useEffect(() => { onSessionEndedRef.current = onSessionEnded }, [onSessionEnded])
     useEffect(() => { onStreamStartRef.current = onStreamStart }, [onStreamStart])
     useEffect(() => { onErrorRef.current = onError }, [onError])
+    useEffect(() => { onTransportSelectedRef.current = onTransportSelected }, [onTransportSelected])
 
     // =========================================================================
     // Script Load Handlers
@@ -275,8 +287,8 @@ export const InterlucientStream = forwardRef<InterlucientStreamRef, Interlucient
         ps.setAttribute('swift-job-request', '')
       }
 
-      if (forceTurn) {
-        ps.setAttribute('force-turn', '')
+      if (forceRelay) {
+        ps.setAttribute('force-relay', '')
       }
 
       if (apiEndpoint) ps.apiEndpoint = apiEndpoint
@@ -363,11 +375,18 @@ export const InterlucientStream = forwardRef<InterlucientStreamRef, Interlucient
         onSessionEndedRef.current?.(reason)
       }
 
+      const handleTransportSelected = (event: CustomEvent<{ turnUsed: boolean } | null>) => {
+        const turnUsed = event.detail?.turnUsed ?? false
+        console.log(turnUsed ? '🔄 Transport: RELAY (TURN)' : '🔗 Transport: DIRECT (P2P)')
+        onTransportSelectedRef.current?.(turnUsed)
+      }
+
       ps.addEventListener('status-change', handleStatusChange as EventListener)
       ps.addEventListener('data-channel-open', handleDataChannelOpen as EventListener)
       ps.addEventListener('ue-command-response', handleMessage as EventListener)
       ps.addEventListener('session-ready', handleSessionReady as EventListener)
       ps.addEventListener('session-ended', handleSessionEnded as EventListener)
+      ps.addEventListener('transport-selected', handleTransportSelected as EventListener)
 
       // Cleanup
       return () => {
@@ -376,6 +395,7 @@ export const InterlucientStream = forwardRef<InterlucientStreamRef, Interlucient
         ps?.removeEventListener('ue-command-response', handleMessage as EventListener)
         ps?.removeEventListener('session-ready', handleSessionReady as EventListener)
         ps?.removeEventListener('session-ended', handleSessionEnded as EventListener)
+        ps?.removeEventListener('transport-selected', handleTransportSelected as EventListener)
       }
     }, [
       scriptLoaded,
@@ -389,7 +409,7 @@ export const InterlucientStream = forwardRef<InterlucientStreamRef, Interlucient
       queueWaitTolerance,
       webrtcNegotiationTolerance,
       swiftJobRequest,
-      forceTurn,
+      forceRelay,
       flexiblePresenceAllowance,
       lingerTolerance,
       rendezvousTolerance,
@@ -456,30 +476,43 @@ export const InterlucientStream = forwardRef<InterlucientStreamRef, Interlucient
       },
 
       /**
-       * Send message in string format (backward compatible with PureWeb)
-       * Converts "type:data" string format to JSON for Interlucent
+       * Send JSON payload directly to UE5
+       * This is the preferred method for Interlucent - sends native JSON format
+       *
+       * Example:
+       *   sendJsonMessage({ type: 'tool_select', tool: 'XRay' })
+       *   sendJsonMessage({ type: 'training_control', action: 'start' })
        */
-      sendStringMessage: (message: string) => {
+      sendJsonMessage: (payload: Record<string, unknown>) => {
         if (!elementRef.current) {
-          console.warn('Cannot send message: pixel-stream not initialized')
+          console.warn('❌ Cannot send message: pixel-stream not initialized')
           return
         }
         if (!dataChannelOpen) {
-          console.warn('Cannot send message: data channel not open')
+          console.warn('⏳ Cannot send message: data channel not open. Payload:', payload)
           return
         }
 
-        // Convert string format to JSON
-        // We include the raw message so UE5 can use either format
-        const colonIndex = message.indexOf(':')
-        const type = colonIndex > -1 ? message.substring(0, colonIndex) : message
-        const data = colonIndex > -1 ? message.substring(colonIndex + 1) : ''
+        console.log('📤 Sending JSON to UE5:', payload)
+        elementRef.current.sendUIInteraction(payload)
+      },
 
-        elementRef.current.sendUIInteraction({
-          type,
-          data,
-          _rawMessage: message, // For backward compatibility
-        })
+      /**
+       * @deprecated Use sendJsonMessage or let useInterlucientMessageBus handle conversion
+       * Legacy method that wrapped strings - now just logs a warning
+       */
+      sendStringMessage: (message: string) => {
+        console.warn('⚠️ sendStringMessage is deprecated. Use sendJsonMessage or messageBus.sendMessage instead')
+        console.warn('   Message was:', message)
+        // Don't send - let the caller update to use proper JSON
+      },
+
+      /**
+       * @deprecated Use sendJsonMessage instead
+       */
+      sendStringMessageAlt: (message: string, format: 'descriptor' | 'command' | 'raw') => {
+        console.warn('⚠️ sendStringMessageAlt is deprecated. Use sendJsonMessage instead')
+        console.warn('   Message was:', message, 'format:', format)
       },
 
       getStatus: () => {

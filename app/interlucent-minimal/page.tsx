@@ -77,10 +77,11 @@ export default function InterlucientMinimalPage() {
     ps.setAttribute('swift-job-request', '')
     ps.setAttribute('reconnect-mode', 'recover')
     ps.setAttribute('reconnect-attempts', '-1')
-    ps.setAttribute('queue-wait-tolerance', '120')
-    ps.setAttribute('rendezvous-tolerance', '60')
-    ps.setAttribute('flexible-presence-allowance', '300')
-    ps.setAttribute('linger-tolerance', '60')
+    ps.setAttribute('queue-wait-tolerance', '60')
+    ps.setAttribute('rendezvous-tolerance', '30')
+    ps.setAttribute('flexible-presence-allowance', '120')
+    ps.setAttribute('linger-tolerance', '30')
+    ps.setAttribute('force-relay', '') // Force TURN relay to bypass DPI firewalls
 
     // Status change listener
     ps.addEventListener('status-change', (e: CustomEvent) => {
@@ -119,6 +120,11 @@ export default function InterlucientMinimalPage() {
 
     ps.addEventListener('ue-command-response', (e: CustomEvent) => {
       addLog(`UE message: ${JSON.stringify(e.detail).substring(0, 100)}`)
+    })
+
+    ps.addEventListener('transport-selected', (e: CustomEvent) => {
+      const turnUsed = e.detail?.turnUsed ?? false
+      addLog(turnUsed ? '🔄 Transport: RELAY (TURN over TLS)' : '🔗 Transport: DIRECT (P2P UDP)')
     })
 
     // Send periodic keep-alive ping when streaming
@@ -160,7 +166,7 @@ export default function InterlucientMinimalPage() {
     <div className="h-screen w-screen flex bg-black text-white">
       {/* Load CDN Script */}
       <Script
-        src="https://cdn.interlucent.ai/dev/pixel-stream/0.0.66/pixel-stream.iife.min.js"
+        src="https://cdn.interlucent.ai/dev/pixel-stream/0.0.73/pixel-stream.iife.min.js"
         strategy="afterInteractive"
         onLoad={() => {
           addLog('pixel-stream script loaded')

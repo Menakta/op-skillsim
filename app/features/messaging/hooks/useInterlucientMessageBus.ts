@@ -3,13 +3,17 @@
 /**
  * Interlucent Message Bus Hook
  *
- * Parallel to useMessageBus.ts but for Interlucent pixel streaming.
- * Provides backward compatibility with PureWeb string message format.
+ * Message bus for Interlucent pixel streaming using native JSON format.
  *
  * Key features:
- * - Sends messages in string format ("type:data") converted to JSON
- * - Receives JSON messages and converts to ParsedMessage format
- * - Compatible with existing training hooks that expect string format
+ * - Sends messages as JSON objects (Interlucent native format)
+ * - Receives JSON messages from UE5
+ * - Converts between string format (for backward compat) and JSON
+ *
+ * Message Format (Interlucent):
+ * - sendUIInteraction({ type: 'tool_select', tool: 'XRay' })
+ * - sendUIInteraction({ type: 'training_control', action: 'start' })
+ * - sendUIInteraction({ type: 'camera_control', preset: 'IsometricNE' })
  */
 
 import { useCallback, useEffect, useState, useRef } from 'react'
@@ -18,7 +22,6 @@ import {
   ParsedMessage,
   MessageLogEntry,
   parseMessage,
-  createMessage,
 } from '@/app/lib/messageTypes'
 
 // =============================================================================
@@ -31,7 +34,7 @@ export interface UseInterlucientMessageBusConfig {
 }
 
 // =============================================================================
-// Hook Return Type (same as useMessageBus for compatibility)
+// Hook Return Type
 // =============================================================================
 
 export interface UseInterlucientMessageBusReturn {
@@ -40,7 +43,10 @@ export interface UseInterlucientMessageBusReturn {
   lastMessage: ParsedMessage | null
   messageLog: MessageLogEntry[]
 
-  // Send functions (same API as useMessageBus)
+  // Send functions - JSON format (Interlucent native)
+  sendJson: (payload: Record<string, unknown>) => void
+
+  // Send functions - String format (backward compatible with existing code)
   sendMessage: (type: string, data?: string) => void
   sendRawMessage: (message: string) => void
 
@@ -55,51 +61,271 @@ export interface UseInterlucientMessageBusReturn {
 }
 
 // =============================================================================
-// JSON to String Message Conversion
+// String to JSON Conversion Utilities
 // =============================================================================
 
 /**
- * Converts incoming JSON message from Interlucent/UE5 to string format
- * This allows existing message handlers to work without modification
+ * Convert a string message (PureWeb format) to JSON object (Interlucent format)
+ *
+ * Examples:
+ *   "tool_select:XRay" -> { type: "tool_select", tool: "XRay" }
+ *   "training_control:start" -> { type: "training_control", action: "start" }
+ *   "explosion_control:50" -> { type: "explosion_control", level: 50 }
+ *   "question_answer:Q1:2:true" -> { type: "question_answer", questionId: "Q1", tryCount: 2, isCorrect: true }
  */
-function jsonToStringFormat(data: unknown): string | null {
+function stringToJson(messageString: string): Record<string, unknown> {
+  const colonIndex = messageString.indexOf(':')
+
+  if (colonIndex === -1) {
+    // No data, just type (e.g., "task_complete")
+    return { type: messageString }
+  }
+
+  const type = messageString.substring(0, colonIndex)
+  const dataString = messageString.substring(colonIndex + 1)
+  const parts = dataString.split(':')
+
+  // Convert based on message type
+  switch (type) {
+    // Training Control: "training_control:start" -> { type, action }
+    case 'training_control':
+      return { type, action: parts[0] }
+
+    // Tool Selection: "tool_select:XRay" -> { type, tool }
+    case 'tool_select':
+      return { type, tool: parts[0] }
+
+    // Pipe Selection: "pipe_select:100mm" -> { type, pipeType }
+    case 'pipe_select':
+      return { type, pipeType: parts[0] }
+
+    // Task Start: "task_start:PipeConnection:100mm" -> { type, tool, pipeType }
+    case 'task_start':
+      return parts.length > 1
+        ? { type, tool: parts[0], pipeType: parts[1] }
+        : { type, tool: parts[0] }
+
+    // Start From Task: "start_from_task:3" -> { type, phaseIndex }
+    case 'start_from_task':
+      return { type, phaseIndex: parseInt(parts[0]) || 0 }
+
+    // Camera Control: "camera_control:IsometricNE" -> { type, preset }
+    case 'camera_control':
+      return { type, preset: parts[0] }
+
+    // Explosion Control: "explosion_control:50" -> { type, level }
+    case 'explosion_control':
+      const levelOrAction = parts[0]
+      if (levelOrAction === 'explode' || levelOrAction === 'assemble') {
+        return { type, action: levelOrAction }
+      }
+      return { type, level: parseFloat(levelOrAction) || 0 }
+
+    // Question Answer: "question_answer:Q1:2:true" -> { type, questionId, tryCount, isCorrect }
+    case 'question_answer':
+      return {
+        type,
+        questionId: parts[0],
+        tryCount: parseInt(parts[1]) || 1,
+        isCorrect: parts[2] === 'true'
+      }
+
+    // Question Hint: "question_hint:Q1" -> { type, questionId }
+    case 'question_hint':
+      return { type, questionId: parts[0] }
+
+    // Question Close: "question_close:Q1" -> { type, questionId }
+    case 'question_close':
+      return { type, questionId: parts[0] }
+
+    // Test Plug Select: "test_plug_select:AirPlug" -> { type, plugType }
+    case 'test_plug_select':
+      return { type, plugType: parts[0] }
+
+    // Pressure Test Start: "pressure_test_start:air_test" -> { type, testType }
+    case 'pressure_test_start':
+      return { type, testType: parts[0] }
+
+    // Waypoint Control: "waypoint_control:activate:0" -> { type, action, index }
+    case 'waypoint_control':
+      if (parts[0] === 'activate' || parts[0] === 'deactivate') {
+        return { type, action: parts[0], index: parseInt(parts[1]) || 0 }
+      }
+      return { type, action: parts[0] }
+
+    // Layer Control: "layer_control:toggle:0" -> { type, action, index }
+    case 'layer_control':
+      if (parts[0] === 'toggle' || parts[0] === 'isolate') {
+        return { type, action: parts[0], index: parseInt(parts[1]) || 0 }
+      }
+      if (parts[0] === 'show' || parts[0] === 'hide') {
+        return { type, action: parts[0], name: parts[1] }
+      }
+      return { type, action: parts[0] }
+
+    // Hierarchical Control: "hierarchical_control:toggle_main:GroupName" -> { type, action, name }
+    case 'hierarchical_control':
+      if (parts[0] === 'toggle_main') {
+        return { type, action: 'toggle_main', groupName: parts[1] }
+      }
+      if (parts[0] === 'toggle_child') {
+        return { type, action: 'toggle_child', parentName: parts[1], childIndex: parseInt(parts[2]) || 0 }
+      }
+      return { type, action: parts[0] }
+
+    // Settings Control: "settings_control:resolution:1920:1080" -> { type, setting, ... }
+    case 'settings_control':
+      const settingType = parts[0]
+      switch (settingType) {
+        case 'resolution':
+          return { type, setting: 'resolution', width: parseInt(parts[1]) || 1920, height: parseInt(parts[2]) || 1080 }
+        case 'graphics_quality':
+          return { type, setting: 'graphics_quality', quality: parts[1] }
+        case 'audio_volume':
+          return { type, setting: 'audio_volume', group: parts[1], volume: parseFloat(parts[2]) || 1.0 }
+        case 'bandwidth':
+          return { type, setting: 'bandwidth', option: parts[1] }
+        case 'fps_tracking':
+          return { type, setting: 'fps_tracking', enabled: parts[1] === 'start' }
+        default:
+          return { type, setting: settingType, value: parts.slice(1).join(':') }
+      }
+
+    // Application Control: "application_control:quit" -> { type, action }
+    case 'application_control':
+      return { type, action: parts[0] }
+
+    // Default: Include raw data for unknown types
+    default:
+      return { type, data: dataString, _raw: messageString }
+  }
+}
+
+// =============================================================================
+// Message Extraction from UE5 Response
+// =============================================================================
+
+/**
+ * Convert JSON object from UE5 to string format for parseMessage()
+ *
+ * UE5 might send JSON in same format we send:
+ *   { type: 'training_progress', progress: 50, taskName: 'TaskName', ... }
+ *
+ * We convert back to string format for parseMessage() compatibility:
+ *   "training_progress:50:TaskName:phase1:3:8:true"
+ */
+function jsonToString(obj: Record<string, unknown>): string | null {
+  const type = obj.type as string
+  if (!type) return null
+
+  switch (type) {
+    case 'training_progress':
+      // { type, progress, taskName, phase, currentTask, totalTasks, isActive }
+      return `${type}:${obj.progress ?? 0}:${obj.taskName ?? ''}:${obj.phase ?? ''}:${obj.currentTask ?? 0}:${obj.totalTasks ?? 5}:${obj.isActive ?? false}`
+
+    case 'tool_change':
+      return `${type}:${obj.toolName ?? obj.tool ?? ''}`
+
+    case 'task_completed':
+      return `${type}:${obj.taskId ?? ''}`
+
+    case 'task_start':
+      return `${type}:${obj.toolName ?? obj.tool ?? ''}`
+
+    case 'task_complete':
+      return type
+
+    case 'question_request':
+      return `${type}:${obj.questionId ?? ''}`
+
+    case 'pressure_test_result':
+      return `${type}:${obj.passed ?? false}:${obj.pressure ?? 0}:${obj.testType ?? 'air_test'}`
+
+    case 'explosion_update':
+      return `${type}:${obj.value ?? obj.level ?? 0}:${obj.isAnimating ?? false}`
+
+    case 'camera_update':
+      return `${type}:${obj.mode ?? 'Manual'}:${obj.perspective ?? obj.preset ?? 'IsometricNE'}:${obj.distance ?? 1500}:${obj.isTransitioning ?? false}`
+
+    case 'error':
+      return `${type}:${obj.code ?? 'UNKNOWN'}:${obj.details ?? obj.message ?? ''}`
+
+    case 'fps_update':
+      return `${type}:${obj.fps ?? obj.value ?? 0}`
+
+    case 'setting_applied':
+      return `${type}:${obj.settingType ?? obj.setting ?? ''}:${obj.value ?? ''}:${obj.success ?? false}`
+
+    default:
+      // Unknown type - include what we have
+      if (obj.data !== undefined) {
+        const dataStr = typeof obj.data === 'string' ? obj.data : JSON.stringify(obj.data)
+        return `${type}:${dataStr}`
+      }
+      return type
+  }
+}
+
+/**
+ * Extracts string message from UE5 response
+ *
+ * UE5 can send messages in multiple formats:
+ * 1. Raw string: "training_progress:50:TaskName:phase1"
+ * 2. JSON with type field: { "type": "training_progress", "progress": 50, ... }
+ * 3. JSON with message field: { "message": "training_progress:50:TaskName:phase1" }
+ * 4. JSON with type/data: { "type": "training_progress", "data": "50:TaskName:phase1" }
+ *
+ * This function normalizes all formats to a string for existing parseMessage() to handle.
+ */
+function extractStringMessage(data: unknown): string | null {
+  // Case 1: Already a string - return as-is
   if (typeof data === 'string') {
-    // Already a string, return as-is
     return data
   }
 
+  // Case 2: Not an object - can't process
   if (typeof data !== 'object' || data === null) {
     return null
   }
 
   const obj = data as Record<string, unknown>
 
-  // Check for _rawMessage (we include this when sending for backward compat)
+  // Case 3: JSON with "type" field - native JSON format (preferred)
+  if (obj.type && typeof obj.type === 'string') {
+    // Check if this is a structured JSON (has fields other than type/data/_raw)
+    const keys = Object.keys(obj).filter(k => !['type', 'data', '_raw', '_dataParts', '_rawMessage'].includes(k))
+
+    if (keys.length > 0) {
+      // Has structured fields - convert JSON to string
+      const converted = jsonToString(obj)
+      if (converted) return converted
+    }
+
+    // Fallback: simple type + data format
+    const type = obj.type as string
+    if (obj.data !== undefined) {
+      const dataStr = typeof obj.data === 'string' ? obj.data : JSON.stringify(obj.data)
+      return `${type}:${dataStr}`
+    }
+    if (Array.isArray(obj._dataParts) && obj._dataParts.length > 0) {
+      return `${type}:${obj._dataParts.join(':')}`
+    }
+    return type
+  }
+
+  // Case 4: JSON with "message" field (wrapped string)
+  if (obj.message && typeof obj.message === 'string') {
+    return obj.message
+  }
+
+  // Case 5: JSON with "_rawMessage" field (backward compat)
   if (obj._rawMessage && typeof obj._rawMessage === 'string') {
     return obj._rawMessage
   }
 
-  // Check for type field
-  if (!obj.type || typeof obj.type !== 'string') {
-    // Try to stringify the whole object as data
-    return JSON.stringify(data)
-  }
-
-  const type = obj.type as string
-
-  // Check for data field
-  if (obj.data !== undefined) {
-    const dataStr = typeof obj.data === 'string' ? obj.data : JSON.stringify(obj.data)
-    return `${type}:${dataStr}`
-  }
-
-  // Check for _dataParts (we include this when sending)
-  if (Array.isArray(obj._dataParts) && obj._dataParts.length > 0) {
-    return `${type}:${obj._dataParts.join(':')}`
-  }
-
-  // No data, just type
-  return type
+  // Case 6: Unknown format - try to stringify for debugging
+  console.warn('⚠️ Unknown message format from UE5:', obj)
+  return null
 }
 
 // =============================================================================
@@ -127,21 +353,52 @@ export function useInterlucientMessageBus(
   }, [isDataChannelOpen])
 
   // ==========================================================================
-  // SEND: Send message to UE5 (string format, converted to JSON internally)
+  // SEND JSON: Send JSON payload directly to UE5 (Interlucent native format)
   // ==========================================================================
 
-  const sendMessage = useCallback((type: string, data?: string) => {
-    const message = createMessage(type, data || '')
-
+  const sendJson = useCallback((payload: Record<string, unknown>) => {
     if (debug) {
-      console.log('📤 Sending to UE (Interlucent):', message)
+      console.log('📤 Sending JSON to UE5:', payload)
     }
 
     if (streamRef.current && isDataChannelOpen) {
-      // Use sendStringMessage which handles the conversion
-      streamRef.current.sendStringMessage(message)
+      streamRef.current.sendUIInteraction(payload)
     } else {
-      if (debug) console.warn('Stream not ready - message not sent:', message)
+      if (debug) console.warn('⏳ Stream not ready - message not sent:', payload)
+    }
+
+    // Log the message
+    const type = (payload.type as string) || 'unknown'
+    const entry: MessageLogEntry = {
+      id: crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      direction: 'sent',
+      type,
+      data: JSON.stringify(payload),
+      raw: JSON.stringify(payload),
+      timestamp: Date.now()
+    }
+    setMessageLog(prev => [entry, ...prev].slice(0, maxLogSize))
+  }, [streamRef, isDataChannelOpen, debug, maxLogSize])
+
+  // ==========================================================================
+  // SEND: Send message (converts string format to JSON)
+  // ==========================================================================
+
+  const sendMessage = useCallback((type: string, data?: string) => {
+    // Build string format for conversion
+    const messageString = data ? `${type}:${data}` : type
+
+    // Convert to JSON format
+    const payload = stringToJson(messageString)
+
+    if (debug) {
+      console.log('📤 Sending to UE5 (converted):', messageString, '→', payload)
+    }
+
+    if (streamRef.current && isDataChannelOpen) {
+      streamRef.current.sendUIInteraction(payload)
+    } else {
+      if (debug) console.warn('⏳ Stream not ready - message not sent:', messageString)
     }
 
     // Log the message
@@ -150,23 +407,26 @@ export function useInterlucientMessageBus(
       direction: 'sent',
       type,
       data: data || '',
-      raw: message,
+      raw: JSON.stringify(payload),
       timestamp: Date.now()
     }
     setMessageLog(prev => [entry, ...prev].slice(0, maxLogSize))
   }, [streamRef, isDataChannelOpen, debug, maxLogSize])
 
   // ==========================================================================
-  // SEND RAW: Send raw message string
+  // SEND RAW: Send raw message string (converts to JSON)
   // ==========================================================================
 
   const sendRawMessage = useCallback((message: string) => {
+    // Convert string to JSON format
+    const payload = stringToJson(message)
+
     if (debug) {
-      console.log('📤 Sending raw to UE (Interlucent):', message)
+      console.log('📤 Sending raw to UE5 (converted):', message, '→', payload)
     }
 
     if (streamRef.current && isDataChannelOpen) {
-      streamRef.current.sendStringMessage(message)
+      streamRef.current.sendUIInteraction(payload)
     }
 
     const colonIndex = message.indexOf(':')
@@ -175,7 +435,7 @@ export function useInterlucientMessageBus(
       direction: 'sent',
       type: colonIndex > -1 ? message.substring(0, colonIndex) : message,
       data: colonIndex > -1 ? message.substring(colonIndex + 1) : '',
-      raw: message,
+      raw: JSON.stringify(payload),
       timestamp: Date.now()
     }
     setMessageLog(prev => [entry, ...prev].slice(0, maxLogSize))
@@ -186,16 +446,16 @@ export function useInterlucientMessageBus(
   // ==========================================================================
 
   const handleIncomingMessage = useCallback((data: unknown) => {
-    if (debug) console.log('📥 Raw message from UE (Interlucent):', data)
+    if (debug) console.log('📥 Raw message from UE5 (Interlucent):', data)
 
-    // Convert JSON to string format for backward compatibility
-    const rawString = jsonToStringFormat(data)
+    // Extract string message from whatever format UE5 sends
+    const rawString = extractStringMessage(data)
     if (!rawString) {
-      if (debug) console.warn('Could not parse message:', data)
+      if (debug) console.warn('Could not extract message from:', data)
       return
     }
 
-    if (debug) console.log('📥 Converted to string format:', rawString)
+    if (debug) console.log('📥 Extracted string message:', rawString)
 
     // Use existing parseMessage function
     const message = parseMessage(rawString)
@@ -255,6 +515,7 @@ export function useInterlucientMessageBus(
     isConnected,
     lastMessage,
     messageLog,
+    sendJson,
     sendMessage,
     sendRawMessage,
     onMessage,

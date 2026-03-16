@@ -16,6 +16,27 @@ interface MessageLogProps {
 // Accent color
 const ACCENT = '#39BEAE'
 
+// Check if a string is valid JSON
+function isJsonString(str: string): boolean {
+  try {
+    JSON.parse(str)
+    return true
+  } catch {
+    return false
+  }
+}
+
+// Format JSON for display
+function formatJson(jsonStr: string): string {
+  try {
+    const obj = JSON.parse(jsonStr)
+    // Compact format for display
+    return JSON.stringify(obj, null, 0)
+  } catch {
+    return jsonStr
+  }
+}
+
 // Memoized message item to prevent re-renders
 const MessageItem = memo(function MessageItem({
   entry,
@@ -31,6 +52,10 @@ const MessageItem = memo(function MessageItem({
     text: isDark ? 'text-white' : 'text-gray-900',
     textSecondary: isDark ? 'text-gray-400' : 'text-gray-600',
   }
+
+  // Check if raw is JSON (Interlucent format)
+  const isJson = isJsonString(entry.raw)
+  const displayContent = isJson ? formatJson(entry.raw) : `${entry.type}${entry.data ? ':' + entry.data : ''}`
 
   return (
     <div
@@ -54,13 +79,24 @@ const MessageItem = memo(function MessageItem({
         <span className={`px-1.5 py-0.5 ${colors.bgSecondary} ${colors.textSecondary} text-[10px] rounded`}>
           {entry.type}
         </span>
+        {isJson && (
+          <span className="px-1.5 py-0.5 bg-purple-500/20 text-purple-400 text-[10px] rounded">
+            JSON
+          </span>
+        )}
       </div>
-      <div className={`${colors.text} whitespace-pre-wrap break-all overflow-hidden`}>
-        <span style={{ color: ACCENT }}>{entry.type}</span>
-        {entry.data && (
+      <div className={`${colors.text} whitespace-pre-wrap break-all overflow-hidden font-mono text-[11px]`}>
+        {isJson ? (
+          <span className="text-amber-400">{displayContent}</span>
+        ) : (
           <>
-            <span className={colors.textSecondary}>:</span>
-            <span className="text-cyan-500">{entry.data}</span>
+            <span style={{ color: ACCENT }}>{entry.type}</span>
+            {entry.data && (
+              <>
+                <span className={colors.textSecondary}>:</span>
+                <span className="text-cyan-500">{entry.data}</span>
+              </>
+            )}
           </>
         )}
       </div>

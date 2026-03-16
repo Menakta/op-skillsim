@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interlucent UIInteraction Debug Test</title>
+    <script src="https://cdn.interlucent.ai/dev/pixel-stream/0.0.73/pixel-stream.iife.min.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 { color: #00d4ff; margin-bottom: 5px; }
+        .subtitle { color: #888; margin-bottom: 20px; }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 20px;
+            height: calc(100vh - 120px);
+        }
+        .stream-container {
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+        pixel-stream {
+            width: 100%;
+            height: 100%;
+        }
+        .controls {
+            background: #16213e;
+            border-radius: 8px;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        .section {
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #333;
+        }
+        .section h3 {
+            color: #00d4ff;
+            margin: 0 0 10px 0;
+            font-size: 14px;
+        }
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #666;
+        }
+        .status-dot.connected { background: #00ff88; }
+        .status-dot.streaming { background: #00d4ff; animation: pulse 1s infinite; }
+        .status-dot.error { background: #ff4444; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            margin: 5px 0;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        button:hover { transform: translateY(-1px); }
+        button:active { transform: translateY(0); }
+        .btn-primary { background: #0066ff; color: white; }
+        .btn-primary:hover { background: #0052cc; }
+        .btn-success { background: #00aa55; color: white; }
+        .btn-success:hover { background: #008844; }
+        .btn-warning { background: #ff8800; color: white; }
+        .btn-warning:hover { background: #cc6d00; }
+        .btn-purple { background: #8855ff; color: white; }
+        .btn-purple:hover { background: #7744dd; }
+        .btn-danger { background: #ff4444; color: white; }
+        .btn-danger:hover { background: #dd3333; }
+        .log {
+            background: #0d1117;
+            border-radius: 6px;
+            padding: 10px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 11px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            padding: 4px 0;
+            border-bottom: 1px solid #222;
+        }
+        .log-entry:last-child { border-bottom: none; }
+        .log-sent { color: #ffaa00; }
+        .log-received { color: #00ff88; }
+        .log-error { color: #ff4444; }
+        .log-info { color: #00d4ff; }
+        .code {
+            background: #0d1117;
+            padding: 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 11px;
+            word-break: break-all;
+            margin: 5px 0;
+        }
+        .proof-box {
+            background: #1a3a1a;
+            border: 1px solid #2a5a2a;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .proof-box h4 {
+            color: #00ff88;
+            margin: 0 0 10px 0;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #333;
+            border-radius: 6px;
+            background: #0d1117;
+            color: #fff;
+            font-family: monospace;
+            margin: 5px 0;
+        }
+        .note {
+            background: #2a2a1a;
+            border-left: 3px solid #ffaa00;
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Interlucent UIInteraction Debug Test</h1>
+    <p class="subtitle">Proof that web is sending messages - for UE5 team verification</p>
+
+    <div class="container">
+        <div class="stream-container">
+            <pixel-stream
+                id="stream"
+                app-id=""
+                controls
+                swift-job-request
+                force-relay
+                queue-wait-tolerance="60"
+                reconnect-mode="recover"
+            ></pixel-stream>
+        </div>
+
+        <div class="controls">
+            <!-- Connection Section -->
+            <div class="section">
+                <h3>1. CONNECTION STATUS</h3>
+                <div class="status">
+                    <div class="status-dot" id="statusDot"></div>
+                    <span id="statusText">Not connected</span>
+                </div>
+                <div class="status">
+                    <div class="status-dot" id="dataChannelDot"></div>
+                    <span id="dataChannelText">Data channel: Unknown</span>
+                </div>
+                <input type="text" id="tokenInput" placeholder="Paste admission token here...">
+                <button class="btn-primary" onclick="connect()">Connect</button>
+                <button class="btn-danger" onclick="disconnect()">Disconnect</button>
+            </div>
+
+            <!-- Test Messages Section -->
+            <div class="section">
+                <h3>2. SEND TEST MESSAGES</h3>
+                <p style="font-size: 12px; color: #888;">Click buttons below. If UE5 has a handler, it should respond.</p>
+
+                <button class="btn-success" onclick="sendFormat1()">
+                    Format 1: { Descriptor: "tool_select:XRay" }
+                </button>
+                <button class="btn-warning" onclick="sendFormat2()">
+                    Format 2: { message: "tool_select:XRay" }
+                </button>
+                <button class="btn-purple" onclick="sendFormat3()">
+                    Format 3: { Cmd: "tool_select", Data: "XRay" }
+                </button>
+                <button class="btn-primary" onclick="sendFormat4()">
+                    Format 4: { action: "tool_select", data: "XRay" }
+                </button>
+
+                <input type="text" id="customMessage" placeholder="Custom message (e.g., fps_tracking:start)">
+                <button class="btn-success" onclick="sendCustom()">Send Custom Message</button>
+            </div>
+
+            <!-- Proof Section -->
+            <div class="section">
+                <h3>3. PROOF FOR UE5 TEAM</h3>
+                <div class="proof-box">
+                    <h4>✅ What This Proves</h4>
+                    <ul style="margin: 0; padding-left: 20px; font-size: 12px;">
+                        <li>Mouse/keyboard works = Data channel is open</li>
+                        <li>Console shows "SENT" = sendUIInteraction() is called</li>
+                        <li>No "RECEIVED" = UE5 has no handler</li>
+                    </ul>
+                </div>
+                <div class="note">
+                    <strong>If no response:</strong> UE5 needs a UIInteraction handler bound to Pixel Streaming Input Component's OnInputEvent.
+                </div>
+            </div>
+
+            <!-- Log Section -->
+            <div class="section" style="border-bottom: none;">
+                <h3>4. MESSAGE LOG</h3>
+                <button class="btn-danger" onclick="clearLog()" style="width: auto; padding: 6px 12px; margin-bottom: 10px;">Clear Log</button>
+                <div class="log" id="log">
+                    <div class="log-entry log-info">Waiting for connection...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const ps = document.getElementById('stream');
+        const log = document.getElementById('log');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const dataChannelDot = document.getElementById('dataChannelDot');
+        const dataChannelText = document.getElementById('dataChannelText');
+
+        let isDataChannelOpen = false;
+
+        // Log function
+        function addLog(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            log.insertBefore(entry, log.firstChild);
+        }
+
+        function clearLog() {
+            log.innerHTML = '<div class="log-entry log-info">Log cleared</div>';
+        }
+
+        // Status change handler
+        ps.addEventListener('status-change', (e) => {
+            const { newStatus, oldStatus } = e.detail;
+            addLog(`Status: ${oldStatus} → ${newStatus}`, 'info');
+            statusText.textContent = newStatus;
+
+            statusDot.className = 'status-dot';
+            if (newStatus === 'streaming') {
+                statusDot.classList.add('streaming');
+            } else if (newStatus === 'connected' || newStatus === 'rendezvoused') {
+                statusDot.classList.add('connected');
+            } else if (newStatus === 'failed') {
+                statusDot.classList.add('error');
+            }
+        });
+
+        // Data channel open handler
+        ps.addEventListener('data-channel-open', () => {
+            isDataChannelOpen = true;
+            dataChannelDot.className = 'status-dot connected';
+            dataChannelText.textContent = 'Data channel: OPEN ✅';
+            addLog('DATA CHANNEL OPEN - Ready to send messages!', 'info');
+        });
+
+        // Message from UE5 handler
+        ps.addEventListener('ue-command-response', (e) => {
+            addLog(`RECEIVED FROM UE5: ${JSON.stringify(e.detail)}`, 'received');
+            console.log('📥 Received from UE5:', e.detail);
+        });
+
+        // Session ended handler
+        ps.addEventListener('session-ended', (e) => {
+            isDataChannelOpen = false;
+            dataChannelDot.className = 'status-dot error';
+            dataChannelText.textContent = 'Data channel: CLOSED';
+            addLog(`Session ended: ${e.detail?.reason || 'unknown'}`, 'error');
+        });
+
+        // Connect function
+        async function connect() {
+            const token = document.getElementById('tokenInput').value.trim();
+            if (!token) {
+                addLog('ERROR: Please paste an admission token', 'error');
+                return;
+            }
+
+            ps.setAttribute('admission-token', token);
+            addLog('Connecting with token...', 'info');
+
+            try {
+                await ps.play();
+                addLog('play() called successfully', 'info');
+            } catch (err) {
+                addLog(`play() error: ${err.message}`, 'error');
+            }
+        }
+
+        // Disconnect function
+        function disconnect() {
+            ps.stop('User disconnected');
+            isDataChannelOpen = false;
+            dataChannelDot.className = 'status-dot';
+            dataChannelText.textContent = 'Data channel: Closed';
+            addLog('Disconnected', 'info');
+        }
+
+        // Send message functions
+        function sendMessage(payload, description) {
+            if (!isDataChannelOpen) {
+                addLog('ERROR: Data channel not open!', 'error');
+                return;
+            }
+
+            const jsonStr = JSON.stringify(payload);
+            addLog(`SENT: ${description}`, 'sent');
+            addLog(`JSON: ${jsonStr}`, 'sent');
+            console.log('📤 Sending to UE5:', payload);
+
+            ps.sendUIInteraction(payload);
+        }
+
+        function sendFormat1() {
+            sendMessage(
+                { Descriptor: "tool_select:XRay" },
+                'Format 1 - Descriptor'
+            );
+        }
+
+        function sendFormat2() {
+            sendMessage(
+                { message: "tool_select:XRay" },
+                'Format 2 - message field'
+            );
+        }
+
+        function sendFormat3() {
+            sendMessage(
+                { Cmd: "tool_select", Data: "XRay" },
+                'Format 3 - Cmd/Data'
+            );
+        }
+
+        function sendFormat4() {
+            sendMessage(
+                { action: "tool_select", data: "XRay" },
+                'Format 4 - action/data'
+            );
+        }
+
+        function sendCustom() {
+            const msg = document.getElementById('customMessage').value.trim();
+            if (!msg) {
+                addLog('ERROR: Enter a custom message', 'error');
+                return;
+            }
+            sendMessage(
+                { Descriptor: msg },
+                `Custom: ${msg}`
+            );
+        }
+
+        // Initial log
+        addLog('Page loaded. Paste token and click Connect.', 'info');
+        addLog('After connecting, test if mouse/keyboard works in stream.', 'info');
+        addLog('If mouse works but buttons don\'t, UE5 needs a UIInteraction handler.', 'info');
+    </script>
+</body>
+</html>

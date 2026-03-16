@@ -36,9 +36,9 @@ The fastest path to a live stream is a single HTML element. Pass an admission to
 
 ```html
 <!-- quickstart.html -->
-<pixel-stream controls></pixel-stream>
+<pixel-stream controls force-relay></pixel-stream>
 
-<script src="https://cdn.interlucent.ai/dev/pixel-stream/0.0.57/pixel-stream.iife.min.js"></script>
+<script src="https://cdn.interlucent.ai/dev/pixel-stream/0.0.73/pixel-stream.iife.min.js"></script>
 <script>
   const ps = document.querySelector('pixel-stream');
   ps.admissionToken = 'YOUR_TOKEN';
@@ -117,7 +117,7 @@ The fastest way to get a live stream running. Load the component from a CDN, pas
 <body>
   <pixel-stream controls></pixel-stream>
 
-  <script src="https://cdn.interlucent.ai/dev/pixel-stream/0.0.57/pixel-stream.iife.min.js"></script>
+  <script src="https://cdn.interlucent.ai/dev/pixel-stream/0.0.73/pixel-stream.iife.min.js"></script>
   <script>
     const ps = document.querySelector('pixel-stream');
     ps.admissionToken = 'YOUR_TOKEN';
@@ -130,7 +130,7 @@ The fastest way to get a live stream running. Load the component from a CDN, pas
 
 | Feature | Description |
 |---------|-------------|
-| **CDN Script** | `https://cdn.interlucent.ai/dev/pixel-stream/0.0.57/pixel-stream.iife.min.js` |
+| **CDN Script** | `https://cdn.interlucent.ai/dev/pixel-stream/0.0.73/pixel-stream.iife.min.js` |
 | **Web Component** | `<pixel-stream>` - Custom HTML element |
 | **Controls Attribute** | `controls` - Enables built-in overlay UI |
 | **Admission Token** | Set via `ps.admissionToken` property |
@@ -208,7 +208,7 @@ Now that you have a stream running, let's customize it. Every aspect of session 
   swift-job-request
 ></pixel-stream>
 
-<script src="https://cdn.interlucent.ai/dev/pixel-stream/0.0.57/pixel-stream.iife.min.js"></script>
+<script src="https://cdn.interlucent.ai/dev/pixel-stream/0.0.73/pixel-stream.iife.min.js"></script>
 <script>
   const ps = document.querySelector('pixel-stream');
   ps.admissionToken = 'YOUR_TOKEN';
@@ -1178,7 +1178,7 @@ You've built up every piece individually — now let's see them working together
     <div id="response-log" style="margin-top:auto; font-size:11px; color:#888;"></div>
   </div>
 
-  <script src="https://cdn.interlucent.ai/dev/pixel-stream/0.0.57/pixel-stream.iife.min.js"></script>
+  <script src="https://cdn.interlucent.ai/dev/pixel-stream/0.0.73/pixel-stream.iife.min.js"></script>
   <script>
     const ps = document.getElementById('ps');
     ps.admissionToken = 'YOUR_TOKEN';

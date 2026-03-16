@@ -2,7 +2,7 @@
  * Interlucent Pixel Streaming Type Definitions
  *
  * TypeScript declarations for the <pixel-stream> web component
- * CDN: https://cdn.interlucent.ai/dev/pixel-stream/0.0.66/pixel-stream.iife.min.js
+ * CDN: https://cdn.interlucent.ai/dev/pixel-stream/0.0.73/pixel-stream.iife.min.js
  */
 
 // =============================================================================
@@ -68,6 +68,13 @@ export interface SessionEndedDetail {
 }
 
 /**
+ * Transport selected event detail
+ */
+export interface TransportSelectedDetail {
+  turnUsed: boolean
+}
+
+/**
  * Custom event types for pixel-stream
  */
 export interface PixelStreamEventMap {
@@ -76,6 +83,7 @@ export interface PixelStreamEventMap {
   'ue-command-response': CustomEvent<unknown>
   'session-ready': CustomEvent<SessionReadyDetail>
   'session-ended': CustomEvent<SessionEndedDetail>
+  'transport-selected': CustomEvent<TransportSelectedDetail>
 }
 
 // =============================================================================
@@ -123,8 +131,8 @@ export interface PixelStreamElement extends HTMLElement {
   /** Enable built-in overlay controls */
   controls: boolean
 
-  /** Force TURN relay mode */
-  forceTurn: boolean
+  /** Force relay mode - routes all traffic through TURN over TLS (port 443) to bypass DPI */
+  forceRelay: boolean
 
   /** Reconnection grace period in seconds */
   flexiblePresenceAllowance: number
@@ -223,7 +231,7 @@ declare global {
           // Boolean attributes
           controls?: boolean
           'swift-job-request'?: boolean
-          'force-turn'?: boolean
+          'force-relay'?: boolean
 
           // String attributes
           'api-endpoint'?: string
@@ -323,63 +331,134 @@ export interface InterlucientConnectionConfig {
   /** Enable swift job request for faster startup */
   swiftJobRequest?: boolean
 
-  /** Force TURN relay mode */
-  forceTurn?: boolean
+  /** Force relay mode - routes all traffic through TURN over TLS (port 443) to bypass DPI */
+  forceRelay?: boolean
 
   /** Flexible presence allowance in seconds */
   flexiblePresenceAllowance?: number
 }
 
 // =============================================================================
-// Backward Compatibility - String Message Format
+// Message Format Documentation
 // =============================================================================
 
 /**
- * Converts a string-format message (PureWeb style) to JSON object (Interlucent style)
- * Example: "camera_control:Front" → { type: "camera_control", data: "Front" }
+ * MESSAGE FORMAT FOR INTERLUCENT ↔ UE5 COMMUNICATION
  *
- * This maintains backward compatibility with existing UE5 message handlers
+ * Interlucent uses native JSON format for all messages (not wrapped strings).
+ *
+ * ============================================================================
+ * SENDING (Web → UE5):
+ * ============================================================================
+ *
+ * Messages are sent as structured JSON objects:
+ *
+ *   // Tool Selection
+ *   { "type": "tool_select", "tool": "XRay" }
+ *
+ *   // Training Control
+ *   { "type": "training_control", "action": "start" }
+ *
+ *   // Camera Control
+ *   { "type": "camera_control", "preset": "IsometricNE" }
+ *
+ *   // Explosion Control
+ *   { "type": "explosion_control", "level": 50 }
+ *   { "type": "explosion_control", "action": "explode" }
+ *
+ *   // Question Answer
+ *   { "type": "question_answer", "questionId": "Q1", "tryCount": 2, "isCorrect": true }
+ *
+ *   // Pipe Selection
+ *   { "type": "pipe_select", "pipeType": "100mm" }
+ *
+ *   // Task Start
+ *   { "type": "task_start", "tool": "PipeConnection", "pipeType": "100mm" }
+ *
+ *   // Settings
+ *   { "type": "settings_control", "setting": "resolution", "width": 1920, "height": 1080 }
+ *   { "type": "settings_control", "setting": "audio_volume", "group": "Master", "volume": 0.8 }
+ *
+ * UE5 should:
+ * 1. Receive JSON via UIInteraction handler
+ * 2. Parse the JSON object directly
+ * 3. Read the "type" field to determine message type
+ * 4. Read other fields based on the type
+ *
+ *
+ * ============================================================================
+ * RECEIVING (UE5 → Web):
+ * ============================================================================
+ *
+ * UE5 can send in any of these formats (we handle all):
+ *
+ * 1. Structured JSON (preferred - matches what we send):
+ *    { "type": "training_progress", "progress": 50, "taskName": "Task1", ... }
+ *
+ * 2. Raw string (same as PureWeb):
+ *    "training_progress:50:TaskName:phase1:3:8:true"
+ *
+ * 3. JSON with type + data fields:
+ *    { "type": "training_progress", "data": "50:TaskName:phase1:3:8:true" }
+ *
+ *
+ * ============================================================================
+ * UE5 IMPLEMENTATION:
+ * ============================================================================
+ *
+ * RECEIVING MESSAGES (in UIInteraction handler):
+ *
+ *   void HandleUIInteraction(const FString& JsonString)
+ *   {
+ *       TSharedPtr<FJsonObject> JsonObject;
+ *       TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(JsonString);
+ *
+ *       if (FJsonSerializer::Deserialize(Reader, JsonObject))
+ *       {
+ *           FString Type;
+ *           if (JsonObject->TryGetStringField(TEXT("type"), Type))
+ *           {
+ *               if (Type == "tool_select")
+ *               {
+ *                   FString Tool;
+ *                   JsonObject->TryGetStringField(TEXT("tool"), Tool);
+ *                   // Handle: Tool = "XRay"
+ *               }
+ *               else if (Type == "training_control")
+ *               {
+ *                   FString Action;
+ *                   JsonObject->TryGetStringField(TEXT("action"), Action);
+ *                   // Handle: Action = "start", "pause", "reset"
+ *               }
+ *               else if (Type == "explosion_control")
+ *               {
+ *                   double Level;
+ *                   if (JsonObject->TryGetNumberField(TEXT("level"), Level))
+ *                   {
+ *                       // Handle: Level = 50.0
+ *                   }
+ *                   else
+ *                   {
+ *                       FString Action;
+ *                       JsonObject->TryGetStringField(TEXT("action"), Action);
+ *                       // Handle: Action = "explode" or "assemble"
+ *                   }
+ *               }
+ *               // ... etc
+ *           }
+ *       }
+ *   }
+ *
+ *
+ * SENDING MESSAGES (to Web):
+ *
+ *   // Option 1: Structured JSON (preferred)
+ *   FString Json = TEXT("{\"type\":\"training_progress\",\"progress\":50,\"taskName\":\"Task1\"}");
+ *   PixelStreamingModule->SendResponse(Json);
+ *
+ *   // Option 2: Raw string (still supported)
+ *   FString Message = TEXT("training_progress:50:Task1:phase1:3:8:true");
+ *   PixelStreamingModule->SendResponse(Message);
  */
-export function stringToJsonMessage(message: string): Record<string, unknown> {
-  const colonIndex = message.indexOf(':')
-  if (colonIndex === -1) {
-    return { type: message }
-  }
-
-  const type = message.substring(0, colonIndex)
-  const data = message.substring(colonIndex + 1)
-
-  // Handle complex data formats
-  const dataParts = data.split(':')
-
-  // Return structured message that UE5 can parse
-  // We send both the structured format AND the raw string for backward compatibility
-  return {
-    type,
-    data,
-    _rawMessage: message, // UE5 can use this if it prefers the original format
-    _dataParts: dataParts  // Pre-split for convenience
-  }
-}
-
-/**
- * Converts a JSON message back to string format
- * This is used when UE5 sends JSON but we need string format internally
- */
-export function jsonToStringMessage(json: Record<string, unknown>): string {
-  const type = json.type as string
-  const data = json.data as string | undefined
-
-  // If _rawMessage is present, use it (backward compatibility)
-  if (json._rawMessage) {
-    return json._rawMessage as string
-  }
-
-  if (!data) {
-    return type
-  }
-
-  return `${type}:${data}`
-}
 
 export {}
