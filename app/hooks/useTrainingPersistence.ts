@@ -11,7 +11,6 @@
  */
 
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
-import { StreamerStatus } from '@pureweb/platform-sdk'
 import { useStatePersistence } from '../features/training'
 import { trainingSessionService } from '../services'
 import { buildQuestionDataMap } from '../types'
@@ -27,8 +26,8 @@ export interface TrainingPersistenceConfig {
   enabled: boolean
   /** User role */
   userRole: 'student' | 'teacher' | 'admin'
-  /** Stream connection status */
-  streamerStatus: StreamerStatus
+  /** Whether stream is connected (works with both PureWeb and Interlucent) */
+  isConnected: boolean
   /** Whether training is complete (modal open) */
   isTrainingComplete: boolean
   /** Whether in cinematic mode */
@@ -86,7 +85,7 @@ export function useTrainingPersistence(
   const {
     enabled,
     userRole,
-    streamerStatus,
+    isConnected,
     isTrainingComplete,
     isCinematicMode,
     sessionStartTime,
@@ -119,7 +118,7 @@ export function useTrainingPersistence(
   // ==========================================================================
 
   useEffect(() => {
-    if (streamerStatus !== StreamerStatus.Connected) return
+    if (!isConnected) return
     if (!enabled) return
     // Don't auto-save until we've attempted to restore state
     // This prevents overwriting saved state with initial "Phase A" on mount
@@ -142,7 +141,7 @@ export function useTrainingPersistence(
       cinematicTimeRemaining: cinematicTimeRemaining
     })
   }, [
-    streamerStatus,
+    isConnected,
     enabled,
     isCinematicMode,
     trainingState.uiMode,

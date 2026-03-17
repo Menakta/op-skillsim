@@ -11,7 +11,6 @@
  */
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
-import { StreamerStatus } from '@pureweb/platform-sdk'
 import { trainingSessionService } from '../services'
 import type { ActiveSession } from '../features'
 import type { RestoredStateData } from '../features/training'
@@ -23,7 +22,8 @@ import type { RestoredStateData } from '../features/training'
 export interface SessionSelectionConfig {
   isLtiSession: boolean
   userRole: 'student' | 'teacher' | 'admin'
-  streamerStatus: StreamerStatus
+  /** Whether stream is connected (works with both PureWeb and Interlucent) */
+  isConnected: boolean
 }
 
 export interface SessionSelectionCallbacks {
@@ -85,7 +85,7 @@ export function useSessionSelection(
   config: SessionSelectionConfig,
   callbacks: SessionSelectionCallbacks
 ): UseSessionSelectionReturn {
-  const { isLtiSession, userRole, streamerStatus } = config
+  const { isLtiSession, userRole, isConnected } = config
   const {
     goToLoadingForCinematic,
     goToLoadingForTraining,
@@ -157,7 +157,7 @@ export function useSessionSelection(
   // ==========================================================================
 
   useEffect(() => {
-    if (streamerStatus !== StreamerStatus.Connected) return
+    if (!isConnected) return
 
     // Case 1: User selected a session to resume
     if (selectedSession) {
@@ -271,7 +271,7 @@ export function useSessionSelection(
     const timer = setTimeout(restoreSession, 2000)
     return () => clearTimeout(timer)
   }, [
-    streamerStatus,
+    isConnected,
     isLtiSession,
     userRole,
     selectedSession,

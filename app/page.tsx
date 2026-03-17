@@ -2,10 +2,29 @@
 
 import dynamic from "next/dynamic";
 import Image from "next/image";
-// Dynamically import the StreamingApp component with SSR disabled
-// This prevents the PureWeb SDK (which uses Node.js modules like tls, fs, net)
-// from being bundled on the server side
-const StreamingApp = dynamic(() => import("./components/StreamingApp"), {
+
+// =============================================================================
+// Streaming Provider Configuration
+// =============================================================================
+// Set NEXT_PUBLIC_STREAMING_PROVIDER to switch between providers:
+// - "pureweb" (default): Use PureWeb SDK for pixel streaming
+// - "interlucent": Use Interlucent SDK for pixel streaming
+const STREAMING_PROVIDER = process.env.NEXT_PUBLIC_STREAMING_PROVIDER || "pureweb";
+
+// =============================================================================
+// Dynamic Imports - Load the appropriate streaming app based on provider
+// =============================================================================
+
+// PureWeb version (default)
+// Uses @pureweb/platform-sdk for connection and string message format
+const StreamingAppPureWeb = dynamic(() => import("./components/StreamingApp"), {
+  ssr: false,
+  loading: () => <LoadingPlaceholder />,
+});
+
+// Interlucent version
+// Uses @interlucent/admission-sdk + CDN web component and JSON message format
+const StreamingAppInterlucent = dynamic(() => import("./components/StreamingAppInterlucent"), {
   ssr: false,
   loading: () => <LoadingPlaceholder />,
 });
@@ -29,5 +48,17 @@ function LoadingPlaceholder() {
 }
 
 export default function Home() {
-  return <StreamingApp />;
+  // Log which provider is being used
+  if (typeof window !== "undefined") {
+    console.log(`🎮 Streaming Provider: ${STREAMING_PROVIDER.toUpperCase()}`);
+    console.log(`   ENV: NEXT_PUBLIC_STREAMING_PROVIDER = "${process.env.NEXT_PUBLIC_STREAMING_PROVIDER || '(not set, defaulting to pureweb)'}"`);
+  }
+
+  // Return the appropriate streaming app based on the provider configuration
+  if (STREAMING_PROVIDER === "interlucent") {
+    return <StreamingAppInterlucent />;
+  }
+
+  // Default to PureWeb
+  return <StreamingAppPureWeb />;
 }
