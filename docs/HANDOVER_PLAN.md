@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the complete transfer of the OP-Skillsim plumbing training simulator from Prographers to Open Polytechnic. The handover includes all cloud services, credentials, and deployment configurations.
+This document outlines the complete transfer of the OP-Skillsim plumbing training simulator from Menakta to Open Polytechnic. The handover includes all cloud services, credentials, and deployment configurations.
 
 ---
 
@@ -10,12 +10,12 @@ This document outlines the complete transfer of the OP-Skillsim plumbing trainin
 
 | Service | Purpose | Current Owner | Transfer Required |
 |---------|---------|---------------|-------------------|
-| **Vercel** | Web app hosting & deployment | Prographers | Yes |
-| **Supabase** | PostgreSQL database & auth | Prographers | Yes |
-| **Interlucent** | UE5 pixel streaming | Prographers | Yes |
-| **PureWeb** | Legacy pixel streaming (backup) | Prographers | Yes |
-| **Resend** | Transactional emails | Prographers | Yes |
-| **GitHub** | Source code repository | Prographers | Yes |
+| **Vercel** | Web app hosting & deployment | Menakta | Yes |
+| **Supabase** | PostgreSQL database & auth | Menakta | Yes |
+| **Interlucent** | UE5 pixel streaming | Menakta | Yes |
+| **PureWeb** | Legacy pixel streaming (backup) | Menakta | Yes |
+| **Resend** | Transactional emails | Menakta | Yes |
+| **GitHub** | Source code repository | Menakta | Yes |
 | **Domain/DNS** | op-skillsim.vercel.app | Vercel (auto) | Included with Vercel |
 
 ---
@@ -32,7 +32,7 @@ This document outlines the complete transfer of the OP-Skillsim plumbing trainin
 
 #### Option A: Transfer Project Ownership (Recommended)
 1. Open Polytechnic creates a Vercel account (if not existing)
-2. Prographers invites OP admin to the Vercel team
+2. Menakta invites OP admin to the Vercel team
 3. Transfer project ownership via Vercel dashboard
 4. Update billing to OP's payment method
 
@@ -236,7 +236,7 @@ NEXT_PUBLIC_APP_URL=https://<production-domain>
 # =============================================================================
 # Security
 # =============================================================================
-ORIGIN_WHITELIST=https://<production-domain>,https://prographers.iqualify.com/,https://<lms-domains>
+ORIGIN_WHITELIST=https://<production-domain>,https://menakta.iqualify.com/,https://<lms-domains>
 ```
 
 ---
@@ -363,7 +363,7 @@ Shared Secret: <new-secret>
 
 ## 13. Support Contacts
 
-### Prographers (Handover Support)
+### Menakta (Handover Support)
 - **Contact**: [Your contact information]
 - **Support Period**: 30 days post-transfer
 
@@ -445,4 +445,4 @@ Shared Secret: <new-secret>
 
 *Document Version: 1.0*
 *Last Updated: 2026-03-09*
-*Prepared by: Prographers Development Team*
+*Prepared by: Menakta Development Team*
