@@ -11,11 +11,11 @@ This document outlines the complete transfer of the OP-Skillsim plumbing trainin
 | Service | Purpose | Current Owner | Transfer Required |
 |---------|---------|---------------|-------------------|
 | **Vercel** | Web app hosting & deployment | Menakta | Yes |
-| **Supabase** | PostgreSQL database & auth | Menakta Tech | Yes |
-| **Interlucent** | UE5 pixel streaming | Menakta Tech | Yes |
-| **PureWeb** | Legacy pixel streaming (backup) | Menakta Tech | Yes |
-| **Resend** | Transactional emails | Menakta Tech | Yes |
-| **GitHub** | Source code repository | Menakta Tech | Yes |
+| **Supabase** | PostgreSQL database & auth | Menakta | Yes |
+| **Interlucent** | UE5 pixel streaming | Menakta | Yes |
+| **PureWeb** | Legacy pixel streaming (backup) | Menakta | Yes |
+| **Resend** | Transactional emails | Menakta | Yes |
+| **GitHub** | Source code repository | Menakta | Yes |
 | **Domain/DNS** | op-skillsim.vercel.app | Vercel (auto) | Included with Vercel |
 
 ---
@@ -32,7 +32,7 @@ This document outlines the complete transfer of the OP-Skillsim plumbing trainin
 
 #### Option A: Transfer Project Ownership (Recommended)
 1. Open Polytechnic creates a Vercel account (if not existing)
-2. Menakta Tech invites OP admin to the Vercel team
+2. Menakta invites OP admin to the Vercel team
 3. Transfer project ownership via Vercel dashboard
 4. Update billing to OP's payment method
 
@@ -363,7 +363,7 @@ Shared Secret: <new-secret>
 
 ## 13. Support Contacts
 
-### Menakta Tech (Handover Support)
+### Menakta (Handover Support)
 - **Contact**: [Your contact information]
 - **Support Period**: 30 days post-transfer
 
@@ -445,4 +445,4 @@ Shared Secret: <new-secret>
 
 *Document Version: 1.0*
 *Last Updated: 2026-03-09*
-*Prepared by: Menakta Tech Web Development Team*
+*Prepared by: Menakta Development Team*
