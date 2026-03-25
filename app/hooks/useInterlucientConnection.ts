@@ -62,6 +62,9 @@ export interface UseInterlucientConnectionReturn {
   sessionId: string | null
   failureReason: string | null
 
+  // Transport info
+  isUsingRelay: boolean | null
+
   // Stream ref (to be attached to InterlucientStream component)
   streamRef: React.RefObject<InterlucientStreamRef | null>
 
@@ -76,6 +79,7 @@ export interface UseInterlucientConnectionReturn {
   handleDataChannelOpen: () => void
   handleSessionEnded: (reason: string) => void
   handleError: (error: string) => void
+  handleTransportSelected: (turnUsed: boolean) => void
 }
 
 // =============================================================================
@@ -156,6 +160,7 @@ export function useInterlucientConnection(
   const [isTokenLoading, setIsTokenLoading] = useState(false)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [failureReason, setFailureReason] = useState<string | null>(null)
+  const [isUsingRelay, setIsUsingRelay] = useState<boolean | null>(null)
 
   // =========================================================================
   // Refs
@@ -321,6 +326,14 @@ export function useInterlucientConnection(
     [onError]
   )
 
+  const handleTransportSelected = useCallback(
+    (turnUsed: boolean) => {
+      console.log(`🔗 Transport selected: ${turnUsed ? 'RELAY (TURN)' : 'DIRECT (P2P)'}`)
+      setIsUsingRelay(turnUsed)
+    },
+    []
+  )
+
   // =========================================================================
   // Note: play() is called from InterlucientStreamingApp.tsx after token is set
   // We don't auto-play here to avoid duplicate calls and to ensure it's triggered
@@ -348,6 +361,9 @@ export function useInterlucientConnection(
     sessionId,
     failureReason,
 
+    // Transport info
+    isUsingRelay,
+
     // Stream ref
     streamRef,
 
@@ -362,6 +378,7 @@ export function useInterlucientConnection(
     handleDataChannelOpen,
     handleSessionEnded,
     handleError,
+    handleTransportSelected,
   }), [
     connectionStatus,
     interlucientStatus,
@@ -373,6 +390,7 @@ export function useInterlucientConnection(
     isTokenLoading,
     sessionId,
     failureReason,
+    isUsingRelay,
     fetchToken,
     play,
     stop,
@@ -381,6 +399,7 @@ export function useInterlucientConnection(
     handleDataChannelOpen,
     handleSessionEnded,
     handleError,
+    handleTransportSelected,
   ])
 }
 

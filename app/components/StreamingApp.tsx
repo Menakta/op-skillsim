@@ -40,6 +40,10 @@ const MessageLog = dynamic(() => import("../components/MessageLog"), {
   ssr: false,
   loading: () => null,
 });
+const DebugPanel = dynamic(() => import("../components/DebugPanel"), {
+  ssr: false,
+  loading: () => null,
+});
 const ModalContainer = dynamic(() => import("../components/ModalContainer"), {
   ssr: false,
   loading: () => null,
@@ -51,7 +55,7 @@ import { useModalManager } from "../hooks/useModalManager";
 import { useScreenFlow } from "../hooks/useScreenFlow";
 import { useStreamConnection } from "../hooks/useStreamConnection";
 // Settings hook - UE5 settings communication
-import { useSettings, SettingsDebugPanel } from "../features/settings";
+import { useSettings } from "../features/settings";
 // Redux sync - bridges hook state to Redux store
 import { useReduxSync } from "../store/useReduxSync";
 // Session complete redirect helper
@@ -968,6 +972,22 @@ export default function StreamingApp() {
           isDark={isDark}
         />
       )}
+
+      {/* Debug Panel - Shows streaming provider info (PureWeb) */}
+      {stream.isConnected && !screenFlow.isCinematicMode && (
+        <DebugPanel
+          connectionStatus={
+            stream.isConnected
+              ? "connected"
+              : stream.connectionStatus === "connecting"
+                ? "connecting"
+                : "disconnected"
+          }
+          isDataChannelOpen={stream.isConnected}
+          isDark={isDark}
+        />
+      )}
+
       {/* Video Stream */}
       <div
         style={{
@@ -1035,10 +1055,6 @@ export default function StreamingApp() {
         maxRetries={RETRY_CONFIG.maxRetries}
         showRetryInfo={stream.retryCount > 0}
       />
-      {/* Settings Debug Panel - Developer tool (Ctrl+Shift+D to toggle) */}
-      {stream.isConnected && (
-        <SettingsDebugPanel sendMessage={training.sendRawMessage} />
-      )}
       {/* Video Styles */}
       <style jsx global>{`
         video {

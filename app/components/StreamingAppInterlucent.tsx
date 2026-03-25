@@ -54,6 +54,10 @@ const MessageLog = dynamic(() => import("../components/MessageLog"), {
   ssr: false,
   loading: () => null,
 });
+const DebugPanel = dynamic(() => import("../components/DebugPanel"), {
+  ssr: false,
+  loading: () => null,
+});
 const ModalContainer = dynamic(() => import("../components/ModalContainer"), {
   ssr: false,
   loading: () => null,
@@ -64,7 +68,7 @@ import { useTrainingMessagesCompositeInterlucent } from "../hooks/useTrainingMes
 import { useModalManager } from "../hooks/useModalManager";
 import { useScreenFlow } from "../hooks/useScreenFlow";
 // Settings hook - UE5 settings communication
-import { useSettings, SettingsDebugPanel } from "../features/settings";
+import { useSettings } from "../features/settings";
 // Redux sync - bridges hook state to Redux store
 import { useReduxSync } from "../store/useReduxSync";
 // Session complete redirect helper
@@ -830,6 +834,25 @@ export default function StreamingAppInterlucent() {
         />
       )}
 
+      {/* Debug Panel - Shows streaming provider info */}
+      {stream.isConnected && !screenFlow.isCinematicMode && (
+        <DebugPanel
+          connectionStatus={
+            stream.isConnected
+              ? "connected"
+              : stream.connectionStatus === "connecting"
+                ? "connecting"
+                : "disconnected"
+          }
+          isUsingRelay={stream.isUsingRelay}
+          forceRelay={false}
+          interlucientStatus={stream.interlucientStatus}
+          sessionId={stream.sessionId}
+          isDataChannelOpen={stream.isDataChannelOpen}
+          isDark={isDark}
+        />
+      )}
+
       {/* Interlucent Video Stream */}
       <div
         style={{
@@ -847,6 +870,7 @@ export default function StreamingAppInterlucent() {
           onMessage={training.hooks.messageBus.handleIncomingMessage}
           onSessionEnded={stream.handleSessionEnded}
           onError={stream.handleError}
+          onTransportSelected={stream.handleTransportSelected}
           swiftJobRequest={true}
           forceRelay={false}
           queueWaitTolerance={60}
@@ -908,10 +932,6 @@ export default function StreamingAppInterlucent() {
         showRetryInfo={false}
       />
 
-      {/* Settings Debug Panel */}
-      {stream.isConnected && (
-        <SettingsDebugPanel sendMessage={training.sendRawMessage} />
-      )}
 
       {/* Video Styles */}
       <style jsx global>{`
