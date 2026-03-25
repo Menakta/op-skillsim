@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the complete transfer of the OP-Skillsim plumbing training simulator from Development Environment to Open Polytechnic. The handover includes all cloud services, credentials, and deployment configurations.
+This document outlines the complete transfer of the OP-Skillsim plumbing training simulator from Menakta to Open Polytechnic. The handover includes all cloud services, credentials, and deployment configurations.
 
 ---
 
@@ -236,7 +236,7 @@ NEXT_PUBLIC_APP_URL=https://<production-domain>
 # =============================================================================
 # Security
 # =============================================================================
-ORIGIN_WHITELIST=https://<production-domain>,https://Menakta Tech.iqualify.com/,https://<lms-domains>
+ORIGIN_WHITELIST=https://<production-domain>,https://menakta.iqualify.com/,https://<lms-domains>
 ```
 
 ---
