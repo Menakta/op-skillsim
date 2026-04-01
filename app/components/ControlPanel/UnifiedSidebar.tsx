@@ -253,6 +253,11 @@ function UnifiedSidebarComponent({
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [isFullscreen, setIsFullscreen] = useState(false)
 
+  // Combined disabled state - controls are disabled during walkthrough OR when training is paused
+  // In training mode: disabled when paused
+  // In cinematic mode: disabled when controlsLocked (walkthrough)
+  const isControlsDisabled = mode === 'training' ? isPaused : controlsLocked
+
   // Settings state - use props from useSettings hook when available, fallback to local state
   const [localAudioEnabled, setLocalAudioEnabled] = useState(true)
   const [localMasterVolume, setLocalMasterVolume] = useState(100)
@@ -730,11 +735,15 @@ function UnifiedSidebarComponent({
               ============================================================ */}
           {activeTab === 'inventory' && isTrainingMode && (
             <div id="materials" className="p-2 sm:p-3 space-y-3 sm:space-y-4">
-              {/* Session Controls */}
-
+              {/* Training Paused Warning */}
+              {isPaused && (
+                <div className={`p-2 rounded-lg text-xs text-center ${isDark ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-700'}`}>
+                  Training paused - controls disabled
+                </div>
+              )}
 
               {/* Pipe Selection */}
-              <div className={!isPipesEnabled ? 'opacity-50' : ''}>
+              <div className={!isPipesEnabled || isPaused ? 'opacity-50 pointer-events-none' : ''}>
                 <div className="flex items-center justify-between mb-2">
                   <h3 className={`text-[11px] sm:text-xs font-medium flex items-center gap-1.5 sm:gap-2 ${isDark ? 'text-white/70' : 'text-gray-600'}`}>
                     <Wrench className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
@@ -786,7 +795,7 @@ function UnifiedSidebarComponent({
               </div>
 
               {/* Pressure Test */}
-              <div className={!isPressureTestEnabled ? 'opacity-50' : ''}>
+              <div className={!isPressureTestEnabled || isPaused ? 'opacity-50 pointer-events-none' : ''}>
                 <div className="flex items-center justify-between mb-2">
                   <h3 className={`text-[11px] sm:text-xs font-medium flex items-center gap-1.5 sm:gap-2 ${isDark ? 'text-white/70' : 'text-gray-600'}`}>
                     <Gauge className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
@@ -1188,7 +1197,15 @@ function UnifiedSidebarComponent({
               ============================================================ */}
           {activeTab === 'settings' && (
             <div className="p-2 sm:p-3 space-y-3 sm:space-y-4">
+              {/* Training Paused Warning */}
+              {isTrainingMode && isPaused && (
+                <div className={`p-2 rounded-lg text-xs text-center ${isDark ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-700'}`}>
+                  Training paused - settings disabled
+                </div>
+              )}
 
+              {/* Settings Content - Disabled when paused in training mode */}
+              <div className={isTrainingMode && isPaused ? 'opacity-50 pointer-events-none' : ''}>
               {/* Theme */}
               <div className={`p-2 sm:p-3 rounded-lg ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
                 <h3 className={`text-[11px] sm:text-xs font-medium mb-2 sm:mb-3 ${isDark ? 'text-white/70' : 'text-gray-600'}`}>Appearance</h3>
@@ -1328,6 +1345,7 @@ function UnifiedSidebarComponent({
                 </div>
                 <span className={`text-[10px] sm:text-xs ${isDark ? 'text-white/30' : 'text-gray-400'}`}>F</span>
               </button>
+              </div>{/* End of Settings Content wrapper */}
             </div>
           )}
 

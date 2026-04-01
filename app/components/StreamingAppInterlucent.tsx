@@ -426,8 +426,9 @@ export default function StreamingAppInterlucent() {
   );
 
   // Idle detection - uses default 15-minute timeout from hook
+  // Disabled when training is paused (user intentionally paused, shouldn't be kicked)
   const { isIdle, resetIdle } = useIdleDetection({
-    enabled: stream.isConnected,
+    enabled: stream.isConnected && !isTrainingPaused,
   });
 
   // Stream health (simplified for Interlucent)
