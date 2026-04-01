@@ -88,6 +88,18 @@ export async function GET(request: NextRequest) {
 
     const supabase = getSupabaseAdmin()
 
+    // Fetch total question count from questionnaires table
+    const { count: totalQuestionsCount, error: countError } = await supabase
+      .from('questionnaires')
+      .select('*', { count: 'exact', head: true })
+
+    if (countError) {
+      logger.error({ error: countError.message }, 'Failed to fetch questionnaires count')
+    }
+
+    // Total questions available in the quiz (from questionnaires table)
+    const TOTAL_QUIZ_QUESTIONS = totalQuestionsCount || 5
+
     // Fetch all quiz responses as the primary data source
     const { data: quizResponses, error: quizError } = await supabase
       .from('quiz_responses')
@@ -192,18 +204,22 @@ export async function GET(request: NextRequest) {
       // Get session info
       const sessionInfo = sessionMap.get(quiz.session_id)
 
-      // Calculate totals from actual question_data entries (like training-results page)
-      // This is the accurate count - not from DB field which may be incorrect
-      const totalQuestions = questions.length
+      // Count correct answers from question_data
       const correctCount = questions.filter(q => q.correct).length
+      const answeredCount = questions.length
 
-      // Calculate score percentage from actual data
+      // Use TOTAL_QUIZ_QUESTIONS from questionnaires table for accurate percentage
+      // e.g., 1 correct out of 5 total = 20%, not 100%
+      const totalQuestions = TOTAL_QUIZ_QUESTIONS
+
+      // Calculate score percentage based on TOTAL questions, not just answered ones
       const scorePercentage = totalQuestions > 0
         ? Math.round((correctCount / totalQuestions) * 100)
         : 0
 
-      // Determine if passed (75% threshold)
-      const passed = scorePercentage >= 75
+      // Determine if passed (75% threshold) - only possible if quiz is complete
+      const isComplete = answeredCount >= totalQuestions
+      const passed = isComplete && scorePercentage >= 75
 
       // Get name from: training session -> lti_context -> email prefix (if real email)
       // Don't use email prefix if it's a fake LTI email (lti-* or ends with @lti.local)
