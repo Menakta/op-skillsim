@@ -13,13 +13,13 @@ This document tracks the resolution status of **web application issues** from CL
 
 | Issue | Description | Status | Notes |
 |-------|-------------|--------|-------|
-| P0-01 | Session Drops During Training | ✅ FIXED | All 5 root causes addressed |
-| P1-05 | No Session Resume Option | ✅ FIXED | Session selection + return navigation fixed |
-| P1-06 | Pause Doesn't Actually Pause | ✅ FIXED | Web controls now disabled when paused |
-| P1-07 | CMS Results Not Displayed for Standalone | ✅ FIXED | Outsiders now save data like LTI users |
-| P1-08 | Tooltips Don't Appear via iQualify (LTI) | ✅ FIXED | setIsComplete(false) for LTI sessions |
-| P1-09/P1-12 | Scene Not Reset When Training Starts | ✅ FIXED | Scene resets to default state before training |
-| P1-10 | Sound Controls Don't Work | ✅ FIXED | Volume 0 parsing bug fixed |
+| P0-01 | Session Drops During Training | ✅ FIXED | All 5 root causes addressed - **Awaiting client testing** |
+| P1-05 | No Session Resume Option | ✅ FIXED | Session selection + return navigation fixed - **Awaiting client testing** |
+| P1-06 | Pause Doesn't Actually Pause | ✅ FIXED | Web controls now disabled when paused - **Awaiting client testing** |
+| P1-07 | CMS Results Not Displayed for Standalone | ✅ FIXED | Outsiders now save data like LTI users - **Awaiting client testing** |
+| P1-08 | Tooltips Don't Appear via iQualify (LTI) | ✅ FIXED | setIsComplete(false) for LTI sessions - **Awaiting client testing** |
+| P1-09/P1-12 | Scene Not Reset When Training Starts | ✅ FIXED | Scene resets to default state before training - **Awaiting client testing** |
+| P1-10 | Sound Controls Don't Work | ✅ FIXED | Volume 0 parsing bug fixed - **Awaiting client testing** |
 
 ---
 
@@ -468,17 +468,30 @@ const { error: sessionError } = await supabaseAdmin
 
 ## Commits
 
-1. `fix(session): Extend session duration and add retry logic for P0-01`
-2. `fix(auth): Fix Supabase TypeScript errors in auth routes`
-3. `fix(session): Fix return navigation for standalone users`
-4. `fix(audio): Fix mute toggle sending volume 1.0 instead of 0`
-5. `fix(pause): Disable web controls when training is paused`
+1. `fix(P0-01): Resolve session drops during training` - Extended session duration, idle timeout, token refresh, disconnect retry
+2. `fix(session): Extend session duration and add retry logic for P0-01`
+3. `fix(auth): Fix Supabase TypeScript errors in auth routes`
+4. `fix(session): Fix return navigation for standalone users`
+5. `fix(audio): Fix mute toggle sending volume 1.0 instead of 0`
+6. `fix(pause): Disable web controls when training is paused`
 
 ---
 
-## All Web Issues Resolved
+## All Web Issues Resolved - Awaiting Client Testing
 
-All web application issues from the client feedback have been resolved. See CLIENT_FEEDBACK_UE5_ISSUES.md for UE5-specific issues that require UE5 team action.
+All web application issues from the client feedback have been implemented and are ready for testing. Each fix requires client verification to confirm the issue is fully resolved in production.
+
+### Testing Required
+Please have the client test each issue and provide feedback:
+- [ ] P0-01: Session Drops - Verify sessions persist for 3+ hours
+- [ ] P1-05: Session Resume - Verify outsiders can resume sessions and see correct return buttons
+- [ ] P1-06: Pause - Verify web controls are disabled when training is paused
+- [ ] P1-07: CMS Results - Verify outsider training data appears in CMS/admin
+- [ ] P1-08: Tooltips - Verify tooltips appear when launched via iQualify (LTI)
+- [ ] P1-09/P1-12: Scene Reset - Verify scene resets to default when starting training
+- [ ] P1-10: Sound Controls - Verify mute toggle and volume sliders work correctly
+
+See CLIENT_FEEDBACK_UE5_ISSUES.md for UE5-specific issues that require UE5 team action.
 
 ---
 
