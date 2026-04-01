@@ -14,6 +14,28 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { trainingSessionService } from '../services'
 import type { ActiveSession } from '../features'
 import type { RestoredStateData } from '../features/training'
+import { TASK_SEQUENCE } from '../config'
+
+// =============================================================================
+// Helper Functions
+// =============================================================================
+
+/**
+ * Convert a phase value to numeric index
+ * Handles both numeric strings ("0", "3") and task IDs ("PIPE_CONNECTION_MAIN")
+ */
+function getPhaseIndex(phaseValue: string | number | undefined | null): number {
+  if (phaseValue === undefined || phaseValue === null) return 0
+  if (typeof phaseValue === 'number') return phaseValue
+
+  // Try to parse as numeric string first
+  const numericIndex = parseInt(phaseValue, 10)
+  if (!isNaN(numericIndex)) return numericIndex
+
+  // Otherwise, try to match by taskId
+  const taskIndex = TASK_SEQUENCE.findIndex(task => task.taskId === phaseValue)
+  return taskIndex >= 0 ? taskIndex : 0
+}
 
 // =============================================================================
 // Types
@@ -124,13 +146,13 @@ export function useSessionSelection(
   // ==========================================================================
 
   const handleStartStream = useCallback(async () => {
-    // For non-LTI or non-student users, skip session selection
-    if (!isLtiSession || userRole !== 'student') {
+    // For non-student users (teachers/admins), skip session selection - they don't need to resume
+    if (userRole !== 'student') {
       goToLoadingForCinematic()
       return
     }
 
-    // Check for active sessions
+    // Check for active sessions for ALL students (both LTI and standalone)
     setSessionsLoading(true)
     try {
       const result = await trainingSessionService.getActiveSessions()
@@ -150,7 +172,7 @@ export function useSessionSelection(
       goToLoadingForCinematic()
     }
     setSessionsLoading(false)
-  }, [isLtiSession, userRole, goToLoadingForCinematic, goToSessionSelection])
+  }, [userRole, goToLoadingForCinematic, goToSessionSelection])
 
   // ==========================================================================
   // Session Resume Effect - Handles what happens after stream connects
@@ -166,8 +188,10 @@ export function useSessionSelection(
         return
       }
 
-      const phaseIndex = parseInt(selectedSession.current_training_phase, 10) || 0
+      // Use getPhaseIndex to handle both numeric strings ("3") and task IDs ("PIPE_CONNECTION_MAIN")
+      const phaseIndex = getPhaseIndex(selectedSession.current_training_phase)
       console.log(`📂 Stream connected - showing resume confirmation for phase ${phaseIndex}`)
+      console.log(`📂 Session data: phase="${selectedSession.current_training_phase}" -> index=${phaseIndex}`)
       console.log(`📂 Session ID: ${selectedSession.id}`)
 
       // Mark this session as handled
@@ -204,8 +228,8 @@ export function useSessionSelection(
       return
     }
 
-    // Case 3: Non-student or non-LTI users
-    if (!isLtiSession || userRole !== 'student') {
+    // Case 3: Non-student users (teachers/admins don't have session resume)
+    if (userRole !== 'student') {
       onStateRestoreAttempted()
       return
     }
@@ -231,22 +255,23 @@ export function useSessionSelection(
         const taskIndexToRestore = trainingState?.currentTaskIndex
         const modeToRestore = trainingState?.mode || 'training'
 
+        // Calculate phase index - prefer taskIndexToRestore, then parse phaseToRestore
+        // phaseToRestore can be a numeric string ("3") or a task ID ("PIPE_CONNECTION_MAIN")
+        const phaseIndex = taskIndexToRestore ?? getPhaseIndex(phaseToRestore)
+
         const shouldResumeTraining = modeToRestore === 'training' ||
-          (phaseToRestore && phaseToRestore !== '0') ||
+          (phaseIndex > 0) ||
           (overallProgress && overallProgress > 0)
 
         if (shouldResumeTraining) {
           goToTraining()
           onEnterTrainingMode()
 
-          const phaseIndex = parseInt(phaseToRestore || '0', 10)
           if (phaseToRestore) {
             setTrainingPhase(phaseToRestore)
           }
-          if (taskIndexToRestore !== undefined && taskIndexToRestore > 0) {
-            setCurrentTaskIndex(taskIndexToRestore)
-          }
           if (phaseIndex > 0) {
+            setCurrentTaskIndex(phaseIndex)
             console.log(`🔄 Resuming training from phase ${phaseIndex}`)
             startFromTask(phaseIndex)
           } else {
@@ -318,7 +343,8 @@ export function useSessionSelection(
     },
 
     confirmResume: (phaseIndex: number) => {
-      console.log(`🚀 User clicked resume - sending start_from_task:${phaseIndex} to UE5`)
+      console.log(`🚀 User clicked resume - phaseIndex=${phaseIndex}`)
+      console.log(`🚀 Will call: ${phaseIndex > 0 ? `startFromTask(${phaseIndex})` : 'startTraining()'}`)
       phaseIndex > 0 ? startFromTask(phaseIndex) : startTraining()
     },
 
@@ -328,7 +354,8 @@ export function useSessionSelection(
       goToTraining()
       onEnterTrainingMode()
 
-      if (isLtiSession && userRole === 'student' && startNewSessionAfterStream) {
+      // Create new training session for all students (both LTI and standalone)
+      if (userRole === 'student' && startNewSessionAfterStream) {
         console.log('🆕 Creating new training session before starting training')
         try {
           const result = await trainingSessionService.createNewSession()
@@ -351,7 +378,6 @@ export function useSessionSelection(
     startTraining,
     startFromTask,
     onEnterTrainingMode,
-    isLtiSession,
     userRole,
     startNewSessionAfterStream,
   ])

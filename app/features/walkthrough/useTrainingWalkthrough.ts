@@ -83,8 +83,10 @@ export function useTrainingWalkthrough(options: UseTrainingWalkthroughOptions = 
   // Check if walkthrough was already completed (only for non-LTI sessions)
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      // Skip the completion check if it's an LTI session (we just cleared it above)
+      // For LTI sessions, explicitly set isComplete to false so walkthrough shows
       if (isLtiSession) {
+        setIsComplete(false)
+        setIsLoading(false)
         return
       }
       const completed = localStorage.getItem(TRAINING_WALKTHROUGH_COMPLETED_KEY)

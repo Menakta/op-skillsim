@@ -33,8 +33,8 @@ import type {
 const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'your-super-secret-jwt-key-min-32-chars'
 )
-const SESSION_DURATION_MS = 1 * 60 * 60 * 1000 // 2 hours
-const SESSION_DURATION_STR = '2h'
+const SESSION_DURATION_MS = 3 * 60 * 60 * 1000 // 3 hours - extended for long training sessions
+const SESSION_DURATION_STR = '3h'
 const REFRESH_THRESHOLD_MS = 5 * 60 * 1000 // Refresh if less than 5 minutes remaining
 // =============================================================================
 // Database Session Type (matches user_sessions table)

@@ -246,8 +246,8 @@ function SessionCompleteContent() {
 
           {/* Action Buttons */}
           <div className="space-y-3">
-            {/* Return to Course (if returnUrl exists) */}
-            {data.returnUrl && (
+            {/* Return to Course (only for LTI users with returnUrl) */}
+            {data.isLti && data.returnUrl && (
               <button
                 onClick={handleReturnToCourse}
                 disabled={isClearing}
@@ -264,14 +264,14 @@ function SessionCompleteContent() {
               </button>
             )}
 
-            {/* Login Button (for non-LTI or staff) */}
-            {(!data.isLti || isStaff) && (
+            {/* Login Button (for staff only - non-LTI students get the button below) */}
+            {isStaff && (
               <button
                 onClick={handleLogin}
                 disabled={isClearing}
-                className={`w-full py-3 px-4 ${data.returnUrl ? 'bg-gray-700 hover:bg-gray-600' : 'bg-[#39BEAE] hover:bg-[#2da89a]'} disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-colors`}
+                className={`w-full py-3 px-4 ${data.isLti && data.returnUrl ? 'bg-gray-700 hover:bg-gray-600' : 'bg-[#39BEAE] hover:bg-[#2da89a]'} disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-colors`}
               >
-                {isStaff ? 'Back to Login' : 'Login Again'}
+                Back to Login
               </button>
             )}
 
@@ -283,6 +283,17 @@ function SessionCompleteContent() {
                 className="w-full py-3 px-4 bg-[#39BEAE] hover:bg-[#2da89a] disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-colors"
               >
                 Close & Return to Course
+              </button>
+            )}
+
+            {/* Return to Login (for non-LTI users without returnUrl) */}
+            {!data.isLti && !data.returnUrl && !isStaff && (
+              <button
+                onClick={handleLogin}
+                disabled={isClearing}
+                className="w-full py-3 px-4 bg-[#39BEAE] hover:bg-[#2da89a] disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-colors"
+              >
+                Return to Login
               </button>
             )}
           </div>

@@ -103,6 +103,40 @@ export function useToolSelection(
   }, [messageBus])
 
   // ==========================================================================
+  // Listen for training:resumed event to set the correct tool
+  // ==========================================================================
+
+  useEffect(() => {
+    const handleTrainingResumed = (data: { taskIndex: number; tool?: string }) => {
+      const { taskIndex, tool } = data
+      console.log(`🔧 Training resumed at phase ${taskIndex}, setting up tool selection`)
+
+      // Get the tool for this phase from TASK_SEQUENCE
+      const taskInfo = TASK_SEQUENCE[taskIndex]
+      const toolForPhase = (tool as ToolName) || taskInfo?.tool || 'None'
+
+      if (toolForPhase && toolForPhase !== 'None') {
+        console.log(`🔧 Setting selected tool to: ${toolForPhase}`)
+        setState(prev => ({
+          ...prev,
+          selectedTool: toolForPhase,
+          currentTool: toolForPhase,
+          selectedPipe: null,
+          airPlugSelected: false
+        }))
+
+        // Send tool selection to UE5
+        messageBus.sendMessage(WEB_TO_UE_MESSAGES.TOOL_SELECT, toolForPhase)
+      }
+    }
+
+    eventBus.on('training:resumed', handleTrainingResumed)
+    return () => {
+      eventBus.off('training:resumed', handleTrainingResumed)
+    }
+  }, [messageBus])
+
+  // ==========================================================================
   // Select Tool
   // ==========================================================================
 

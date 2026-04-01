@@ -176,7 +176,11 @@ export async function POST(request: NextRequest) {
 
     const supabase = getSupabaseAdmin()
 
-    // Get the user session to retrieve LTI context (courseId, courseName, full_name, institution)
+    // Try to get LTI context from user_sessions (for LTI users)
+    // For standalone/outsider users, this will fail gracefully
+    let ltiContext: Record<string, string> = {}
+    let fullName = 'Unknown Student'
+
     const { data: userSession, error: userSessionError } = await supabase
       .from('user_sessions')
       .select('lti_context')
@@ -184,32 +188,45 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (userSessionError) {
-      logger.warn({
+      // Not an error for standalone users - they don't have user_sessions entries
+      logger.info({
         sessionId: session.sessionId,
         error: userSessionError.message,
-        code: userSessionError.code,
-      }, 'Failed to get user session for LTI context - full_name may be missing')
+      }, 'No user_session found (expected for standalone users)')
     }
 
-    // Parse LTI context
-    const ltiContext = userSession?.lti_context
-      ? (typeof userSession.lti_context === 'string'
-          ? JSON.parse(userSession.lti_context)
-          : userSession.lti_context)
-      : {}
+    if (userSession?.lti_context) {
+      ltiContext = typeof userSession.lti_context === 'string'
+        ? JSON.parse(userSession.lti_context)
+        : userSession.lti_context
+      fullName = ltiContext.full_name || fullName
+    }
+
+    // For standalone users, try to get full_name from user_profiles
+    if (!userSession?.lti_context) {
+      const { data: userProfile } = await supabase
+        .from('user_profiles')
+        .select('full_name')
+        .eq('email', session.email)
+        .single()
+
+      if (userProfile?.full_name) {
+        fullName = userProfile.full_name
+      }
+    }
 
     logger.info({
       sessionId: session.sessionId,
       hasUserSession: !!userSession,
       hasLtiContext: !!userSession?.lti_context,
-      fullName: ltiContext.full_name || 'NOT FOUND',
-    }, 'LTI context lookup for training session creation')
+      fullName,
+    }, 'Context lookup for training session creation')
 
-    // Build student details for JSONB column using LTI context
+    // Build student details for JSONB column
     const student = {
       user_id: session.userId,
       email: session.email,
-      full_name: ltiContext.full_name || 'Unknown Student',
+      full_name: fullName,
       course_name: ltiContext.courseName || 'OP-Skillsim Plumbing Training',
       institution: ltiContext.institution || 'Open Polytechnic Kuratini Tuwhera',
       lti_role: ltiContext.lti_role || 'student',
@@ -237,7 +254,35 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (createError) {
-      logger.error({ error: createError.message, code: createError.code }, 'Failed to create new training session')
+      // If insert failed due to duplicate (race condition or session already exists), fetch the existing one
+      if (createError.code === '23505') {
+        const { data: existingSession } = await supabase
+          .from('training_sessions')
+          .select('*')
+          .eq('session_id', session.sessionId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single()
+
+        if (existingSession) {
+          logger.info({ sessionId: existingSession.id }, 'Returning existing session after duplicate key error')
+          return NextResponse.json({
+            success: true,
+            session: existingSession,
+            isNew: false,
+          })
+        }
+      }
+
+      logger.error({
+        error: createError.message,
+        code: createError.code,
+        hint: createError.hint,
+        details: createError.details,
+        sessionId: session.sessionId,
+        email: session.email,
+        studentData: student,
+      }, 'Failed to create new training session')
       return NextResponse.json(
         { success: false, error: 'Failed to create new training session', details: createError.message },
         { status: 500 }

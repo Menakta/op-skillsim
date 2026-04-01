@@ -125,7 +125,7 @@ export type CameraPerspective =
 
 export type CameraMode = 'Manual' | 'Orbit'
 
-export type TrainingControlAction = 'start' | 'pause' | 'reset' | 'test'
+export type TrainingControlAction = 'start' | 'pause' | 'resume' | 'reset' | 'test'
 
 /**
  * Task sequence and TaskDefinition are now in @/app/config/tasks.config.ts

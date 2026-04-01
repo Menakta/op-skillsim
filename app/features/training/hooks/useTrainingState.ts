@@ -284,7 +284,36 @@ export function useTrainingState(
   // ==========================================================================
 
   const startTraining = useCallback(async () => {
-    console.log('Training started')
+    console.log('🚀 ========== startTraining() CALLED ==========')
+
+    // ==========================================================================
+    // SCENE RESET: Ensure scene is in default state before training starts
+    // This fixes P1-09/P1-12: Scene not reset when training starts
+    // ==========================================================================
+
+    // 1. Reset explosion to 0% (assembled state) - try both formats for compatibility
+    console.log('🔧 Resetting scene state before training...')
+    console.log('📤 Sending explosion_control:assemble')
+    messageBus.sendMessage(WEB_TO_UE_MESSAGES.EXPLOSION_CONTROL, 'assemble')
+
+    // Also send numeric 0 for compatibility
+    console.log('📤 Sending explosion_control:0')
+    messageBus.sendMessage(WEB_TO_UE_MESSAGES.EXPLOSION_CONTROL, '0')
+
+    // 2. Reset camera to default perspective
+    console.log('📤 Sending camera_control:reset')
+    messageBus.sendMessage(WEB_TO_UE_MESSAGES.CAMERA_CONTROL, 'reset')
+
+    // 3. Reset layers to show all (default visibility)
+    console.log('📤 Sending hierarchical_control:show_all')
+    messageBus.sendMessage(WEB_TO_UE_MESSAGES.HIERARCHICAL_CONTROL, 'show_all')
+
+    // 4. Small delay to ensure UE5 processes resets before starting training
+    await new Promise(resolve => setTimeout(resolve, 200))
+
+    // ==========================================================================
+    // Continue with normal training start flow
+    // ==========================================================================
 
     // Start session timer
     sessionStartTimeRef.current = Date.now()
@@ -345,9 +374,13 @@ export function useTrainingState(
     // Send resume message to UE5 IMMEDIATELY
     messageBus.sendMessage(WEB_TO_UE_MESSAGES.TRAINING_CONTROL, 'resume')
 
+    // Get the tool for the current phase
+    const taskInfo = TASK_SEQUENCE[state.currentTaskIndex]
+    const toolForPhase = taskInfo?.tool || 'None'
+
     // Update local state
     setState(prev => ({ ...prev, isActive: true }))
-    eventBus.emit('training:resumed', { taskIndex: state.currentTaskIndex })
+    eventBus.emit('training:resumed', { taskIndex: state.currentTaskIndex, tool: toolForPhase })
   }, [messageBus, state.currentTaskIndex])
 
   const resetTraining = useCallback(async () => {
@@ -373,7 +406,14 @@ export function useTrainingState(
    * Used when student returns to continue a previous session
    */
   const startFromTask = useCallback(async (phaseIndex: number) => {
-    console.log(`🔄 Resuming training from phase ${phaseIndex}`)
+    console.log(`🔄 [startFromTask] CALLED with phaseIndex=${phaseIndex}`)
+
+    // Get the task info for this phase to determine the correct tool
+    const taskInfo = TASK_SEQUENCE[phaseIndex]
+    const toolForPhase = taskInfo?.tool || 'None'
+    const taskName = taskInfo?.name || 'Unknown Task'
+
+    console.log(`🔧 [startFromTask] Phase ${phaseIndex} requires tool: ${toolForPhase}, taskName: ${taskName}`)
 
     // Start session timer
     sessionStartTimeRef.current = Date.now()
@@ -383,14 +423,17 @@ export function useTrainingState(
       mode: 'training',
       uiMode: 'task',
       currentTaskIndex: phaseIndex,
-      trainingStarted: false,
+      taskName: taskName,
+      trainingStarted: true, // Set to true so tools are enabled
     }))
 
     // Send start_from_task message to UE5 to jump to the correct phase
+    console.log(`📤 [startFromTask] Sending START_FROM_TASK message with phaseIndex=${phaseIndex}`)
     messageBus.sendMessage(WEB_TO_UE_MESSAGES.START_FROM_TASK, String(phaseIndex))
 
-    // Emit event
-    eventBus.emit('training:resumed', { taskIndex: phaseIndex })
+    // Emit event with tool info
+    console.log(`📢 [startFromTask] Emitting training:resumed event with taskIndex=${phaseIndex}, tool=${toolForPhase}`)
+    eventBus.emit('training:resumed', { taskIndex: phaseIndex, tool: toolForPhase })
   }, [messageBus])
 
   // State setters
@@ -413,6 +456,46 @@ export function useTrainingState(
   const setTrainingStarted = useCallback((trainingStarted: boolean) => {
     setState(prev => ({ ...prev, trainingStarted }))
   }, [])
+
+  // ==========================================================================
+  // Proactive Token Refresh During Active Training
+  // Fixes P0-01: Session drops during training
+  // Refreshes the session token every 30 minutes while training is active
+  // ==========================================================================
+
+  useEffect(() => {
+    if (!state.isActive && state.mode !== 'training') {
+      return // Only refresh during active training
+    }
+
+    const refreshToken = async () => {
+      try {
+        const response = await fetch('/api/auth/session/refresh', {
+          method: 'POST',
+          credentials: 'include',
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.refreshed) {
+            console.log('🔄 Session token refreshed during training')
+          }
+        } else {
+          console.warn('⚠️ Failed to refresh session token:', response.status)
+        }
+      } catch (error) {
+        console.warn('⚠️ Error refreshing session token:', error)
+      }
+    }
+
+    // Refresh every 30 minutes during active training
+    const refreshInterval = setInterval(refreshToken, 30 * 60 * 1000)
+
+    // Also refresh immediately when training becomes active
+    refreshToken()
+
+    return () => clearInterval(refreshInterval)
+  }, [state.isActive, state.mode])
 
   return {
     state,

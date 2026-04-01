@@ -92,6 +92,8 @@ export function useStreamConnection(config: UseStreamConnectionConfig): UseStrea
   const platformRef = useRef<PlatformNext | null>(null)
   const preWarmStartedRef = useRef(false)
   const wasConnectedRef = useRef(false)
+  const disconnectRetryCountRef = useRef(0)
+  const MAX_DISCONNECT_RETRIES = 2 // Try to reconnect up to 2 times before ending session
 
   // Initialize platform on first render
   if (!platformRef.current) {
@@ -298,6 +300,10 @@ export function useStreamConnection(config: UseStreamConnectionConfig): UseStrea
     }
   }, [initializePlatform, onError])
 
+  // Ref to reconnectStream for use in status change effect
+  const reconnectStreamRef = useRef(reconnectStream)
+  reconnectStreamRef.current = reconnectStream
+
   // ==========================================================================
   // Model Selection
   // ==========================================================================
@@ -372,6 +378,7 @@ export function useStreamConnection(config: UseStreamConnectionConfig): UseStrea
     if (streamerStatus === StreamerStatus.Connected) {
       setConnectionStatus('connected')
       setRetryCount(0)
+      disconnectRetryCountRef.current = 0 // Reset disconnect retry counter on successful connection
       const isFirstConnection = !wasConnectedRef.current
       wasConnectedRef.current = true
       onConnected?.(isFirstConnection)
@@ -406,27 +413,34 @@ export function useStreamConnection(config: UseStreamConnectionConfig): UseStrea
     ) {
       console.log('🔌 Stream disconnected with status:', streamerStatus)
 
-      // Determine the reason based on status
-      // IMPORTANT: Stream closures are NOT the same as user logout!
-      // - 'disconnected': Stream connection lost (network issues, server restart, etc.)
-      // - 'kicked': User was forcibly removed (Withdrawn status)
-      // - 'other': Unknown reason
-      let reason: 'expired' | 'logged_out' | 'inactive' | 'kicked' | 'disconnected' | 'other' = 'other'
-
+      // For Withdrawn (kicked) status, don't retry - end session immediately
       if (streamerStatus === StreamerStatus.Withdrawn) {
-        // User was kicked/withdrawn - this is a deliberate action
-        reason = 'kicked'
-      } else if (
-        streamerStatus === StreamerStatus.Closed ||
-        streamerStatus === StreamerStatus.Disconnected ||
-        streamerStatus === StreamerStatus.Completed
-      ) {
-        // Stream closed/disconnected - this is a connection issue, NOT a logout
-        // Don't confuse users by saying "You have been logged out"
-        reason = 'disconnected'
+        console.log('👢 User was kicked/withdrawn - ending session')
+        disconnectRetryCountRef.current = 0
+        onSessionEnd?.('kicked')
+        return
       }
 
-      onSessionEnd?.(reason)
+      // For other disconnection types, attempt automatic reconnection first
+      // This fixes P0-01: Temporary network issues shouldn't end the session
+      if (disconnectRetryCountRef.current < MAX_DISCONNECT_RETRIES) {
+        disconnectRetryCountRef.current += 1
+        console.log(`🔄 Attempting automatic reconnection (${disconnectRetryCountRef.current}/${MAX_DISCONNECT_RETRIES})...`)
+
+        // Small delay before reconnection attempt
+        setTimeout(() => {
+          reconnectStreamRef.current()
+        }, 2000) // 2 second delay before retry
+        return
+      }
+
+      // Max retries exceeded - now end the session
+      console.log('❌ Max reconnection attempts exceeded - ending session')
+      disconnectRetryCountRef.current = 0 // Reset for next time
+
+      // Stream closed/disconnected - this is a connection issue, NOT a logout
+      // Don't confuse users by saying "You have been logged out"
+      onSessionEnd?.('disconnected')
     }
   }, [streamerStatus, retryCount, onConnected, onSessionEnd])
 

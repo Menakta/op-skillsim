@@ -64,27 +64,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Skip save for non-LTI sessions (demo mode)
-    if (!session.isLti) {
-      logger.info({ sessionId: session.sessionId }, 'Demo mode: Returning mock training session')
-      return NextResponse.json({
-        success: true,
-        session: {
-          id: `demo_${session.sessionId}`,
-          session_id: session.sessionId,
-          course_id: 'demo',
-          course_name: 'OP-Skillsim Plumbing Training',
-          current_training_phase: '0', // Phase index as string
-          overall_progress: 0,
-          status: 'active',
-          phases_completed: 0,
-          total_score: 0,
-        },
-        isNew: true,
-        demo: true,
-      })
-    }
-
     // Skip save for admin/teacher roles (they are just testing)
     if (session.role === 'admin' || session.role === 'teacher') {
       logger.info({ sessionId: session.sessionId, role: session.role }, 'Test mode: Returning mock training session for admin/teacher')
@@ -113,7 +92,11 @@ export async function POST(request: NextRequest) {
 
     // ==========================================================================
     // Get LTI context from user_sessions for full_name and other details
+    // For standalone/outsider users, this will fail gracefully
     // ==========================================================================
+    let ltiContext: Record<string, string> = {}
+    let fullName = 'Unknown Student'
+
     const { data: userSession, error: userSessionError } = await supabase
       .from('user_sessions')
       .select('lti_context')
@@ -121,18 +104,32 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (userSessionError) {
-      logger.warn({
+      // Not an error for standalone users - they don't have user_sessions entries
+      logger.info({
         sessionId: session.sessionId,
         error: userSessionError.message,
-      }, 'Failed to get user session for LTI context')
+      }, 'No user_session found (expected for standalone users)')
     }
 
-    // Parse LTI context
-    const ltiContext = userSession?.lti_context
-      ? (typeof userSession.lti_context === 'string'
-          ? JSON.parse(userSession.lti_context)
-          : userSession.lti_context)
-      : {}
+    if (userSession?.lti_context) {
+      ltiContext = typeof userSession.lti_context === 'string'
+        ? JSON.parse(userSession.lti_context)
+        : userSession.lti_context
+      fullName = ltiContext.full_name || fullName
+    }
+
+    // For standalone users, try to get full_name from user_profiles
+    if (!userSession?.lti_context) {
+      const { data: userProfile } = await supabase
+        .from('user_profiles')
+        .select('full_name')
+        .eq('email', session.email)
+        .single()
+
+      if (userProfile?.full_name) {
+        fullName = userProfile.full_name
+      }
+    }
 
     // ==========================================================================
     // IMPORTANT: Query by student EMAIL, not session_id
@@ -183,11 +180,11 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Build student details for JSONB column using LTI context
+    // Build student details for JSONB column
     const student = {
       user_id: session.userId,
       email: session.email,
-      full_name: ltiContext.full_name || 'Unknown Student',
+      full_name: fullName,
       course_name: ltiContext.courseName || courseName || 'OP-Skillsim Plumbing Training',
       institution: ltiContext.institution || 'Open Polytechnic Kuratini Tuwhera',
       lti_role: ltiContext.rawLtiRole || 'student',
@@ -197,7 +194,7 @@ export async function POST(request: NextRequest) {
     logger.info({
       sessionId: session.sessionId,
       email: session.email,
-      fullName: student.full_name,
+      fullName,
       hasLtiContext: !!userSession?.lti_context,
     }, 'Creating new training session with student details')
 
@@ -279,15 +276,6 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Return null for non-LTI sessions (demo mode - no stored data)
-    if (!session.isLti) {
-      return NextResponse.json({
-        success: true,
-        session: null,
-        demo: true,
-      })
-    }
-
     const supabase = getSupabaseAdmin()
 
     // Query by student EMAIL to find active training session
@@ -336,17 +324,6 @@ export async function PATCH(request: NextRequest) {
         { success: false, error: 'Authentication required' },
         { status: 401 }
       )
-    }
-
-    // Skip update for non-LTI sessions (demo mode)
-    if (!session.isLti) {
-      const body = await request.json()
-      logger.info({ sessionId: session.sessionId, status: body.status }, 'Demo mode: Skipping session status update')
-      return NextResponse.json({
-        success: true,
-        status: body.status || 'active',
-        demo: true,
-      })
     }
 
     const body = await request.json()

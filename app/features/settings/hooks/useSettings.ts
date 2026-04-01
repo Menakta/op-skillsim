@@ -147,39 +147,56 @@ export function useSettings(
   // ==========================================================================
 
   const setAudioEnabled = useCallback((enabled: boolean) => {
-    setSettings(prev => ({ ...prev, audioEnabled: enabled }))
+    setSettings(prev => {
+      const newState = { ...prev, audioEnabled: enabled }
 
-    // Send mute/unmute by setting master volume to 0 or restoring
-    if (!enabled) {
-      sendMessage(createAudioVolumeMessage('Master', 0))
-    } else {
-      // Restore previous master volume
-      setSettings(prev => {
+      if (!enabled) {
+        // Mute all audio groups
+        sendMessage(createAudioVolumeMessage('Master', 0))
+        sendMessage(createAudioVolumeMessage('Ambient', 0))
+        sendMessage(createAudioVolumeMessage('SFX', 0))
+      } else {
+        // Restore all audio group volumes
         sendMessage(createAudioVolumeMessage('Master', prev.masterVolume))
-        return prev
-      })
-    }
+        sendMessage(createAudioVolumeMessage('Ambient', prev.ambientVolume))
+        sendMessage(createAudioVolumeMessage('SFX', prev.sfxVolume))
+      }
+
+      return newState
+    })
   }, [sendMessage])
 
   const setMasterVolume = useCallback((volume: number) => {
     const clampedVolume = Math.max(0, Math.min(1, volume))
-    setSettings(prev => ({ ...prev, masterVolume: clampedVolume }))
-
-    if (settings.audioEnabled) {
-      sendMessage(createAudioVolumeMessage('Master', clampedVolume))
-    }
-  }, [sendMessage, settings.audioEnabled])
+    setSettings(prev => {
+      // Only send message if audio is enabled
+      if (prev.audioEnabled) {
+        sendMessage(createAudioVolumeMessage('Master', clampedVolume))
+      }
+      return { ...prev, masterVolume: clampedVolume }
+    })
+  }, [sendMessage])
 
   const setAmbientVolume = useCallback((volume: number) => {
     const clampedVolume = Math.max(0, Math.min(1, volume))
-    setSettings(prev => ({ ...prev, ambientVolume: clampedVolume }))
-    sendMessage(createAudioVolumeMessage('Ambient', clampedVolume))
+    setSettings(prev => {
+      // Only send message if audio is enabled
+      if (prev.audioEnabled) {
+        sendMessage(createAudioVolumeMessage('Ambient', clampedVolume))
+      }
+      return { ...prev, ambientVolume: clampedVolume }
+    })
   }, [sendMessage])
 
   const setSfxVolume = useCallback((volume: number) => {
     const clampedVolume = Math.max(0, Math.min(1, volume))
-    setSettings(prev => ({ ...prev, sfxVolume: clampedVolume }))
-    sendMessage(createAudioVolumeMessage('SFX', clampedVolume))
+    setSettings(prev => {
+      // Only send message if audio is enabled
+      if (prev.audioEnabled) {
+        sendMessage(createAudioVolumeMessage('SFX', clampedVolume))
+      }
+      return { ...prev, sfxVolume: clampedVolume }
+    })
   }, [sendMessage])
 
   // ==========================================================================

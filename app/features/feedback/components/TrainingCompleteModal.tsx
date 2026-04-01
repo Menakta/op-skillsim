@@ -59,8 +59,8 @@ export function TrainingCompleteModal({
       return
     }
 
-    // LTI Students: fetch data, clear session, redirect to training-results page
-    if (isLti && role === 'student') {
+    // All Students (LTI and Outsiders): fetch data, clear session, redirect to training-results page
+    if (role === 'student') {
       setIsRedirecting(true)
 
       try {
@@ -82,7 +82,7 @@ export function TrainingCompleteModal({
 
         // Build URL with data encoded as base64
         const params = new URLSearchParams()
-        params.set('isLti', 'true')
+        params.set('isLti', isLti ? 'true' : 'false')
         if (returnUrl) {
           params.set('returnUrl', encodeURIComponent(returnUrl))
         }
@@ -99,7 +99,7 @@ export function TrainingCompleteModal({
         // Still redirect even if fetch fails, page will show error
         await completeSessionCleanup()
         const params = new URLSearchParams()
-        params.set('isLti', 'true')
+        params.set('isLti', isLti ? 'true' : 'false')
         if (returnUrl) {
           params.set('returnUrl', encodeURIComponent(returnUrl))
         }
@@ -108,7 +108,7 @@ export function TrainingCompleteModal({
       return
     }
 
-    // Non-LTI Students: redirect to session-complete page for proper cleanup
+    // Fallback for any other case
     redirectToSessionComplete({
       reason: 'completed',
       role,
@@ -124,11 +124,8 @@ export function TrainingCompleteModal({
     if (isStaff) {
       return 'Back to Dashboard'
     }
-    if (isLti && role === 'student') {
+    if (role === 'student') {
       return 'View Results'
-    }
-    if (!isLti) {
-      return 'Back to Login'
     }
     return 'Continue'
   }

@@ -203,6 +203,7 @@ export function useModalManager(): UseModalManagerReturn {
   }, [])
 
   const openResumeConfirmation = useCallback((phaseIndex: number) => {
+    console.log(`📂 [useModalManager] openResumeConfirmation called with phaseIndex=${phaseIndex}`)
     setState(prev => ({
       ...prev,
       activeModal: 'resumeConfirmation',

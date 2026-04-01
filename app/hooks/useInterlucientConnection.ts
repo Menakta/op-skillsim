@@ -169,6 +169,8 @@ export function useInterlucientConnection(
   const streamRef = useRef<InterlucientStreamRef>(null)
   const wasConnectedRef = useRef(false)
   const tokenFetchedRef = useRef(false)
+  const disconnectRetryCountRef = useRef(0)
+  const MAX_DISCONNECT_RETRIES = 2 // Try to reconnect up to 2 times before ending session
 
   // =========================================================================
   // Derived State
@@ -273,6 +275,10 @@ export function useInterlucientConnection(
     // Play will be triggered automatically when token is set
   }, [fetchToken])
 
+  // Ref to reconnect for use in handleSessionEnded
+  const reconnectRef = useRef(reconnect)
+  reconnectRef.current = reconnect
+
   // =========================================================================
   // Event Handlers (to be passed to InterlucientStream)
   // =========================================================================
@@ -286,6 +292,7 @@ export function useInterlucientConnection(
       if (newStatus === 'streaming') {
         const isFirstConnection = !wasConnectedRef.current
         wasConnectedRef.current = true
+        disconnectRetryCountRef.current = 0 // Reset disconnect retry counter on successful connection
         onConnected?.(isFirstConnection)
 
         // Get session ID from stream ref
@@ -312,7 +319,36 @@ export function useInterlucientConnection(
     (reason: string) => {
       console.log('🔌 Session ended:', reason)
       setIsDataChannelOpen(false)
-      onSessionEnd?.(mapSessionEndReason(reason))
+
+      const mappedReason = mapSessionEndReason(reason)
+
+      // For kicked/withdrawn status, don't retry - end session immediately
+      if (mappedReason === 'kicked') {
+        console.log('👢 User was kicked/withdrawn - ending session')
+        disconnectRetryCountRef.current = 0
+        onSessionEnd?.(mappedReason)
+        return
+      }
+
+      // For disconnection types, attempt automatic reconnection first
+      // This fixes P0-01: Temporary network issues shouldn't end the session
+      if (mappedReason === 'disconnected' && disconnectRetryCountRef.current < MAX_DISCONNECT_RETRIES) {
+        disconnectRetryCountRef.current += 1
+        console.log(`🔄 Attempting automatic reconnection (${disconnectRetryCountRef.current}/${MAX_DISCONNECT_RETRIES})...`)
+
+        // Small delay before reconnection attempt
+        setTimeout(() => {
+          reconnectRef.current()
+        }, 2000) // 2 second delay before retry
+        return
+      }
+
+      // Max retries exceeded or non-recoverable reason - end session
+      if (disconnectRetryCountRef.current >= MAX_DISCONNECT_RETRIES) {
+        console.log('❌ Max reconnection attempts exceeded - ending session')
+      }
+      disconnectRetryCountRef.current = 0 // Reset for next time
+      onSessionEnd?.(mappedReason)
     },
     [onSessionEnd]
   )

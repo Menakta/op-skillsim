@@ -141,104 +141,126 @@ export async function POST(request: NextRequest) {
           )
         }
 
-        // Approved outsider - trigger SMS OTP for 2FA
-        if (!profile.phone) {
-          logger.error({ email, userId: profile.id }, 'Approved outsider has no phone number')
-          return NextResponse.json(
-            { success: false, error: 'No phone number on file. Please contact an administrator.' },
-            { status: 400 }
-          )
+        // ==========================================================================
+        // APPROVED OUTSIDER - Login directly (OTP bypassed for now)
+        // TODO: Re-enable OTP when Twilio is configured in Supabase
+        // ==========================================================================
+        const sessionId = randomUUID()
+        const now = new Date()
+        const expiresAt = new Date(now.getTime() + 3 * 60 * 60 * 1000) // 3 hours
+
+        // Create user_sessions record (just like LTI does)
+        const supabaseAdmin = getSupabaseAdmin()
+        const ltiContext = {
+          courseId: 'outsider',
+          courseName: 'OP-Skillsim Plumbing Training',
+          resourceId: 'outsider-login',
+          institution: 'External User',
+          full_name: profile.full_name || profile.email.split('@')[0],
         }
 
-        // Send OTP via Supabase (Twilio)
-        // Use shouldCreateUser: false since the user already exists
-        const { error: otpError } = await supabase.auth.signInWithOtp({
-          phone: profile.phone,
-          options: {
-            shouldCreateUser: false,
+        const { error: sessionError } = await supabaseAdmin
+          .from('user_sessions')
+          .insert({
+            session_id: sessionId,
+            user_id: profile.id,
+            session_type: 'lti',
+            email: profile.email,
+            role: 'student',
+            lti_context: ltiContext,
+            expires_at: expiresAt.toISOString(),
+            status: 'active',
+            login_count: 1,
+            last_login_at: now.toISOString(),
+          })
+
+        if (sessionError) {
+          logger.warn({ error: sessionError.message, sessionId }, 'Failed to create user_session record for outsider')
+        } else {
+          logger.info({ sessionId, email: profile.email }, 'Created user_session record for outsider student')
+        }
+
+        const token = await new SignJWT({
+          sessionId,
+          userId: profile.id,
+          email: profile.email,
+          role: profile.role,
+          sessionType: 'lti',
+          isLti: true, // Enable data saving for outsiders
+          iat: Math.floor(now.getTime() / 1000),
+        })
+          .setProtectedHeader({ alg: 'HS256' })
+          .setExpirationTime(expiresAt)
+          .sign(JWT_SECRET)
+
+        logger.info({
+          userId: profile.id,
+          email: profile.email,
+          role: profile.role,
+          registrationType: 'outsider',
+          sessionId,
+        }, 'Approved outsider login successful (OTP bypassed)')
+
+        const response = NextResponse.json({
+          success: true,
+          user: {
+            id: profile.id,
+            email: profile.email,
+            name: profile.full_name || email.split('@')[0],
+            role: profile.role,
+            isLti: true,
           },
         })
 
-        if (otpError) {
-          logger.error({ email, phone: profile.phone, error: otpError.message, code: otpError.code }, 'Failed to send OTP')
-
-          // Return more specific error for debugging
-          let errorMessage = 'Failed to send verification code. Please try again.'
-          if (otpError.message.includes('Phone provider')) {
-            errorMessage = 'SMS service not configured. Please contact administrator.'
-          } else if (otpError.message.includes('Invalid phone')) {
-            errorMessage = 'Invalid phone number format.'
-          } else if (otpError.message.includes('User not found') || otpError.message.includes('Signups not allowed')) {
-            // Phone not linked to any user - we need to update the user's phone first
-            // Use admin client to update the user's phone in auth.users
-            const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-              profile.id,
-              { phone: profile.phone }
-            )
-
-            if (updateError) {
-              logger.error({ email, error: updateError.message }, 'Failed to update user phone')
-              return NextResponse.json(
-                { success: false, error: 'Failed to configure phone verification.', debug: updateError.message },
-                { status: 500 }
-              )
-            }
-
-            // Retry sending OTP after updating phone
-            const { error: retryError } = await supabase.auth.signInWithOtp({
-              phone: profile.phone,
-              options: {
-                shouldCreateUser: false,
-              },
-            })
-
-            if (retryError) {
-              logger.error({ email, error: retryError.message }, 'Failed to send OTP after phone update')
-              return NextResponse.json(
-                { success: false, error: 'Failed to send verification code.', debug: retryError.message },
-                { status: 500 }
-              )
-            }
-
-            // OTP sent successfully after retry
-            logger.info({ email, userId: profile.id, phone: profile.phone }, 'OTP sent after phone update')
-
-            return NextResponse.json({
-              success: true,
-              requiresOtp: true,
-              userId: profile.id,
-              email: profile.email,
-              phone: profile.phone,
-              maskedPhone: profile.phone.replace(/(\+\d{2})\d+(\d{4})/, '$1****$2'),
-              message: 'Verification code sent to your phone',
-            })
-          }
-
-          return NextResponse.json(
-            { success: false, error: errorMessage, debug: otpError.message },
-            { status: 500 }
-          )
-        }
-
-        logger.info({ email, userId: profile.id, phone: profile.phone }, 'OTP sent to outsider')
-
-        // Return response indicating OTP was sent (no session yet)
-        // Include the actual phone (for OTP verification) and masked version (for display)
-        return NextResponse.json({
-          success: true,
-          requiresOtp: true,
-          userId: profile.id,
-          email: profile.email, // Used to look up user during OTP verification
-          phone: profile.phone, // Actual phone for Supabase OTP verification
-          maskedPhone: profile.phone.replace(/(\+\d{2})\d+(\d{4})/, '$1****$2'), // For display
-          message: 'Verification code sent to your phone',
+        response.cookies.set('session_token', token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          path: '/',
+          maxAge: 60 * 60 * 24, // 24 hours
         })
+
+        return response
       }
 
       // Non-outsider Supabase user (e.g., LTI user logging in directly) - create session
       const sessionId = randomUUID()
       const now = new Date()
-      const expiresAt = new Date(now.getTime() + 60 * 60 * 1000) // 1 hour
+      const expiresAt = new Date(now.getTime() + 3 * 60 * 60 * 1000) // 3 hours (matches LTI)
+
+      // For students, set isLti: true to enable data saving (training progress, quiz results)
+      const shouldSaveData = profile.role === 'student'
+
+      // Create user_sessions record for students (just like LTI does)
+      if (shouldSaveData) {
+        const supabaseAdmin = getSupabaseAdmin()
+        const ltiContext = {
+          courseId: 'direct-login',
+          courseName: 'OP-Skillsim Plumbing Training',
+          resourceId: 'direct-login',
+          institution: 'Open Polytechnic Kuratini Tuwhera',
+          full_name: profile.full_name || profile.email.split('@')[0],
+        }
+
+        const { error: sessionError } = await supabaseAdmin
+          .from('user_sessions')
+          .insert({
+            session_id: sessionId,
+            user_id: profile.id,
+            session_type: 'lti',
+            email: profile.email,
+            role: 'student',
+            lti_context: ltiContext,
+            expires_at: expiresAt.toISOString(),
+            status: 'active',
+            login_count: 1,
+            last_login_at: now.toISOString(),
+          })
+
+        if (sessionError) {
+          logger.warn({ error: sessionError.message, sessionId }, 'Failed to create user_session record')
+        }
+      }
 
       const token = await new SignJWT({
         sessionId,
@@ -246,7 +268,7 @@ export async function POST(request: NextRequest) {
         email: profile.email,
         role: profile.role,
         sessionType: profile.role === 'student' ? 'lti' : profile.role,
-        isLti: false,
+        isLti: shouldSaveData,
         iat: Math.floor(now.getTime() / 1000),
       })
         .setProtectedHeader({ alg: 'HS256' })
@@ -258,7 +280,7 @@ export async function POST(request: NextRequest) {
         email: profile.email,
         role: profile.role,
         registrationType: profile.registration_type,
-        isLti: false,
+        isLti: shouldSaveData,
         sessionId,
       }, 'Non-outsider login successful')
 
@@ -269,7 +291,7 @@ export async function POST(request: NextRequest) {
           email: profile.email,
           name: profile.full_name || email.split('@')[0],
           role: profile.role,
-          isLti: false,
+          isLti: shouldSaveData,
         },
       })
 
@@ -307,7 +329,10 @@ export async function POST(request: NextRequest) {
     // Demo user found - create session
     const sessionId = randomUUID()
     const now = new Date()
-    const expiresAt = new Date(now.getTime() + 60 * 60 * 1000) // 1 hour
+    const expiresAt = new Date(now.getTime() + 3 * 60 * 60 * 1000) // 3 hours - extended for long training sessions
+
+    // For demo students, set isLti: true to enable data saving
+    const demoShouldSaveData = demoUser.role === 'student'
 
     const token = await new SignJWT({
       sessionId,
@@ -315,7 +340,7 @@ export async function POST(request: NextRequest) {
       email: demoUser.email,
       role: demoUser.role,
       sessionType: demoUser.role === 'student' ? 'lti' : demoUser.role,
-      isLti: false,
+      isLti: demoShouldSaveData,
       iat: Math.floor(now.getTime() / 1000),
     })
       .setProtectedHeader({ alg: 'HS256' })
@@ -326,7 +351,7 @@ export async function POST(request: NextRequest) {
       userId: demoUser.id,
       email: demoUser.email,
       role: demoUser.role,
-      isLti: false,
+      isLti: demoShouldSaveData,
       sessionId,
     }, 'Demo login successful')
 
@@ -337,7 +362,7 @@ export async function POST(request: NextRequest) {
         email: demoUser.email,
         name: demoUser.full_name,
         role: demoUser.role,
-        isLti: false,
+        isLti: demoShouldSaveData,
       },
     })
 
@@ -346,7 +371,7 @@ export async function POST(request: NextRequest) {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
-      maxAge: 60 * 60 * 2, // 2 hours
+      maxAge: 60 * 60 * 3, // 3 hours - matches JWT expiry
     })
 
     return response

@@ -161,18 +161,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 2. Skip save for non-LTI sessions (demo mode)
-    if (!session.isLti) {
-      logger.info({ sessionId: session.sessionId }, 'Demo mode: Skipping quiz response save')
-      return NextResponse.json({
-        success: true,
-        response: null,
-        demo: true,
-        message: 'Demo mode: Quiz response not saved',
-      })
-    }
-
-    // 3. Skip save for admin/teacher roles (they are just testing)
+    // 2. Skip save for admin/teacher roles (they are just testing)
     if (session.role === 'admin' || session.role === 'teacher') {
       logger.info({ sessionId: session.sessionId, role: session.role }, 'Test mode: Skipping quiz response save for admin/teacher')
       return NextResponse.json({

@@ -40,8 +40,8 @@ interface EventListener<T = unknown> {
 export interface AppEvents {
   // Training events
   'training:started': { taskIndex: number }
-  'training:paused': undefined
-  'training:resumed': undefined
+  'training:paused': { taskIndex: number }
+  'training:resumed': { taskIndex: number; tool?: string }
   'training:completed': { totalTasks: number; score?: number }
   'training:taskChanged': { taskIndex: number; taskName: string; toolName: string }
   'training:progressUpdated': { progress: number; currentTask: number; totalTasks: number }

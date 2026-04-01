@@ -114,8 +114,8 @@ export function useSessionInfo(config?: UseSessionInfoConfig): UseSessionInfoRet
     // Check immediately
     checkExpiry()
 
-    // Check every 30 seconds
-    const interval = setInterval(checkExpiry, 30000)
+    // Check every 10 seconds for more responsive session expiry warnings
+    const interval = setInterval(checkExpiry, 10000)
 
     return () => clearInterval(interval)
   }, [sessionExpiresAt, onSessionExpiring])

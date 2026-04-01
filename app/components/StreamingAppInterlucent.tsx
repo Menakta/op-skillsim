@@ -204,10 +204,19 @@ export default function StreamingAppInterlucent() {
   const [showExplosionControls, setShowExplosionControls] = useState(true);
   // Training pause state
   const [isTrainingPaused, setIsTrainingPaused] = useState(false);
-  // Cinematic walkthrough state
-  const [showCinematicWalkthrough, setShowCinematicWalkthrough] = useState(true);
-  // Training walkthrough state
-  const [showTrainingWalkthrough, setShowTrainingWalkthrough] = useState(false);
+  // Cinematic walkthrough state - check localStorage on init
+  const [showCinematicWalkthrough, setShowCinematicWalkthrough] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return localStorage.getItem('op-skillsim-cinematic-walkthrough-completed') !== 'true';
+  });
+  // Training walkthrough state - check localStorage on init
+  const [showTrainingWalkthrough, setShowTrainingWalkthrough] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    // Only show if cinematic is done but training isn't
+    const cinematicDone = localStorage.getItem('op-skillsim-cinematic-walkthrough-completed') === 'true';
+    const trainingDone = localStorage.getItem('op-skillsim-training-walkthrough-completed') === 'true';
+    return cinematicDone && !trainingDone;
+  });
   // Track if user is transitioning from cinematic to training
   const isTransitioningToTrainingRef = useRef(false);
   // Pending training start
@@ -416,9 +425,8 @@ export default function StreamingAppInterlucent() {
     },
   );
 
-  // Idle detection
+  // Idle detection - uses default 15-minute timeout from hook
   const { isIdle, resetIdle } = useIdleDetection({
-    idleTimeout: 5 * 60 * 1000,
     enabled: stream.isConnected,
   });
 
@@ -473,6 +481,7 @@ export default function StreamingAppInterlucent() {
       resume: sessionSelection.actions.resume,
       startNew: sessionSelection.actions.startNew,
       confirmResume: () => {
+        console.log(`🔄 confirmResume called with modals.resumePhaseIndex=${modals.resumePhaseIndex}`)
         modals.closeModal("resumeConfirmation");
         sessionSelection.actions.confirmResume(modals.resumePhaseIndex);
       },
@@ -640,11 +649,14 @@ export default function StreamingAppInterlucent() {
   const handleCloseSidebar = useCallback(() => setForceSidebarOpen(false), []);
 
   const handleTrainingWalkthroughComplete = useCallback(() => {
+    console.log('🎓 Training walkthrough COMPLETE');
     setShowTrainingWalkthrough(false);
     setForceSidebarOpen(false);
     setForceSidebarTab(undefined);
     setTimeout(() => {
+      console.log('🎓 Checking pendingTrainingStartRef:', !!pendingTrainingStartRef.current);
       if (pendingTrainingStartRef.current) {
+        console.log('🎓 Calling pendingTrainingStartRef (startTraining)');
         pendingTrainingStartRef.current();
         pendingTrainingStartRef.current = null;
       }
@@ -654,11 +666,14 @@ export default function StreamingAppInterlucent() {
   }, []);
 
   const handleTrainingWalkthroughSkip = useCallback(() => {
+    console.log('🎓 Training walkthrough SKIPPED');
     setShowTrainingWalkthrough(false);
     setForceSidebarOpen(false);
     setForceSidebarTab(undefined);
     setTimeout(() => {
+      console.log('🎓 Checking pendingTrainingStartRef:', !!pendingTrainingStartRef.current);
       if (pendingTrainingStartRef.current) {
+        console.log('🎓 Calling pendingTrainingStartRef (startTraining)');
         pendingTrainingStartRef.current();
         pendingTrainingStartRef.current = null;
       }

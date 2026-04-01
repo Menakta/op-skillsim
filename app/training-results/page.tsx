@@ -180,15 +180,17 @@ function TrainingResultsContent() {
     }
   }, [data])
 
-  // Handle return to course
-  const handleReturnToCourse = useCallback(() => {
-    if (returnUrl) {
+  // Handle return to course/login
+  const handleReturn = useCallback(() => {
+    // For LTI users with returnUrl, go back to course
+    if (isLti && returnUrl) {
       window.location.href = returnUrl
     } else if (isLti) {
       // Try to close window for LTI without return URL
       window.close()
       alert('Please close this browser tab to return to your course.')
     } else {
+      // For outsiders/non-LTI users, always go to login
       window.location.href = '/login'
     }
   }, [returnUrl, isLti])
@@ -263,11 +265,11 @@ function TrainingResultsContent() {
               {isExporting ? 'Exporting...' : 'Export PDF'}
             </button>
             <button
-              onClick={handleReturnToCourse}
+              onClick={handleReturn}
               className="flex items-center gap-2 px-4 py-2 bg-[#39BEAE] hover:bg-[#2da89a] text-white rounded-lg font-medium transition-colors text-xs md:text-lg"
             >
               <ExternalLink className="w-4 h-4" />
-              Return to Course
+              {isLti ? 'Return to Course' : 'Return to Login'}
             </button>
           </div>
         </div>

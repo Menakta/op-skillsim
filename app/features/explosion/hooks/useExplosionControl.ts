@@ -40,6 +40,8 @@ export interface UseExplosionControlReturn {
   setExplosionLevel: (level: number) => void
   explodeBuilding: () => void
   assembleBuilding: () => void
+  /** Reset explosion to 0% (assembled state) - used when starting training */
+  resetExplosion: () => void
 }
 
 // =============================================================================
@@ -91,11 +93,19 @@ export function useExplosionControl(
     messageBus.sendMessage(WEB_TO_UE_MESSAGES.EXPLOSION_CONTROL, 'assemble')
   }, [messageBus])
 
+  const resetExplosion = useCallback(() => {
+    // Send 0 to reset explosion to assembled state
+    messageBus.sendMessage(WEB_TO_UE_MESSAGES.EXPLOSION_CONTROL, '0')
+    // Reset local state
+    setState(initialState)
+  }, [messageBus])
+
   return {
     state,
     setExplosionLevel,
     explodeBuilding,
-    assembleBuilding
+    assembleBuilding,
+    resetExplosion
   }
 }
 

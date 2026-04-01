@@ -125,7 +125,46 @@ export async function POST(request: NextRequest) {
     // Create session
     const sessionId = randomUUID()
     const now = new Date()
-    const expiresAt = new Date(now.getTime() + 60 * 60 * 1000) // 1 hour
+    const expiresAt = new Date(now.getTime() + 3 * 60 * 60 * 1000) // 3 hours (matches LTI)
+
+    // For students (including approved outsiders), set isLti: true to enable data saving
+    // This ensures their training progress and quiz results are recorded in the CMS
+    const shouldSaveData = profile.role === 'student'
+
+    // ==========================================================================
+    // CRITICAL: Create user_sessions record (just like LTI does)
+    // This is required for training APIs to find the session context
+    // ==========================================================================
+    if (shouldSaveData) {
+      const ltiContext = {
+        courseId: 'outsider',
+        courseName: 'OP-Skillsim Plumbing Training',
+        resourceId: 'outsider-login',
+        institution: 'External User',
+        full_name: profile.full_name || profile.email.split('@')[0],
+      }
+
+      const { error: sessionError } = await supabaseAdmin
+        .from('user_sessions')
+        .insert({
+          session_id: sessionId,
+          user_id: profile.id,
+          session_type: 'lti', // Use 'lti' type so training APIs work the same
+          email: profile.email,
+          role: 'student',
+          lti_context: ltiContext,
+          expires_at: expiresAt.toISOString(),
+          status: 'active',
+          login_count: 1,
+          last_login_at: now.toISOString(),
+        })
+
+      if (sessionError) {
+        logger.warn({ error: sessionError.message, sessionId }, 'Failed to create user_session record')
+      } else {
+        logger.info({ sessionId, email: profile.email }, 'Created user_session record for outsider student')
+      }
+    }
 
     const token = await new SignJWT({
       sessionId,
@@ -133,7 +172,7 @@ export async function POST(request: NextRequest) {
       email: profile.email,
       role: profile.role,
       sessionType: profile.role === 'student' ? 'lti' : profile.role,
-      isLti: false,
+      isLti: shouldSaveData,
       iat: Math.floor(now.getTime() / 1000),
     })
       .setProtectedHeader({ alg: 'HS256' })
@@ -145,6 +184,7 @@ export async function POST(request: NextRequest) {
       email: profile.email,
       role: profile.role,
       sessionId,
+      hasUserSession: shouldSaveData,
     }, 'OTP verification successful - session created')
 
     const response = NextResponse.json({
@@ -154,7 +194,7 @@ export async function POST(request: NextRequest) {
         email: profile.email,
         name: profile.full_name || profile.email.split('@')[0],
         role: profile.role,
-        isLti: false,
+        isLti: shouldSaveData,
       },
     })
 

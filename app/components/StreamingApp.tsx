@@ -505,8 +505,8 @@ export default function StreamingApp() {
     },
   );
   // Idle detection - only active when stream is connected
+  // Uses default 15-minute timeout from useIdleDetection hook
   const { isIdle, resetIdle } = useIdleDetection({
-    idleTimeout: 5 * 60 * 1000, // 5 minutes
     enabled: stream.isConnected, // Only detect idle when connected
   });
   // ==========================================================================

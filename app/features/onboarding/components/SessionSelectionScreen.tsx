@@ -24,6 +24,12 @@ export interface ActiveSession {
   phases_completed: number
   created_at: string
   updated_at: string
+  training_state?: {
+    currentTaskIndex?: number
+    phase?: string
+    mode?: string
+    progress?: number
+  } | null
 }
 
 interface SessionSelectionScreenProps {
@@ -38,14 +44,35 @@ interface SessionSelectionScreenProps {
 // Helper Functions
 // =============================================================================
 
-function getPhaseInfo(phaseIndex: string | number) {
-  const index = typeof phaseIndex === 'string' ? parseInt(phaseIndex, 10) : phaseIndex
-  if (isNaN(index) || index < 0 || index >= TASK_SEQUENCE.length) {
-    return { name: 'Not Started' }
+/**
+ * Get phase index from either a numeric index or a task ID string
+ * Handles both formats:
+ * - Numeric: "0", "1", "2", etc.
+ * - Task ID: "XRAY_MAIN", "SHOVEL_MAIN", "PIPE_CONNECTION_MAIN", etc.
+ */
+function getPhaseIndex(phaseValue: string | number | undefined | null): number {
+  if (phaseValue === undefined || phaseValue === null) return 0
+
+  // If it's already a number, use it directly
+  if (typeof phaseValue === 'number') return phaseValue
+
+  // Try to parse as numeric string first
+  const numericIndex = parseInt(phaseValue, 10)
+  if (!isNaN(numericIndex)) return numericIndex
+
+  // Otherwise, try to match by taskId (e.g., "PIPE_CONNECTION_MAIN")
+  const taskIndex = TASK_SEQUENCE.findIndex(task => task.taskId === phaseValue)
+  return taskIndex >= 0 ? taskIndex : 0
+}
+
+function getPhaseInfo(phaseIndex: number) {
+  if (phaseIndex < 0 || phaseIndex >= TASK_SEQUENCE.length) {
+    return { name: 'Not Started', index: 0 }
   }
-  const task = TASK_SEQUENCE[index]
+  const task = TASK_SEQUENCE[phaseIndex]
   return {
     name: task?.name || 'Unknown Phase',
+    index: phaseIndex,
   }
 }
 
@@ -113,9 +140,12 @@ export function SessionSelectionScreen({
 
               <div className="space-y-3 max-h-[280px] overflow-y-auto">
                 {sessions.map((session) => {
-                  const phaseInfo = getPhaseInfo(session.current_training_phase)
-                  const phaseIndex = parseInt(session.current_training_phase, 10)
-                  const progress = Math.round((phaseIndex / TASK_SEQUENCE.length) * 100)
+                  // Prefer training_state.currentTaskIndex, fall back to parsing current_training_phase
+                  const phaseIndex = session.training_state?.currentTaskIndex
+                    ?? getPhaseIndex(session.current_training_phase)
+                  const phaseInfo = getPhaseInfo(phaseIndex)
+                  // Use the stored overall_progress from the database
+                  const progress = session.overall_progress ?? 0
 
                   return (
                     <button
