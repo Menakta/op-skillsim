@@ -27,8 +27,8 @@ export default function LoginPage() {
   // OTP state
   const [otpStep, setOtpStep] = useState(false)
   const [otp, setOtp] = useState('')
-  const [phone, setPhone] = useState('')
-  const [maskedPhone, setMaskedPhone] = useState('')
+  const [otpEmail, setOtpEmail] = useState('')
+  const [maskedEmail, setMaskedEmail] = useState('')
 
   // Get redirect path and error from URL params
   useEffect(() => {
@@ -67,8 +67,8 @@ export default function LoginPage() {
 
       // Check if OTP is required (outsider users)
       if (data.requiresOtp) {
-        setPhone(data.phone) // Store actual phone for Supabase OTP verification
-        setMaskedPhone(data.maskedPhone) // Display masked version
+        setOtpEmail(data.email) // Store email for OTP verification
+        setMaskedEmail(data.maskedEmail) // Display masked version
         setOtpStep(true)
         setLoading(false)
         return
@@ -88,12 +88,10 @@ export default function LoginPage() {
     setError(null)
 
     try {
-      // Need to get the actual phone from user_profiles, not the masked one
-      // We'll re-fetch using email since we stored it
       const response = await fetch('/api/auth/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, otp }),
+        body: JSON.stringify({ email: otpEmail, otp }),
       })
 
       const data = await response.json()
@@ -255,7 +253,7 @@ export default function LoginPage() {
             <form onSubmit={handleOtpSubmit} className="space-y-4 md:pr-20">
               <div className={`mb-4 p-3 rounded-lg ${isDark ? 'bg-blue-900/30 border border-blue-700/50' : 'bg-blue-100 border border-blue-300'}`}>
                 <p className={`text-sm ${isDark ? 'text-blue-300' : 'text-blue-800'}`}>
-                  A verification code has been sent to {maskedPhone}
+                  A verification code has been sent to {maskedEmail}
                 </p>
               </div>
 

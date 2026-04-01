@@ -8,8 +8,9 @@
  * Outsider registration flow:
  * - Outsiders must be approved in user_profiles before they can log in
  * - Pending/rejected outsiders get 403 with appropriate message
+ * - Approved outsiders receive email OTP for verification
  *
- * Creates a session with isLti=false flag.
+ * Creates a session with isLti=false flag for demo users, isLti=true for outsiders.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -19,6 +20,7 @@ import { logger } from '@/app/lib/logger'
 import { randomUUID } from 'crypto'
 import type { UserRole } from '@/app/types'
 import demoUsers from '@/app/data/demo-users.json'
+import { sendOtpEmail, generateOtpCode } from '@/app/lib/email'
 
 // =============================================================================
 // Configuration
@@ -27,6 +29,9 @@ import demoUsers from '@/app/data/demo-users.json'
 const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'your-super-secret-jwt-key-min-32-chars'
 )
+
+// OTP expiry time in milliseconds (10 minutes)
+const OTP_EXPIRY_MS = 10 * 60 * 1000
 
 // =============================================================================
 // Supabase Client
@@ -78,6 +83,18 @@ interface UserProfile {
   registration_type: 'lti' | 'outsider' | 'demo'
   approval_status: 'pending' | 'approved' | 'rejected'
   role: UserRole
+}
+
+// =============================================================================
+// Helper: Mask email for display (e.g., j***@example.com)
+// =============================================================================
+
+function maskEmail(email: string): string {
+  const [localPart, domain] = email.split('@')
+  if (localPart.length <= 2) {
+    return `${localPart[0]}***@${domain}`
+  }
+  return `${localPart[0]}***${localPart[localPart.length - 1]}@${domain}`
 }
 
 // =============================================================================
@@ -142,86 +159,55 @@ export async function POST(request: NextRequest) {
         }
 
         // ==========================================================================
-        // APPROVED OUTSIDER - Login directly (OTP bypassed for now)
-        // TODO: Re-enable OTP when Twilio is configured in Supabase
+        // APPROVED OUTSIDER - Send email OTP for verification
         // ==========================================================================
-        const sessionId = randomUUID()
-        const now = new Date()
-        const expiresAt = new Date(now.getTime() + 3 * 60 * 60 * 1000) // 3 hours
+        const otpCode = generateOtpCode()
+        const otpExpiresAt = new Date(Date.now() + OTP_EXPIRY_MS)
 
-        // Create user_sessions record (just like LTI does)
-        const supabaseAdmin = getSupabaseAdmin()
-        const ltiContext = {
-          courseId: 'outsider',
-          courseName: 'OP-Skillsim Plumbing Training',
-          resourceId: 'outsider-login',
-          institution: 'External User',
-          full_name: profile.full_name || profile.email.split('@')[0],
+        // Store OTP in user_profiles
+        // Note: otp_code and otp_expires_at columns added via migration 20260401_add_email_otp_columns.sql
+        // Using type assertion to bypass strict Supabase types until schema is regenerated
+        const { error: updateError } = await (supabaseAdmin as unknown as {
+          from: (table: string) => {
+            update: (data: Record<string, unknown>) => {
+              eq: (column: string, value: string) => Promise<{ error: { message: string } | null }>
+            }
+          }
+        }).from('user_profiles').update({
+          otp_code: otpCode,
+          otp_expires_at: otpExpiresAt.toISOString(),
+        }).eq('id', profile.id)
+
+        if (updateError) {
+          logger.error({ error: updateError.message, email }, 'Failed to store OTP')
+          return NextResponse.json(
+            { success: false, error: 'Failed to send verification code. Please try again.' },
+            { status: 500 }
+          )
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { error: sessionError } = await supabaseAdmin
-          .from('user_sessions')
-          .insert({
-            session_id: sessionId,
-            user_id: profile.id,
-            session_type: 'lti',
-            email: profile.email,
-            role: 'student',
-            lti_context: ltiContext,
-            expires_at: expiresAt.toISOString(),
-            status: 'active',
-            login_count: 1,
-            last_login_at: now.toISOString(),
-          } as any)
+        // Send OTP email
+        const emailResult = await sendOtpEmail(
+          { email: profile.email, fullName: profile.full_name },
+          otpCode
+        )
 
-        if (sessionError) {
-          logger.warn({ error: sessionError.message, sessionId }, 'Failed to create user_session record for outsider')
-        } else {
-          logger.info({ sessionId, email: profile.email }, 'Created user_session record for outsider student')
+        if (!emailResult.success) {
+          logger.error({ email, error: emailResult.error }, 'Failed to send OTP email')
+          return NextResponse.json(
+            { success: false, error: 'Failed to send verification email. Please try again.' },
+            { status: 500 }
+          )
         }
 
-        const token = await new SignJWT({
-          sessionId,
-          userId: profile.id,
-          email: profile.email,
-          role: profile.role,
-          sessionType: 'lti',
-          isLti: true, // Enable data saving for outsiders
-          iat: Math.floor(now.getTime() / 1000),
-        })
-          .setProtectedHeader({ alg: 'HS256' })
-          .setExpirationTime(expiresAt)
-          .sign(JWT_SECRET)
+        logger.info({ email, userId: profile.id }, 'OTP email sent to approved outsider')
 
-        logger.info({
-          userId: profile.id,
-          email: profile.email,
-          role: profile.role,
-          registrationType: 'outsider',
-          sessionId,
-        }, 'Approved outsider login successful (OTP bypassed)')
-
-        const response = NextResponse.json({
+        return NextResponse.json({
           success: true,
-          user: {
-            id: profile.id,
-            email: profile.email,
-            name: profile.full_name || email.split('@')[0],
-            role: profile.role,
-            isLti: true,
-          },
+          requiresOtp: true,
+          email: profile.email,
+          maskedEmail: maskEmail(profile.email),
         })
-
-        response.cookies.set('session_token', token, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          path: '/',
-          maxAge: 60 * 60 * 24, // 24 hours
-        })
-
-        return response
       }
 
       // Non-outsider Supabase user (e.g., LTI user logging in directly) - create session

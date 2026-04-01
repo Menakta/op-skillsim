@@ -1,7 +1,7 @@
 /**
  * OTP Verification Endpoint
  *
- * Verifies the SMS OTP sent to outsider users during login.
+ * Verifies the email OTP sent to outsider users during login.
  * On success, creates a session and returns the user data.
  */
 
@@ -20,21 +20,12 @@ const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'your-super-secret-jwt-key-min-32-chars'
 )
 
+// OTP expiry time in milliseconds (10 minutes)
+const OTP_EXPIRY_MS = 10 * 60 * 1000
+
 // =============================================================================
 // Supabase Client
 // =============================================================================
-
-let _supabase: ReturnType<typeof createClient> | null = null
-
-function getSupabase() {
-  if (!_supabase) {
-    _supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!
-    )
-  }
-  return _supabase
-}
 
 let _supabaseAdmin: ReturnType<typeof createClient> | null = null
 
@@ -61,6 +52,8 @@ interface UserProfile {
   registration_type: 'lti' | 'outsider' | 'demo'
   approval_status: 'pending' | 'approved' | 'rejected'
   role: UserRole
+  otp_code: string | null
+  otp_expires_at: string | null
 }
 
 // =============================================================================
@@ -69,53 +62,90 @@ interface UserProfile {
 
 export async function POST(request: NextRequest) {
   try {
-    const { phone, otp } = await request.json()
+    const { email, otp } = await request.json()
 
-    if (!phone || !otp) {
+    if (!email || !otp) {
       return NextResponse.json(
-        { success: false, error: 'Phone and OTP are required' },
+        { success: false, error: 'Email and OTP are required' },
         { status: 400 }
       )
     }
 
-    logger.info({ phone: phone.replace(/(\+\d{2})\d+(\d{4})/, '$1****$2') }, 'OTP verification attempt')
+    logger.info({ email }, 'Email OTP verification attempt')
 
-    const supabase = getSupabase()
-
-    // Verify OTP with Supabase
-    const { data: authData, error: verifyError } = await supabase.auth.verifyOtp({
-      phone,
-      token: otp,
-      type: 'sms',
-    })
-
-    if (verifyError || !authData.user) {
-      logger.warn({ phone, error: verifyError?.message }, 'OTP verification failed')
-      return NextResponse.json(
-        { success: false, error: 'Invalid or expired verification code' },
-        { status: 401 }
-      )
-    }
-
-    // Get user profile
     const supabaseAdmin = getSupabaseAdmin()
+
+    // Get user profile with OTP data
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('user_profiles')
-      .select('id, email, full_name, phone, registration_type, approval_status, role')
-      .eq('phone', phone)
+      .select('id, email, full_name, phone, registration_type, approval_status, role, otp_code, otp_expires_at')
+      .eq('email', email)
       .single<UserProfile>()
 
     if (profileError || !profile) {
-      logger.error({ phone }, 'OTP verified but no profile found')
+      logger.warn({ email }, 'OTP verification failed - no profile found')
       return NextResponse.json(
         { success: false, error: 'Account not found' },
         { status: 404 }
       )
     }
 
+    // Check if OTP exists
+    if (!profile.otp_code || !profile.otp_expires_at) {
+      logger.warn({ email }, 'OTP verification failed - no OTP set')
+      return NextResponse.json(
+        { success: false, error: 'No verification code found. Please request a new code.' },
+        { status: 400 }
+      )
+    }
+
+    // Check if OTP has expired
+    const otpExpiresAt = new Date(profile.otp_expires_at)
+    if (new Date() > otpExpiresAt) {
+      logger.warn({ email }, 'OTP verification failed - OTP expired')
+      // Clear expired OTP
+      // Using type assertion to bypass strict Supabase types until schema is regenerated
+      await (supabaseAdmin as unknown as {
+        from: (table: string) => {
+          update: (data: Record<string, unknown>) => {
+            eq: (column: string, value: string) => Promise<{ error: { message: string } | null }>
+          }
+        }
+      }).from('user_profiles').update({
+        otp_code: null,
+        otp_expires_at: null,
+      }).eq('id', profile.id)
+      return NextResponse.json(
+        { success: false, error: 'Verification code has expired. Please request a new code.' },
+        { status: 401 }
+      )
+    }
+
+    // Verify OTP matches
+    if (profile.otp_code !== otp) {
+      logger.warn({ email }, 'OTP verification failed - invalid code')
+      return NextResponse.json(
+        { success: false, error: 'Invalid verification code' },
+        { status: 401 }
+      )
+    }
+
+    // OTP is valid - clear it from the database
+    // Using type assertion to bypass strict Supabase types until schema is regenerated
+    await (supabaseAdmin as unknown as {
+      from: (table: string) => {
+        update: (data: Record<string, unknown>) => {
+          eq: (column: string, value: string) => Promise<{ error: { message: string } | null }>
+        }
+      }
+    }).from('user_profiles').update({
+      otp_code: null,
+      otp_expires_at: null,
+    }).eq('id', profile.id)
+
     // Double-check approval status
     if (profile.approval_status !== 'approved') {
-      logger.warn({ phone, status: profile.approval_status }, 'OTP verified but user not approved')
+      logger.warn({ email, status: profile.approval_status }, 'OTP verified but user not approved')
       return NextResponse.json(
         { success: false, error: 'Your account is not approved' },
         { status: 403 }
@@ -186,7 +216,7 @@ export async function POST(request: NextRequest) {
       role: profile.role,
       sessionId,
       hasUserSession: shouldSaveData,
-    }, 'OTP verification successful - session created')
+    }, 'Email OTP verification successful - session created')
 
     const response = NextResponse.json({
       success: true,

@@ -311,6 +311,127 @@ export async function sendAdminNotificationEmail(user: UserInfo): Promise<EmailR
   }
 }
 
+// =============================================================================
+// OTP Email Template
+// =============================================================================
+
+function getOtpEmailHtml(user: UserInfo, otp: string): string {
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Verification Code</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f4f4; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f4f4f4;">
+    <tr>
+      <td align="center" style="padding: 40px 20px;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 500px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+          <!-- Header -->
+          <tr>
+            <td align="center" style="background: linear-gradient(135deg, #39BEAE 0%, #2EA89A 100%); padding: 30px 20px;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">${APP_NAME}</h1>
+            </td>
+          </tr>
+          <!-- Content -->
+          <tr>
+            <td style="padding: 40px 30px;">
+              <h2 style="margin: 0 0 20px 0; color: #333333; font-size: 22px; font-weight: 600; text-align: center;">Your Verification Code</h2>
+
+              <p style="margin: 0 0 25px 0; color: #555555; font-size: 16px; line-height: 1.6; text-align: center;">
+                Hi ${user.fullName || 'there'},<br>
+                Use the code below to complete your sign-in:
+              </p>
+
+              <!-- OTP Code Box -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td align="center" style="padding: 20px 0;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                      <tr>
+                        <td align="center" style="background-color: #39BEAE; border-radius: 8px; padding: 20px 40px;">
+                          <span style="font-family: 'Courier New', monospace; font-size: 36px; font-weight: bold; color: #ffffff; letter-spacing: 8px;">${otp}</span>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Warning Box -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top: 25px;">
+                <tr>
+                  <td style="background-color: #fff8e6; border: 1px solid #ffe0a3; border-radius: 8px; padding: 15px 20px;">
+                    <p style="margin: 0; color: #8a6d3b; font-size: 14px; line-height: 1.5; text-align: center;">
+                      <strong>Note:</strong> This code expires in 10 minutes.<br>
+                      If you didn't request this code, please ignore this email.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 20px 30px 30px 30px; border-top: 1px solid #eeeeee;">
+              <p style="margin: 0; color: #999999; font-size: 13px; line-height: 1.5; text-align: center;">
+                Best regards,<br>
+                The ${APP_NAME} Team
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`
+}
+
+/**
+ * Generate a 6-digit OTP code
+ */
+export function generateOtpCode(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString()
+}
+
+/**
+ * Send OTP verification email to user
+ */
+export async function sendOtpEmail(
+  user: UserInfo,
+  otp: string
+): Promise<EmailResult> {
+  if (!process.env.RESEND_API_KEY) {
+    logger.warn('RESEND_API_KEY not configured - skipping OTP email')
+    return { success: false, error: 'Email service not configured' }
+  }
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: user.email,
+      subject: `${APP_NAME} - Your verification code is ${otp}`,
+      html: getOtpEmailHtml(user, otp),
+    })
+
+    if (error) {
+      logger.error({ error, email: user.email }, 'Failed to send OTP email')
+      return { success: false, error: error.message }
+    }
+
+    logger.info({ messageId: data?.id, email: user.email }, 'OTP email sent')
+    return { success: true, messageId: data?.id }
+  } catch (error) {
+    logger.error({ error, email: user.email }, 'Error sending OTP email')
+    return { success: false, error: 'Failed to send email' }
+  }
+}
+
 /**
  * Generate a confirmation token for email verification
  * Token expires in 24 hours
