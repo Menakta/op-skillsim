@@ -159,6 +159,7 @@ export async function POST(request: NextRequest) {
           full_name: profile.full_name || profile.email.split('@')[0],
         }
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { error: sessionError } = await supabaseAdmin
           .from('user_sessions')
           .insert({
@@ -172,7 +173,7 @@ export async function POST(request: NextRequest) {
             status: 'active',
             login_count: 1,
             last_login_at: now.toISOString(),
-          })
+          } as any)
 
         if (sessionError) {
           logger.warn({ error: sessionError.message, sessionId }, 'Failed to create user_session record for outsider')
@@ -242,6 +243,7 @@ export async function POST(request: NextRequest) {
           full_name: profile.full_name || profile.email.split('@')[0],
         }
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { error: sessionError } = await supabaseAdmin
           .from('user_sessions')
           .insert({
@@ -255,7 +257,7 @@ export async function POST(request: NextRequest) {
             status: 'active',
             login_count: 1,
             last_login_at: now.toISOString(),
-          })
+          } as any)
 
         if (sessionError) {
           logger.warn({ error: sessionError.message, sessionId }, 'Failed to create user_session record')
