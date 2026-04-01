@@ -333,16 +333,15 @@ export async function POST(request: NextRequest) {
     const now = new Date()
     const expiresAt = new Date(now.getTime() + 3 * 60 * 60 * 1000) // 3 hours - extended for long training sessions
 
-    // For demo students, set isLti: true to enable data saving
-    const demoShouldSaveData = demoUser.role === 'student'
-
+    // Demo users: isLti: false - no data saving, no session resume
+    // This differentiates them from real users (LTI and Outsiders)
     const token = await new SignJWT({
       sessionId,
       userId: demoUser.id,
       email: demoUser.email,
       role: demoUser.role,
       sessionType: demoUser.role === 'student' ? 'lti' : demoUser.role,
-      isLti: demoShouldSaveData,
+      isLti: false,
       iat: Math.floor(now.getTime() / 1000),
     })
       .setProtectedHeader({ alg: 'HS256' })
@@ -353,7 +352,7 @@ export async function POST(request: NextRequest) {
       userId: demoUser.id,
       email: demoUser.email,
       role: demoUser.role,
-      isLti: demoShouldSaveData,
+      isLti: false,
       sessionId,
     }, 'Demo login successful')
 
@@ -364,7 +363,7 @@ export async function POST(request: NextRequest) {
         email: demoUser.email,
         name: demoUser.full_name,
         role: demoUser.role,
-        isLti: demoShouldSaveData,
+        isLti: false,
       },
     })
 

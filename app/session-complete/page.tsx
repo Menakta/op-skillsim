@@ -275,19 +275,8 @@ function SessionCompleteContent() {
               </button>
             )}
 
-            {/* Close Tab Message (for LTI without returnUrl) */}
-            {data.isLti && !data.returnUrl && !isStaff && (
-              <button
-                onClick={handleCloseBrowser}
-                disabled={isClearing}
-                className="w-full py-3 px-4 bg-[#39BEAE] hover:bg-[#2da89a] disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-colors"
-              >
-                Close & Return to Course
-              </button>
-            )}
-
-            {/* Return to Login (for non-LTI users without returnUrl) */}
-            {!data.isLti && !data.returnUrl && !isStaff && (
+            {/* Return to Login (for users without returnUrl - Outsiders or non-LTI) */}
+            {!data.returnUrl && !isStaff && (
               <button
                 onClick={handleLogin}
                 disabled={isClearing}
@@ -298,12 +287,6 @@ function SessionCompleteContent() {
             )}
           </div>
 
-          {/* Help Text */}
-          {data.isLti && !data.returnUrl && (
-            <p className="text-gray-500 text-xs text-center mt-4">
-              If the window doesn&apos;t close automatically, please close this browser tab manually to return to your course.
-            </p>
-          )}
         </div>
 
         {/* Footer */}
