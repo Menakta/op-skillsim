@@ -147,16 +147,24 @@ export function useSettings(
   // ==========================================================================
 
   const setAudioEnabled = useCallback((enabled: boolean) => {
+    console.log('🔊 [Settings] setAudioEnabled called:', enabled)
+
     setSettings(prev => {
       const newState = { ...prev, audioEnabled: enabled }
 
       if (!enabled) {
         // Mute all audio groups
-        sendMessage(createAudioVolumeMessage('Master', 0))
-        sendMessage(createAudioVolumeMessage('Ambient', 0))
-        sendMessage(createAudioVolumeMessage('SFX', 0))
+        console.log('🔇 [Settings] Muting all audio groups...')
+        const masterMsg = createAudioVolumeMessage('Master', 0)
+        const ambientMsg = createAudioVolumeMessage('Ambient', 0)
+        const sfxMsg = createAudioVolumeMessage('SFX', 0)
+        console.log('🔇 [Settings] Messages:', { masterMsg, ambientMsg, sfxMsg })
+        sendMessage(masterMsg)
+        sendMessage(ambientMsg)
+        sendMessage(sfxMsg)
       } else {
         // Restore all audio group volumes
+        console.log('🔊 [Settings] Restoring audio volumes:', { master: prev.masterVolume, ambient: prev.ambientVolume, sfx: prev.sfxVolume })
         sendMessage(createAudioVolumeMessage('Master', prev.masterVolume))
         sendMessage(createAudioVolumeMessage('Ambient', prev.ambientVolume))
         sendMessage(createAudioVolumeMessage('SFX', prev.sfxVolume))

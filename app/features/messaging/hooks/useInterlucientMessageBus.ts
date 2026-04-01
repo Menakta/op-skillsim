@@ -181,8 +181,11 @@ function stringToJson(messageString: string): Record<string, unknown> {
           return { type, setting: 'resolution', width: parseInt(parts[1]) || 1920, height: parseInt(parts[2]) || 1080 }
         case 'graphics_quality':
           return { type, setting: 'graphics_quality', quality: parts[1] }
-        case 'audio_volume':
-          return { type, setting: 'audio_volume', group: parts[1], volume: parseFloat(parts[2]) || 1.0 }
+        case 'audio_volume': {
+          const parsedVolume = parseFloat(parts[2])
+          // Use isNaN check instead of || to properly handle volume 0 (mute)
+          return { type, setting: 'audio_volume', group: parts[1], volume: isNaN(parsedVolume) ? 1.0 : parsedVolume }
+        }
         case 'bandwidth':
           return { type, setting: 'bandwidth', option: parts[1] }
         case 'fps_tracking':
@@ -421,12 +424,16 @@ export function useInterlucientMessageBus(
     // Convert string to JSON format
     const payload = stringToJson(message)
 
-    if (debug) {
+    // Always log audio messages for debugging P1-10
+    if (debug || message.includes('audio_volume')) {
       console.log('📤 Sending raw to UE5 (converted):', message, '→', payload)
+      console.log('📤 Stream ready:', !!streamRef.current, '| Data channel open:', isDataChannelOpen)
     }
 
     if (streamRef.current && isDataChannelOpen) {
       streamRef.current.sendUIInteraction(payload)
+    } else {
+      console.warn('⚠️ Cannot send message - stream not ready:', message, { streamReady: !!streamRef.current, dataChannelOpen: isDataChannelOpen })
     }
 
     const colonIndex = message.indexOf(':')
