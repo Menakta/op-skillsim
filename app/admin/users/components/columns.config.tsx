@@ -4,7 +4,7 @@
  * Column definitions, helpers, and export config for users page.
  */
 
-import { CheckCircle, XCircle, Mail, MailX } from 'lucide-react'
+import { CheckCircle, XCircle, Mail, MailX, Shield } from 'lucide-react'
 import { Badge } from '../../components/ui/Badge'
 import type { RegisteredUser, Column, BadgeVariant, ApprovalStatus } from '../../types'
 import { formatDate, type ExportColumn } from '../../utils'
@@ -82,6 +82,7 @@ interface ColumnFactoryOptions {
   onRoleChange: (userId: string, role: UserRole) => void
 }
 
+
 export function createUserColumns({
   isAdmin,
   isPendingApproval,
@@ -101,9 +102,17 @@ export function createUserColumns({
             </span>
           </div>
           <div className="min-w-0">
-            <p className="font-medium theme-text-primary truncate">
-              {user.full_name || 'No name'}
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="font-medium theme-text-primary truncate">
+                {user.full_name || 'No name'}
+              </p>
+              {user.is_system_admin && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                  <Shield className="w-3 h-3" />
+                  System
+                </span>
+              )}
+            </div>
             <p className="text-xs theme-text-muted truncate">{user.email}</p>
           </div>
         </div>
@@ -114,7 +123,7 @@ export function createUserColumns({
       header: 'Type',
       render: (user) => (
         <Badge variant={getRegistrationTypeBadgeVariant(user.registration_type)}>
-          {user.registration_type}
+          {user.registration_type ==="outsider" ? "External":"Intrnal"}
         </Badge>
       ),
     },
@@ -123,7 +132,7 @@ export function createUserColumns({
       header: 'Status',
       render: (user) => (
         <Badge variant={getApprovalBadgeVariant(user.approval_status)}>
-          {user.approval_status}
+          {user.approval_status.toUpperCase()}
         </Badge>
       ),
     },
@@ -149,7 +158,7 @@ export function createUserColumns({
       className: 'hidden lg:table-cell',
       headerClassName: 'hidden lg:table-cell',
       render: (user) => (
-        isAdmin ? (
+        isAdmin && !user.is_system_admin ? (
           <select
             value={user.role}
             onChange={(e) => {
@@ -180,13 +189,56 @@ export function createUserColumns({
         </span>
       ),
     },
-    {
-      key: 'actions',
+    // Only show actions column for admins
+    ...(isAdmin ? [{
+      key: 'actions' as const,
       header: 'Actions',
-      render: (user) => (
-        <div className="flex items-center gap-2">
-          {user.approval_status === 'pending' && (
-            <>
+      render: (user: RegisteredUser) => (
+        // Don't show actions for system admin
+        user.is_system_admin ? (
+          <span className="text-xs theme-text-muted">Protected</span>
+        ) : (
+          <div className="flex items-center gap-2">
+            {user.approval_status === 'pending' && (
+              <>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onApproval(user.id, 'approved')
+                  }}
+                  disabled={isPendingApproval}
+                  className="p-1.5 text-green-400 hover:bg-green-400/20 rounded-lg transition-colors disabled:opacity-50"
+                  title="Approve"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onApproval(user.id, 'rejected')
+                  }}
+                  disabled={isPendingApproval}
+                  className="p-1.5 text-red-400 hover:bg-red-400/20 rounded-lg transition-colors disabled:opacity-50"
+                  title="Reject"
+                >
+                  <XCircle className="w-4 h-4" />
+                </button>
+              </>
+            )}
+            {user.approval_status === 'approved' && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onApproval(user.id, 'rejected')
+                }}
+                disabled={isPendingApproval}
+                className="p-1.5 text-red-400 hover:bg-red-400/20 rounded-lg transition-colors disabled:opacity-50"
+                title="Revoke Access"
+              >
+                <XCircle className="w-4 h-4" />
+              </button>
+            )}
+            {user.approval_status === 'rejected' && (
               <button
                 onClick={(e) => {
                   e.stopPropagation()
@@ -198,47 +250,10 @@ export function createUserColumns({
               >
                 <CheckCircle className="w-4 h-4" />
               </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onApproval(user.id, 'rejected')
-                }}
-                disabled={isPendingApproval}
-                className="p-1.5 text-red-400 hover:bg-red-400/20 rounded-lg transition-colors disabled:opacity-50"
-                title="Reject"
-              >
-                <XCircle className="w-4 h-4" />
-              </button>
-            </>
-          )}
-          {user.approval_status === 'approved' && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onApproval(user.id, 'rejected')
-              }}
-              disabled={isPendingApproval}
-              className="p-1.5 text-red-400 hover:bg-red-400/20 rounded-lg transition-colors disabled:opacity-50"
-              title="Revoke Access"
-            >
-              <XCircle className="w-4 h-4" />
-            </button>
-          )}
-          {user.approval_status === 'rejected' && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onApproval(user.id, 'approved')
-              }}
-              disabled={isPendingApproval}
-              className="p-1.5 text-green-400 hover:bg-green-400/20 rounded-lg transition-colors disabled:opacity-50"
-              title="Approve"
-            >
-              <CheckCircle className="w-4 h-4" />
-            </button>
-          )}
-        </div>
+            )}
+          </div>
+        )
       ),
-    },
+    }] : []),
   ]
 }

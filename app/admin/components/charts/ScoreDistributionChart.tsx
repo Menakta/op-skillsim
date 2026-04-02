@@ -5,7 +5,7 @@
  *
  * Bar chart showing student score distribution across percentage ranges.
  * Uses React Query for data fetching.
- * Export to PDF available for LTI users only.
+ * Export to PDF available for all teachers and admins.
  */
 
 import { useRef, useState } from 'react'
@@ -86,7 +86,8 @@ export function ScoreDistributionChart({ className = '' }: ScoreDistributionChar
   const { data, isLoading, error } = useResults()
   const { user } = useCurrentUser()
 
-  const canExport = user?.isLti === true
+  // All teachers and admins can export (both LTI and outsiders)
+  const canExport = user?.role === 'teacher' || user?.role === 'admin'
 
   // Calculate score distribution
   const chartData: ScoreRange[] = SCORE_RANGES.map(range => {

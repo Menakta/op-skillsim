@@ -31,7 +31,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
   { label: 'Sessions', href: '/admin/sessions', icon: Users },
-  { label: 'Users', href: '/admin/users', icon: UserCheck },
+  { label: 'External Users', href: '/admin/users', icon: UserCheck },
   { label: 'Questionnaires', href: '/admin/questionnaires', icon: ClipboardList },
   // { label: 'Fittings', href: '/admin/fittings', icon: Wrench },
   { label: 'Results', href: '/admin/results', icon: BarChart3 },
@@ -44,7 +44,7 @@ const SECONDARY_ITEMS: NavItem[] = [
 interface SidebarProps {
   onLogout: () => void
   userName?: string
-  userRole?: string
+  userRole?: 'teacher' | 'admin' | string
   isOpen?: boolean
   onClose?: () => void
   isLti?: boolean // Hide logout for LTI users (they should return via LMS)
@@ -53,12 +53,15 @@ interface SidebarProps {
 export function Sidebar({
   onLogout,
   userName = 'Teacher',
-  userRole = 'Instructor',
+  userRole = 'teacher',
   isOpen = false,
   onClose,
   isLti = true,
 }: SidebarProps) {
   const pathname = usePathname()
+
+  // Check if user is admin (for display purposes)
+  const isAdmin = userRole === 'admin'
 
   const isActive = (href: string) => {
     if (href === '/admin') {
@@ -185,7 +188,7 @@ export function Sidebar({
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate theme-text-primary">{userName}</p>
-            <p className="text-xs theme-text-muted">{userRole}</p>
+            <p className="text-xs theme-text-muted">{isAdmin ? 'Administrator' : 'Teacher'}</p>
           </div>
         </div>
       </div>

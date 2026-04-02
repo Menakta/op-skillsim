@@ -155,34 +155,59 @@ export async function POST(request: NextRequest) {
     // Create session
     const sessionId = randomUUID()
     const now = new Date()
-    const expiresAt = new Date(now.getTime() + 3 * 60 * 60 * 1000) // 3 hours (matches LTI)
+    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000) // 24 hours for outsiders
 
-    // For students (including approved outsiders), set isLti: true to enable data saving
-    // This ensures their training progress and quiz results are recorded in the CMS
-    const shouldSaveData = profile.role === 'student'
+    // Determine session type based on role
+    // Students use 'lti' session type for training API compatibility
+    // Teachers/admins use 'teacher' session type for admin dashboard
+    const isStudent = profile.role === 'student'
+    const sessionType = isStudent ? 'lti' : 'teacher'
 
     // ==========================================================================
-    // CRITICAL: Create user_sessions record (just like LTI does)
-    // This is required for training APIs to find the session context
+    // CRITICAL: Create user_sessions record for ALL roles
+    // Students need it for training APIs, teachers/admins need it for dashboard
     // ==========================================================================
-    if (shouldSaveData) {
-      const ltiContext = {
-        courseId: 'outsider',
-        courseName: 'OP-Skillsim Plumbing Training',
-        resourceId: 'outsider-login',
-        institution: 'External User',
-        full_name: profile.full_name || profile.email.split('@')[0],
-      }
+    const ltiContext = {
+      courseId: 'outsider',
+      courseName: 'OP-Skillsim Plumbing Training',
+      resourceId: 'outsider-login',
+      institution: 'External User',
+      full_name: profile.full_name || profile.email.split('@')[0],
+    }
 
+    // Check if a session already exists for this user
+    const { data: existingSession } = await supabaseAdmin
+      .from('user_sessions')
+      .select('id, login_count')
+      .eq('email', profile.email)
+      .eq('status', 'active')
+      .single<{ id: string; login_count: number | null }>()
+
+    if (existingSession) {
+      // Update existing session
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabaseAdmin as any)
+        .from('user_sessions')
+        .update({
+          session_id: sessionId,
+          expires_at: expiresAt.toISOString(),
+          login_count: (existingSession.login_count || 0) + 1,
+          last_login_at: now.toISOString(),
+        })
+        .eq('id', existingSession.id)
+
+      logger.info({ sessionId, email: profile.email, role: profile.role }, 'Updated existing user_session record')
+    } else {
+      // Create new session
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error: sessionError } = await supabaseAdmin
         .from('user_sessions')
         .insert({
           session_id: sessionId,
           user_id: profile.id,
-          session_type: 'lti', // Use 'lti' type so training APIs work the same
+          session_type: sessionType,
           email: profile.email,
-          role: 'student',
+          role: profile.role, // Use actual role from profile
           lti_context: ltiContext,
           expires_at: expiresAt.toISOString(),
           status: 'active',
@@ -193,7 +218,7 @@ export async function POST(request: NextRequest) {
       if (sessionError) {
         logger.warn({ error: sessionError.message, sessionId }, 'Failed to create user_session record')
       } else {
-        logger.info({ sessionId, email: profile.email }, 'Created user_session record for outsider student')
+        logger.info({ sessionId, email: profile.email, role: profile.role }, 'Created user_session record')
       }
     }
 
@@ -202,8 +227,8 @@ export async function POST(request: NextRequest) {
       userId: profile.id,
       email: profile.email,
       role: profile.role,
-      sessionType: profile.role === 'student' ? 'lti' : profile.role,
-      isLti: shouldSaveData,
+      sessionType: sessionType,
+      isLti: isStudent, // Only students get isLti: true for data saving
       iat: Math.floor(now.getTime() / 1000),
     })
       .setProtectedHeader({ alg: 'HS256' })
@@ -215,7 +240,7 @@ export async function POST(request: NextRequest) {
       email: profile.email,
       role: profile.role,
       sessionId,
-      hasUserSession: shouldSaveData,
+      sessionType,
     }, 'Email OTP verification successful - session created')
 
     const response = NextResponse.json({
@@ -225,7 +250,7 @@ export async function POST(request: NextRequest) {
         email: profile.email,
         name: profile.full_name || profile.email.split('@')[0],
         role: profile.role,
-        isLti: shouldSaveData,
+        isLti: isStudent,
       },
     })
 

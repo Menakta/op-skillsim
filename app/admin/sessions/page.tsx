@@ -35,7 +35,7 @@ import {
   useSessions,
   useExportDynamic,
   useDeleteSessions,
-  useIsLtiAdmin,
+  useIsAdmin,
   type ExportData,
 } from "../hooks";
 import {
@@ -59,7 +59,7 @@ const ITEMS_PER_PAGE = 10;
 
 export default function SessionsPage() {
   const { data, isLoading, error, refetch } = useSessions();
-  const { isLtiAdmin } = useIsLtiAdmin();
+  const { isAdmin } = useIsAdmin();
   const deleteSessions = useDeleteSessions();
 
   const [activeTab, setActiveTab] = useState<SessionTabType>("students");
@@ -447,7 +447,7 @@ export default function SessionsPage() {
                 selectedCount={getCurrentTabData().selectedKeys.size}
               />
 
-              {isLtiAdmin && getCurrentSelectedKeys().size > 0 && (
+              {isAdmin && getCurrentSelectedKeys().size > 0 && (
                 <button
                   onClick={handleDeleteClick}
                   className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"

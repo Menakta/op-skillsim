@@ -5,7 +5,7 @@
  *
  * Doughnut chart showing completed vs active training sessions.
  * Uses React Query for data fetching with 10-minute cache.
- * Export to PDF available for LTI users only.
+ * Export to PDF available for all teachers and admins.
  */
 
 import { useRef, useState } from 'react'
@@ -81,7 +81,8 @@ export function SessionStatusChart({ className = '' }: SessionStatusChartProps) 
   const { data, isLoading, error } = useTrainingAnalytics()
   const { user } = useCurrentUser()
 
-  const canExport = user?.isLti === true
+  // All teachers and admins can export (both LTI and outsiders)
+  const canExport = user?.role === 'teacher' || user?.role === 'admin'
 
   const handleExport = async () => {
     if (!chartRef.current || !data) return

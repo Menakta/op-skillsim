@@ -34,6 +34,8 @@ interface DataTableProps<T> {
   selectable?: boolean
   selectedKeys?: Set<string>
   onSelectionChange?: (selectedKeys: Set<string>) => void
+  // Rows that cannot be selected (e.g., system admins)
+  disabledRows?: Set<string>
 }
 
 // =============================================================================
@@ -58,20 +60,24 @@ export function DataTable<T>({
   selectable = false,
   selectedKeys = new Set(),
   onSelectionChange,
+  disabledRows = new Set(),
 }: DataTableProps<T>) {
-  // Check if all current page items are selected
-  const allPageSelected = data.length > 0 && data.every(item => selectedKeys.has(getRowKey(item)))
-  const somePageSelected = data.some(item => selectedKeys.has(getRowKey(item)))
+  // Filter out disabled rows from selectable items
+  const selectableData = data.filter(item => !disabledRows.has(getRowKey(item)))
+
+  // Check if all current page selectable items are selected
+  const allPageSelected = selectableData.length > 0 && selectableData.every(item => selectedKeys.has(getRowKey(item)))
+  const somePageSelected = selectableData.some(item => selectedKeys.has(getRowKey(item)))
 
   const handleSelectAll = () => {
     if (!onSelectionChange) return
     const newSelected = new Set(selectedKeys)
     if (allPageSelected) {
-      // Deselect all on current page
-      data.forEach(item => newSelected.delete(getRowKey(item)))
+      // Deselect all selectable items on current page
+      selectableData.forEach(item => newSelected.delete(getRowKey(item)))
     } else {
-      // Select all on current page
-      data.forEach(item => newSelected.add(getRowKey(item)))
+      // Select all selectable items on current page
+      selectableData.forEach(item => newSelected.add(getRowKey(item)))
     }
     onSelectionChange(newSelected)
   }
@@ -79,6 +85,9 @@ export function DataTable<T>({
   const handleSelectRow = (item: T) => {
     if (!onSelectionChange) return
     const key = getRowKey(item)
+    // Don't allow selection of disabled rows
+    if (disabledRows.has(key)) return
+
     const newSelected = new Set(selectedKeys)
     if (newSelected.has(key)) {
       newSelected.delete(key)
@@ -144,6 +153,7 @@ export function DataTable<T>({
                 {data.map((item) => {
                   const rowKey = getRowKey(item)
                   const isSelected = selectedKeys.has(rowKey)
+                  const isDisabled = disabledRows.has(rowKey)
                   return (
                     <TableRow key={rowKey} className={isSelected ? 'bg-[#39BEAE]/10' : ''}>
                       {selectable && (
@@ -152,7 +162,11 @@ export function DataTable<T>({
                             type="checkbox"
                             checked={isSelected}
                             onChange={() => handleSelectRow(item)}
-                            className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-[#39BEAE] focus:ring-[#39BEAE] focus:ring-offset-0 cursor-pointer"
+                            disabled={isDisabled}
+                            title={isDisabled ? 'This item cannot be selected' : undefined}
+                            className={`w-4 h-4 rounded border-gray-600 bg-gray-700 text-[#39BEAE] focus:ring-[#39BEAE] focus:ring-offset-0 ${
+                              isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                            }`}
                           />
                         </TableCell>
                       )}

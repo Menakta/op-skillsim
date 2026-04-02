@@ -25,6 +25,7 @@ import {
   type QuestionFromDB,
 } from '../components'
 import { useAdmin, DemoModeNotice } from '../context/AdminContext'
+import { useCurrentUser } from '../hooks'
 import { formatPhase } from '../utils'
 import { useQuestions, useUpdateQuestion } from '../hooks'
 
@@ -40,7 +41,11 @@ const ITEMS_PER_PAGE = 10
 
 export default function QuestionnairesPage() {
   const { isLti } = useAdmin()
+  const { user } = useCurrentUser()
   const { data: questions = [], isLoading, error, refetch } = useQuestions()
+
+  // All teachers and admins can edit (both LTI and outsiders)
+  const canEdit = user?.role === 'teacher' || user?.role === 'admin'
   const updateQuestion = useUpdateQuestion()
 
   const [searchQuery, setSearchQuery] = useState('')
@@ -142,7 +147,7 @@ export default function QuestionnairesPage() {
       {/* Info Notice */}
       <div className="mb-3 p-3 rounded-lg border theme-bg-info theme-border-info">
         <p className="text-sm theme-text-info">
-          <strong>Note:</strong> {isLti
+          <strong>Note:</strong> {canEdit
             ? 'You can edit existing questions but cannot add new ones or delete existing ones. Changes will be reflected immediately in the training simulation.'
             : 'You are viewing questions in read-only mode.'}
         </p>
@@ -216,7 +221,7 @@ export default function QuestionnairesPage() {
                       onCancel={() => setEditingId(null)}
                       onSave={handleSave}
                       saving={updateQuestion.isPending}
-                      canEdit={isLti}
+                      canEdit={canEdit}
                     />
                   ))}
                   {totalPages > 1 && (

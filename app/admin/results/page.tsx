@@ -21,7 +21,7 @@ import {
   ConfirmDialog,
 } from '../components'
 import type { QuizResult, ResultFilter } from '../types'
-import { useResults, useExport, useDeleteResults, useIsLtiAdmin } from '../hooks'
+import { useResults, useExport, useDeleteResults, useIsAdmin } from '../hooks'
 import { ResultsTable, PDF_COLUMNS } from './components'
 
 // =============================================================================
@@ -36,7 +36,7 @@ const ITEMS_PER_PAGE = 10
 
 export default function ResultsPage() {
   const { data, isLoading, error, refetch } = useResults()
-  const { isLtiAdmin } = useIsLtiAdmin()
+  const { isAdmin } = useIsAdmin()
   const deleteResults = useDeleteResults()
 
   const [searchQuery, setSearchQuery] = useState('')
@@ -259,8 +259,8 @@ export default function ResultsPage() {
                 selectedCount={selectedKeys.size}
               />
 
-              {/* Delete Button */}
-              {isLtiAdmin && selectedKeys.size > 0 && (
+              {/* Delete Button - Admin only */}
+              {isAdmin && selectedKeys.size > 0 && (
                 <button
                   onClick={handleDeleteClick}
                   className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"

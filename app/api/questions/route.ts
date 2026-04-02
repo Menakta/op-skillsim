@@ -154,11 +154,11 @@ export async function GET(request: NextRequest) {
 /**
  * PUT - Update an existing question
  * Only updates allowed, no create or delete
- * Requires LTI session (demo sessions are read-only)
+ * All teachers and admins can edit (both LTI and outsiders)
  */
 export async function PUT(request: NextRequest) {
   try {
-    // Check session for LTI access
+    // Check session for staff access
     const token = request.cookies.get('session_token')?.value
     if (!token) {
       return NextResponse.json(
@@ -179,13 +179,8 @@ export async function PUT(request: NextRequest) {
         )
       }
 
-      // Check if LTI session (demo sessions cannot edit)
-      if (session.isLti === false) {
-        return NextResponse.json(
-          { error: 'Read-only mode: Changes not allowed in demo session' },
-          { status: 403 }
-        )
-      }
+      // All teachers and admins can edit questions
+      // (removed isLti check - both LTI and outsider staff can edit)
     } catch {
       return NextResponse.json(
         { error: 'Invalid session' },

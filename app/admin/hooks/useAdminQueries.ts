@@ -420,7 +420,7 @@ async function deleteUsers(params: { ids: string[] }): Promise<DeleteResponse> {
 // =============================================================================
 
 /**
- * Hook to delete sessions (LTI Admin only)
+ * Hook to delete sessions (Admin only)
  */
 export function useDeleteSessions() {
   const queryClient = useQueryClient()
@@ -492,7 +492,7 @@ export function useDeleteSessions() {
 }
 
 /**
- * Hook to delete results (LTI Admin only)
+ * Hook to delete results (Admin only)
  */
 export function useDeleteResults() {
   const queryClient = useQueryClient()
@@ -539,7 +539,7 @@ export function useDeleteResults() {
 }
 
 /**
- * Hook to delete users (LTI Admin only)
+ * Hook to delete users (Admin only)
  */
 export function useDeleteUsers() {
   const queryClient = useQueryClient()

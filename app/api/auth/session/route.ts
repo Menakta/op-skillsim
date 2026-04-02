@@ -34,13 +34,9 @@ export async function GET(request: NextRequest) {
     const { payload } = await jwtVerify(token, JWT_SECRET)
     const session = payload as unknown as SessionPayload
 
-    // Ensure role matches sessionType for teacher/admin
-    let role = session.role
-    if (session.sessionType === 'teacher') {
-      role = 'teacher'
-    } else if (session.sessionType === 'admin') {
-      role = 'admin'
-    }
+    // Use role from JWT directly - it's already correctly set during login
+    // sessionType is just for categorization (lti vs teacher login), not for role determination
+    const role = session.role
 
     // Get return URL, user name, and raw LTI role from database for LTI sessions
     let returnUrl: string | null = null

@@ -10,7 +10,8 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "seed:admin": "npx tsx scripts/seed-system-admin.ts"
   },
   "dependencies": {
     "@interlucent/admission-sdk": "^1.0.2",

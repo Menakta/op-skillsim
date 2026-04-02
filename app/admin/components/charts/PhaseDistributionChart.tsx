@@ -5,7 +5,7 @@
  *
  * Horizontal bar chart showing active training sessions by phase.
  * Uses React Query for data fetching with 10-minute cache.
- * Export to PDF available for LTI users only.
+ * Export to PDF available for all teachers and admins.
  */
 
 import { useRef, useState } from 'react'
@@ -88,7 +88,8 @@ export function PhaseDistributionChart({ className = '' }: PhaseDistributionChar
   const { data, isLoading, error } = useTrainingAnalytics()
   const { user } = useCurrentUser()
 
-  const canExport = user?.isLti === true
+  // All teachers and admins can export (both LTI and outsiders)
+  const canExport = user?.role === 'teacher' || user?.role === 'admin'
 
   const barData = data?.phaseCounts.map((item, index) => ({
     phaseKey: item.phaseKey,

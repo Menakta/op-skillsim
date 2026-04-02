@@ -319,6 +319,7 @@ export interface RegisteredUser {
   role: 'student' | 'teacher' | 'admin'
   institution: string | null
   is_confirmed: boolean
+  is_system_admin?: boolean
   created_at: string
   updated_at: string
 }

@@ -57,15 +57,15 @@ async function getSessionFromRequest(request: NextRequest): Promise<SessionInfo 
 }
 
 // =============================================================================
-// Helper: Check if user is LTI Admin (only LTI admins can delete)
+// Helper: Check if user is Admin (only admins can delete results)
 // =============================================================================
 
-function isLtiAdmin(session: SessionInfo | null): boolean {
-  return session !== null && (session.role === 'admin' || session.role === 'teacher') && session.isLti === true
+function isAdmin(session: SessionInfo | null): boolean {
+  return session !== null && session.role === 'admin'
 }
 
 // =============================================================================
-// GET - Get all results from quiz_responses
+// GET - Get all results from quiz_responses (Admin and Teacher can view)
 // =============================================================================
 
 export async function GET(request: NextRequest) {
@@ -79,7 +79,8 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    if (session.role !== 'teacher' && session.role !== 'admin') {
+    // Admin and teachers can view results
+    if (session.role !== 'admin' && session.role !== 'teacher') {
       return NextResponse.json(
         { success: false, error: 'Access denied' },
         { status: 403 }
@@ -301,7 +302,7 @@ export async function GET(request: NextRequest) {
 }
 
 // =============================================================================
-// DELETE - Delete quiz results (single or bulk) - LTI Admin only
+// DELETE - Delete quiz results (single or bulk) - Admin only
 // =============================================================================
 
 export async function DELETE(request: NextRequest) {
@@ -315,10 +316,10 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // Only LTI admins can delete
-    if (!isLtiAdmin(session)) {
+    // Only admins can delete results
+    if (!isAdmin(session)) {
       return NextResponse.json(
-        { success: false, error: 'Access denied. Only LTI administrators can delete results.' },
+        { success: false, error: 'Access denied. Only administrators can delete results.' },
         { status: 403 }
       )
     }
@@ -358,7 +359,7 @@ export async function DELETE(request: NextRequest) {
       deletedCount: deletedIds.length,
       adminEmail: session.email,
       deletedIds,
-    }, 'Quiz results deleted by LTI admin')
+    }, 'Quiz results deleted by admin')
 
     return NextResponse.json({
       success: true,

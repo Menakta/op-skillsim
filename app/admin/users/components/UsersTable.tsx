@@ -7,7 +7,7 @@
  */
 
 import { useMemo } from 'react'
-import { UserCheck, CheckCircle, XCircle, Mail, MailX } from 'lucide-react'
+import { UserCheck, CheckCircle, XCircle, Mail, MailX, Shield } from 'lucide-react'
 import { Card, DataTable, MobileCardList, Badge } from '../../components'
 import type { RegisteredUser, ApprovalStatus } from '../../types'
 import { formatDate } from '../../utils'
@@ -74,7 +74,10 @@ export function UsersTable({
     [isAdmin, isPendingApproval, isPendingRole, onApproval, onRoleChange]
   )
 
-  const handleSelectUser = (userId: string) => {
+  const handleSelectUser = (userId: string, isSystemAdmin?: boolean) => {
+    // Prevent selecting system admin for deletion
+    if (isSystemAdmin) return
+
     const newSet = new Set(selectedKeys)
     if (newSet.has(userId)) {
       newSet.delete(userId)
@@ -83,6 +86,30 @@ export function UsersTable({
     }
     onSelectionChange(newSet)
   }
+
+  // Filter out system admins from selection for the DataTable
+  const handleSelectionChange = (keys: Set<string>) => {
+    // Remove any system admin IDs that might have been selected
+    const filteredKeys = new Set<string>()
+    keys.forEach(key => {
+      const user = data.find(u => u.id === key)
+      if (user && !user.is_system_admin) {
+        filteredKeys.add(key)
+      }
+    })
+    onSelectionChange(filteredKeys)
+  }
+
+  // Create a map of disabled rows (system admins)
+  const disabledRows = useMemo(() => {
+    const disabled = new Set<string>()
+    data.forEach(user => {
+      if (user.is_system_admin) {
+        disabled.add(user.id)
+      }
+    })
+    return disabled
+  }, [data])
 
   const emptyDescription =
     searchQuery || statusFilter !== 'all'
@@ -108,7 +135,8 @@ export function UsersTable({
         showActions={false}
         selectable={true}
         selectedKeys={selectedKeys}
-        onSelectionChange={onSelectionChange}
+        onSelectionChange={handleSelectionChange}
+        disabledRows={disabledRows}
       />
 
       {/* Mobile Card List */}
@@ -131,8 +159,12 @@ export function UsersTable({
                 <input
                   type="checkbox"
                   checked={selectedKeys.has(user.id)}
-                  onChange={() => handleSelectUser(user.id)}
-                  className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-[#39BEAE] focus:ring-[#39BEAE] focus:ring-offset-0 cursor-pointer"
+                  onChange={() => handleSelectUser(user.id, user.is_system_admin)}
+                  disabled={user.is_system_admin}
+                  className={`w-4 h-4 rounded border-gray-600 bg-gray-700 text-[#39BEAE] focus:ring-[#39BEAE] focus:ring-offset-0 ${
+                    user.is_system_admin ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                  }`}
+                  title={user.is_system_admin ? 'System admin cannot be deleted' : undefined}
                 />
                 <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center flex-shrink-0">
                   <span className="text-white text-sm font-medium">
@@ -140,9 +172,17 @@ export function UsersTable({
                   </span>
                 </div>
                 <div>
-                  <p className="font-medium theme-text-primary">
-                    {user.full_name || 'No name'}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium theme-text-primary">
+                      {user.full_name || 'No name'}
+                    </p>
+                    {user.is_system_admin && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                        <Shield className="w-3 h-3" />
+                        System
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs theme-text-muted">{user.email}</p>
                 </div>
               </div>
@@ -156,7 +196,7 @@ export function UsersTable({
                 <Badge variant={getRegistrationTypeBadgeVariant(user.registration_type)}>
                   {user.registration_type}
                 </Badge>
-                {isAdmin ? (
+                {isAdmin && !user.is_system_admin ? (
                   <select
                     value={user.role}
                     onChange={(e) => onRoleChange(user.id, e.target.value as UserRole)}
@@ -172,16 +212,27 @@ export function UsersTable({
                 )}
               </div>
 
-              <div className="flex items-center gap-1">
-                {user.approval_status === 'pending' && (
-                  <>
-                    <button
-                      onClick={() => onApproval(user.id, 'approved')}
-                      disabled={isPendingApproval}
-                      className="p-2 text-green-400 hover:bg-green-400/20 rounded-lg transition-colors disabled:opacity-50"
-                    >
-                      <CheckCircle className="w-5 h-5" />
-                    </button>
+              {isAdmin && !user.is_system_admin && (
+                <div className="flex items-center gap-1">
+                  {user.approval_status === 'pending' && (
+                    <>
+                      <button
+                        onClick={() => onApproval(user.id, 'approved')}
+                        disabled={isPendingApproval}
+                        className="p-2 text-green-400 hover:bg-green-400/20 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        <CheckCircle className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => onApproval(user.id, 'rejected')}
+                        disabled={isPendingApproval}
+                        className="p-2 text-red-400 hover:bg-red-400/20 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        <XCircle className="w-5 h-5" />
+                      </button>
+                    </>
+                  )}
+                  {user.approval_status === 'approved' && (
                     <button
                       onClick={() => onApproval(user.id, 'rejected')}
                       disabled={isPendingApproval}
@@ -189,27 +240,18 @@ export function UsersTable({
                     >
                       <XCircle className="w-5 h-5" />
                     </button>
-                  </>
-                )}
-                {user.approval_status === 'approved' && (
-                  <button
-                    onClick={() => onApproval(user.id, 'rejected')}
-                    disabled={isPendingApproval}
-                    className="p-2 text-red-400 hover:bg-red-400/20 rounded-lg transition-colors disabled:opacity-50"
-                  >
-                    <XCircle className="w-5 h-5" />
-                  </button>
-                )}
-                {user.approval_status === 'rejected' && (
-                  <button
-                    onClick={() => onApproval(user.id, 'approved')}
-                    disabled={isPendingApproval}
-                    className="p-2 text-green-400 hover:bg-green-400/20 rounded-lg transition-colors disabled:opacity-50"
-                  >
-                    <CheckCircle className="w-5 h-5" />
-                  </button>
-                )}
-              </div>
+                  )}
+                  {user.approval_status === 'rejected' && (
+                    <button
+                      onClick={() => onApproval(user.id, 'approved')}
+                      disabled={isPendingApproval}
+                      className="p-2 text-green-400 hover:bg-green-400/20 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      <CheckCircle className="w-5 h-5" />
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="flex items-center justify-between mt-2">

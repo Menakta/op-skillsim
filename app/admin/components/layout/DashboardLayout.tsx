@@ -49,13 +49,8 @@ export function DashboardLayout({ children, title, subtitle }: DashboardLayoutPr
         const data = await response.json()
 
         if (data.session) {
-          // Determine role based on sessionType
-          let role: 'teacher' | 'admin' = 'teacher'
-          if (data.session.sessionType === 'admin') {
-            role = 'admin'
-          } else if (data.session.sessionType === 'teacher') {
-            role = 'teacher'
-          }
+          // Use role directly from session (already correctly set during login)
+          const role: 'teacher' | 'admin' = data.session.role === 'admin' ? 'admin' : 'teacher'
 
           const userInfo: UserInfo = {
             id: data.session.userId,
@@ -135,7 +130,7 @@ export function DashboardLayout({ children, title, subtitle }: DashboardLayoutPr
       <Sidebar
         onLogout={handleLogout}
         userName={displayName}
-        userRole={displayRole}
+        userRole={user?.role || 'teacher'}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         isLti={user?.isLti ?? true}
@@ -148,7 +143,7 @@ export function DashboardLayout({ children, title, subtitle }: DashboardLayoutPr
           subtitle={subtitle}
           onMenuClick={() => setSidebarOpen(true)}
           showMenuButton={true}
-          isAdmin={user?.role === 'admin' || user?.role === 'teacher'}
+          isAdmin={user?.role === 'admin'}
         />
         <main className="flex-1 p-2 md:p-3">{children}</main>
       </div>

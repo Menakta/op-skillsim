@@ -61,13 +61,27 @@ export function useCurrentUser() {
 }
 
 /**
- * Check if the current user is an LTI admin or teacher (can perform admin operations)
+ * Check if the current user is an admin (can perform user management operations)
+ * Both LTI and outsider admins can manage users.
+ */
+export function useIsAdmin() {
+  const { user, isLoading } = useCurrentUser()
+
+  return {
+    isAdmin: user?.role === 'admin',
+    isLoading,
+    user,
+  }
+}
+
+/**
+ * @deprecated Use useIsAdmin instead. LTI distinction no longer matters for user management.
  */
 export function useIsLtiAdmin() {
   const { user, isLoading } = useCurrentUser()
 
   return {
-    isLtiAdmin: (user?.role === 'admin' || user?.role === 'teacher') && user?.isLti === true,
+    isLtiAdmin: user?.role === 'admin',
     isLoading,
     user,
   }

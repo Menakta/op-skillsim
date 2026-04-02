@@ -6,7 +6,7 @@
  * Bar chart showing user sessions by role.
  * Supports weekly, monthly, and yearly views.
  * Uses React Query for data fetching with 10-minute cache.
- * Export to PDF available for LTI users only.
+ * Export to PDF available for all teachers and admins.
  */
 
 import { useState, useRef } from 'react'
@@ -98,7 +98,8 @@ export function SessionsChart({ className = '' }: SessionsChartProps) {
   const { data = [], isLoading, error } = useSessionsChart(range)
   const { user } = useCurrentUser()
 
-  const canExport = user?.isLti === true
+  // All teachers and admins can export (both LTI and outsiders)
+  const canExport = user?.role === 'teacher' || user?.role === 'admin'
   const hasData = data.length > 0
 
   const maxValue = Math.max(

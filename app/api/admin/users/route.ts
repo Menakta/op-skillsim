@@ -1,9 +1,10 @@
 /**
  * Admin Users API
  *
- * Endpoints for managing registered users (outsiders).
- * GET: Fetch all registered users from user_profiles
- * PATCH: Update user approval status (sends email notification)
+ * Endpoints for managing registered users.
+ * GET: Fetch all registered users from user_profiles (admin/teacher)
+ * PATCH: Update user approval status or role (admin only)
+ * DELETE: Delete users (admin only)
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -70,20 +71,20 @@ async function validateSession(req: NextRequest): Promise<SessionInfo | null> {
 }
 
 // =============================================================================
-// Helper: Check if user is LTI Admin (only LTI admins can delete)
+// Helper: Check if user is Admin (for user management operations)
 // =============================================================================
 
-function isLtiAdmin(session: SessionInfo | null): boolean {
-  return session !== null && (session.role === 'admin' || session.role === 'teacher') && session.isLti === true
+function isAdmin(session: SessionInfo | null): boolean {
+  return session !== null && session.role === 'admin'
 }
 
 // =============================================================================
-// GET - Fetch all registered users
+// GET - Fetch all registered users (Admin and Teacher can view)
 // =============================================================================
 
 export async function GET(req: NextRequest) {
   try {
-    // Verify admin/teacher session
+    // Verify admin/teacher session - both can view users
     const session = await validateSession(req)
     if (!session || (session.role !== 'admin' && session.role !== 'teacher')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -130,10 +131,10 @@ export async function GET(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
-    // Verify admin/teacher session (admins and teachers can approve/reject/change roles)
+    // Verify admin session (only admins can approve/reject/change roles)
     const session = await validateSession(req)
-    if (!session || (session.role !== 'admin' && session.role !== 'teacher')) {
-      return NextResponse.json({ error: 'Unauthorized - Admin or Teacher access required' }, { status: 401 })
+    if (!session || session.role !== 'admin') {
+      return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 403 })
     }
 
     const body = await req.json()
@@ -163,13 +164,21 @@ export async function PATCH(req: NextRequest) {
     // First, get the current user to check if status is actually changing
     const { data: currentUser, error: fetchError } = await supabase
       .from('user_profiles')
-      .select('email, full_name, approval_status, role')
+      .select('email, full_name, approval_status, role, is_system_admin')
       .eq('id', userId)
-      .single<{ email: string; full_name: string | null; approval_status: string; role: string }>()
+      .single<{ email: string; full_name: string | null; approval_status: string; role: string; is_system_admin: boolean }>()
 
     if (fetchError || !currentUser) {
       logger.error({ error: fetchError, userId }, 'Failed to fetch user for update')
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    // Prevent modifying system admin's role or approval status
+    if (currentUser.is_system_admin) {
+      return NextResponse.json(
+        { error: 'Cannot modify system administrator' },
+        { status: 403 }
+      )
     }
 
     const previousStatus = currentUser.approval_status
@@ -250,7 +259,7 @@ export async function PATCH(req: NextRequest) {
 }
 
 // =============================================================================
-// DELETE - Delete users (single or bulk) - LTI Admin only
+// DELETE - Delete users (single or bulk) - Admin only
 // =============================================================================
 
 export async function DELETE(req: NextRequest) {
@@ -264,10 +273,10 @@ export async function DELETE(req: NextRequest) {
       )
     }
 
-    // Only LTI admins can delete
-    if (!isLtiAdmin(session)) {
+    // Only admins can delete users
+    if (!isAdmin(session)) {
       return NextResponse.json(
-        { success: false, error: 'Access denied. Only LTI administrators can delete users.' },
+        { success: false, error: 'Access denied. Only administrators can delete users.' },
         { status: 403 }
       )
     }
@@ -291,12 +300,18 @@ export async function DELETE(req: NextRequest) {
         // Get user profile first to check if it's safe to delete
         const { data: userProfile, error: fetchError } = await supabase
           .from('user_profiles')
-          .select('email, registration_type')
+          .select('email, registration_type, is_system_admin')
           .eq('id', id)
           .single()
 
         if (fetchError || !userProfile) {
           errors.push(`User ${id} not found`)
+          continue
+        }
+
+        // Prevent deletion of system admin
+        if (userProfile.is_system_admin) {
+          errors.push(`Cannot delete system administrator (${userProfile.email})`)
           continue
         }
 
@@ -348,7 +363,7 @@ export async function DELETE(req: NextRequest) {
       deletedCount: deletedIds.length,
       adminEmail: session.email,
       deletedIds,
-    }, 'Users deleted by LTI admin')
+    }, 'Users deleted by admin')
 
     return NextResponse.json({
       success: true,

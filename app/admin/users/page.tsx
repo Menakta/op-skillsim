@@ -19,7 +19,7 @@ import { ExportDropdown } from '../components/ui/ExportDropdown'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { useUsers, useUpdateUserApproval, useUpdateUserRole, useDeleteUsers } from '../hooks/useAdminQueries'
 import { useExport } from '../hooks/useExport'
-import { useIsLtiAdmin } from '../hooks/useCurrentUser'
+import { useIsAdmin } from '../hooks/useCurrentUser'
 import { useAdmin } from '../context/AdminContext'
 import type { ApprovalFilter, ApprovalStatus } from '../types'
 import { UsersTable, EXPORT_COLUMNS, type UserRole } from './components'
@@ -40,9 +40,10 @@ export default function UsersPage() {
   const updateRole = useUpdateUserRole()
   const deleteUsers = useDeleteUsers()
   const { userRole: currentUserRole } = useAdmin()
-  const { isLtiAdmin } = useIsLtiAdmin()
+  const { isAdmin: isAdminUser } = useIsAdmin()
 
-  const isAdmin = currentUserRole === 'admin'
+  // Only admins can manage users (approve/reject, change roles, delete)
+  const isAdmin = currentUserRole === 'admin' || isAdminUser
 
   // State
   const [searchQuery, setSearchQuery] = useState('')
@@ -165,7 +166,7 @@ export default function UsersPage() {
   return (
     <DashboardLayout title="Registered Users" subtitle="Manage user registrations and approvals">
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-2 mb-3">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 mb-3">
         <StatCard
           label="Total Users"
           value={stats.total}
@@ -190,12 +191,7 @@ export default function UsersPage() {
           icon={<XCircle className="w-5 h-5" />}
           color="red"
         />
-        <StatCard
-          label="Outsiders"
-          value={stats.outsiders}
-          icon={<UserPlus className="w-5 h-5" />}
-          color="purple"
-        />
+       
       </div>
 
       {/* Filters */}
@@ -247,7 +243,7 @@ export default function UsersPage() {
                 selectedCount={selectedUsers.size}
               />
 
-              {isLtiAdmin && selectedUsers.size > 0 && (
+              {isAdmin && selectedUsers.size > 0 && (
                 <button
                   onClick={handleDeleteClick}
                   className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"

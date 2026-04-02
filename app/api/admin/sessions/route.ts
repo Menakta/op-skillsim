@@ -95,15 +95,15 @@ async function getSessionFromRequest(request: NextRequest): Promise<SessionInfo 
 }
 
 // =============================================================================
-// Helper: Check if user is LTI Admin (only LTI admins can delete)
+// Helper: Check if user is Admin (only admins can delete sessions)
 // =============================================================================
 
-function isLtiAdmin(session: SessionInfo | null): boolean {
-  return session !== null && (session.role === 'admin' || session.role === 'teacher') && session.isLti === true
+function isAdmin(session: SessionInfo | null): boolean {
+  return session !== null && session.role === 'admin'
 }
 
 // =============================================================================
-// GET - Get all sessions
+// GET - Get all sessions (Admin and Teacher can view)
 // =============================================================================
 
 export async function GET(request: NextRequest) {
@@ -117,7 +117,8 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    if (session.role !== 'teacher' && session.role !== 'admin') {
+    // Admin and teachers can view sessions
+    if (session.role !== 'admin' && session.role !== 'teacher') {
       return NextResponse.json(
         { success: false, error: 'Access denied' },
         { status: 403 }
@@ -313,7 +314,7 @@ export async function GET(request: NextRequest) {
 }
 
 // =============================================================================
-// DELETE - Delete sessions (single or bulk) - LTI Admin/Teacher only
+// DELETE - Delete sessions (single or bulk) - Admin only
 // =============================================================================
 
 export async function DELETE(request: NextRequest) {
@@ -327,10 +328,10 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // Only LTI admins/teachers can delete
-    if (!isLtiAdmin(session)) {
+    // Only admins can delete sessions
+    if (!isAdmin(session)) {
       return NextResponse.json(
-        { success: false, error: 'Access denied. Only LTI administrators can delete sessions.' },
+        { success: false, error: 'Access denied. Only administrators can delete sessions.' },
         { status: 403 }
       )
     }
@@ -403,7 +404,7 @@ export async function DELETE(request: NextRequest) {
       type,
       adminEmail: session.email,
       deletedIds,
-    }, 'Sessions deleted by LTI admin/teacher')
+    }, 'Sessions deleted by admin')
 
     return NextResponse.json({
       success: true,

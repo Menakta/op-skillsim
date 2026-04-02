@@ -213,31 +213,54 @@ export async function POST(request: NextRequest) {
       // Non-outsider Supabase user (e.g., LTI user logging in directly) - create session
       const sessionId = randomUUID()
       const now = new Date()
-      const expiresAt = new Date(now.getTime() + 3 * 60 * 60 * 1000) // 3 hours (matches LTI)
+      const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000) // 24 hours
 
-      // For students, set isLti: true to enable data saving (training progress, quiz results)
-      const shouldSaveData = profile.role === 'student'
+      // Determine session type based on role
+      const isStudent = profile.role === 'student'
+      const sessionType = isStudent ? 'lti' : 'teacher'
 
-      // Create user_sessions record for students (just like LTI does)
-      if (shouldSaveData) {
-        const supabaseAdmin = getSupabaseAdmin()
-        const ltiContext = {
-          courseId: 'direct-login',
-          courseName: 'OP-Skillsim Plumbing Training',
-          resourceId: 'direct-login',
-          institution: 'Open Polytechnic Kuratini Tuwhera',
-          full_name: profile.full_name || profile.email.split('@')[0],
-        }
+      // Create user_sessions record for ALL roles
+      // supabaseAdmin already declared above
+      const ltiContext = {
+        courseId: 'direct-login',
+        courseName: 'OP-Skillsim Plumbing Training',
+        resourceId: 'direct-login',
+        institution: 'Open Polytechnic Kuratini Tuwhera',
+        full_name: profile.full_name || profile.email.split('@')[0],
+      }
 
+      // Check if a session already exists for this user
+      const { data: existingSession } = await supabaseAdmin
+        .from('user_sessions')
+        .select('id, login_count')
+        .eq('email', profile.email)
+        .eq('status', 'active')
+        .single<{ id: string; login_count: number | null }>()
+
+      if (existingSession) {
+        // Update existing session
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabaseAdmin as any)
+          .from('user_sessions')
+          .update({
+            session_id: sessionId,
+            expires_at: expiresAt.toISOString(),
+            login_count: (existingSession.login_count || 0) + 1,
+            last_login_at: now.toISOString(),
+          })
+          .eq('id', existingSession.id)
+
+        logger.info({ sessionId, email: profile.email, role: profile.role }, 'Updated existing user_session record')
+      } else {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { error: sessionError } = await supabaseAdmin
           .from('user_sessions')
           .insert({
             session_id: sessionId,
             user_id: profile.id,
-            session_type: 'lti',
+            session_type: sessionType,
             email: profile.email,
-            role: 'student',
+            role: profile.role, // Use actual role from profile
             lti_context: ltiContext,
             expires_at: expiresAt.toISOString(),
             status: 'active',
@@ -247,6 +270,8 @@ export async function POST(request: NextRequest) {
 
         if (sessionError) {
           logger.warn({ error: sessionError.message, sessionId }, 'Failed to create user_session record')
+        } else {
+          logger.info({ sessionId, email: profile.email, role: profile.role }, 'Created user_session record')
         }
       }
 
@@ -255,8 +280,8 @@ export async function POST(request: NextRequest) {
         userId: profile.id,
         email: profile.email,
         role: profile.role,
-        sessionType: profile.role === 'student' ? 'lti' : profile.role,
-        isLti: shouldSaveData,
+        sessionType: sessionType,
+        isLti: isStudent, // Only students get isLti: true for data saving
         iat: Math.floor(now.getTime() / 1000),
       })
         .setProtectedHeader({ alg: 'HS256' })
@@ -268,7 +293,7 @@ export async function POST(request: NextRequest) {
         email: profile.email,
         role: profile.role,
         registrationType: profile.registration_type,
-        isLti: shouldSaveData,
+        sessionType,
         sessionId,
       }, 'Non-outsider login successful')
 
@@ -279,7 +304,7 @@ export async function POST(request: NextRequest) {
           email: profile.email,
           name: profile.full_name || email.split('@')[0],
           role: profile.role,
-          isLti: shouldSaveData,
+          isLti: isStudent,
         },
       })
 
