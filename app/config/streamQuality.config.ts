@@ -9,7 +9,7 @@
 // Types
 // =============================================================================
 
-export type StreamQualityPreset = 'auto' | 'low' | 'medium' | 'high' | 'ultra'
+export type StreamQualityPreset = 'auto' | 'low' | 'medium' | 'high' | 'ultra' | '4k'
 
 export interface StreamQualityOption {
   key: StreamQualityPreset
@@ -50,8 +50,14 @@ export const STREAM_QUALITY_OPTIONS: StreamQualityOption[] = [
   {
     key: 'ultra',
     label: '1440p',
-    description: 'Ultra HD quality',
+    description: 'Quad HD quality',
     resolution: { maxWidth: 2560, maxHeight: 1440 }
+  },
+  {
+    key: '4k',
+    label: '4K',
+    description: 'Ultra HD 4K quality',
+    resolution: { maxWidth: 3840, maxHeight: 2160 }
   }
 ]
 

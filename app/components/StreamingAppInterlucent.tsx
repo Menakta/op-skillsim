@@ -83,9 +83,12 @@ import { useTrainingPersistence } from "../hooks/useTrainingPersistence";
 import {
   type StreamQualityPreset,
   STREAM_QUALITY_OPTIONS,
+  getStreamQualityOption,
   loadStreamQuality,
   saveStreamQuality,
 } from "../config/streamQuality.config";
+// Message creation for resolution control
+import { createResolutionMessage } from "../lib/messageTypes";
 
 // =============================================================================
 // Helper Functions
@@ -158,11 +161,6 @@ export default function StreamingAppInterlucent() {
 
   // Stream quality state
   const [streamQuality, setStreamQualityState] = useState<StreamQualityPreset>(() => loadStreamQuality());
-
-  const setStreamQuality = useCallback((preset: StreamQualityPreset) => {
-    setStreamQualityState(preset);
-    saveStreamQuality(preset);
-  }, []);
 
   // Questions context - for getting total question count
   const { questionCount } = useQuestions();
@@ -353,6 +351,21 @@ export default function StreamingAppInterlucent() {
     if (!training.lastMessage) return;
     handleSettingsMessageRef.current(training.lastMessage);
   }, [training.lastMessage]);
+
+  // ==========================================================================
+  // Stream Quality Control - Sends resolution changes to UE5
+  // ==========================================================================
+  const setStreamQuality = useCallback((preset: StreamQualityPreset) => {
+    // Update local state and persist to localStorage
+    setStreamQualityState(preset);
+    saveStreamQuality(preset);
+
+    // Send resolution change to UE5 via message bus
+    const { maxWidth, maxHeight } = getStreamQualityOption(preset).resolution;
+    const message = createResolutionMessage(maxWidth, maxHeight);
+    console.log(`📺 Stream quality changed to ${preset} (${maxWidth}x${maxHeight})`);
+    training.sendRawMessage(message);
+  }, [training.sendRawMessage]);
 
   // ==========================================================================
   // Training Persistence - Auto-save and quiz submission

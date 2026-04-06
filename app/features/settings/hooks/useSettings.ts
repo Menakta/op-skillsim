@@ -235,8 +235,11 @@ export function useSettings(
   // ==========================================================================
 
   const setBandwidthOption = useCallback((option: BandwidthOption) => {
+    const message = createBandwidthMessage(option)
+    console.log(`📡 [Settings] Bandwidth changed to: ${option}`)
+    console.log(`📡 [Settings] Sending to UE5: ${message}`)
     setSettings(prev => ({ ...prev, bandwidthOption: option }))
-    sendMessage(createBandwidthMessage(option))
+    sendMessage(message)
   }, [sendMessage])
 
   // ==========================================================================
