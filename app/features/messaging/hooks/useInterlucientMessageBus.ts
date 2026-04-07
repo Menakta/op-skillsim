@@ -431,8 +431,8 @@ export function useInterlucientMessageBus(
     // Convert string to JSON format
     const payload = stringToJson(message)
 
-    // Always log audio messages for debugging P1-10
-    if (debug || message.includes('audio_volume')) {
+    // Always log audio and bandwidth messages for debugging
+    if (debug || message.includes('audio_volume') || message.includes('bandwidth')) {
       console.log('📤 Sending raw to UE5 (converted):', message, '→', payload)
       console.log('📤 Stream ready:', !!streamRef.current, '| Data channel open:', isDataChannelOpen)
     }

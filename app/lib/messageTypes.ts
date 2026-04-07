@@ -275,7 +275,7 @@ export interface HierarchicalLayerData {
 
 export type GraphicsQuality = 'Low' | 'Medium' | 'High' | 'Epic'
 export type AudioGroup = 'Master' | 'Ambient' | 'SFX'
-export type BandwidthOption = 'Auto' | 'Low Quality' | 'Medium Quality' | 'High Quality'
+export type BandwidthOption = 'Auto' | 'Low' | 'Medium' | 'High' | 'Ultra'
 export type ResolutionPreset = '720p' | '1080p' | '1440p' | '4k'
 
 export interface SettingAppliedData {

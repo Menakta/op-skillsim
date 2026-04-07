@@ -1458,7 +1458,7 @@ function UnifiedSidebarComponent({
                   <h3 className={`text-[11px] sm:text-xs font-medium ${isDark ? 'text-white/70' : 'text-gray-600'}`}>Network Quality</h3>
                 </div>
                 <div className="grid grid-cols-2 gap-1 sm:gap-1.5">
-                  {(['Auto', 'Low Quality', 'Medium Quality', 'High Quality'] as const).map((option) => (
+                  {(['Auto', 'Low', 'Medium', 'High', 'Ultra'] as const).map((option) => (
                     <button
                       key={option}
                       onClick={() => handleSetBandwidthOption(option)}
@@ -1470,7 +1470,7 @@ function UnifiedSidebarComponent({
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                       }`}
                     >
-                      {option.replace(' Quality', '')}
+                      {option}
                     </button>
                   ))}
                 </div>
