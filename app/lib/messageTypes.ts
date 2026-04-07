@@ -296,6 +296,28 @@ export interface SettingsOptionsData {
   [key: string]: unknown
 }
 
+// InfoPoint data - for measurement start/end markers
+export interface InfoPointData {
+  id: string           // e.g., "yjunction_start", "bend_end"
+  visible: boolean     // true = show, false = hide
+  x: number            // normalized X position (0-1)
+  y: number            // normalized Y position (0-1)
+  scale: number        // size scale factor
+  label: string        // text label e.g., "Start Measurement here"
+  [key: string]: unknown
+}
+
+// MeasurementGuidance data - for measurement line overlay
+export interface MeasurementGuidanceData {
+  visible: boolean
+  startX: number       // normalized start X (0-1)
+  startY: number       // normalized start Y (0-1)
+  endX: number         // normalized end X (0-1)
+  endY: number         // normalized end Y (0-1)
+  distance: number     // measurement value
+  [key: string]: unknown
+}
+
 // Resolution mapping
 export const RESOLUTION_MAP: Record<ResolutionPreset, { width: number; height: number }> = {
   '720p': { width: 1280, height: 720 },
@@ -329,6 +351,8 @@ export type IncomingMessageType =
   | 'fps_update'
   | 'setting_applied'
   | 'settings_options'
+  | 'info_point'
+  | 'measurement_guidance'
   | 'unknown'
 
 export interface ParsedMessage {
@@ -557,6 +581,60 @@ function parseDataString(type: IncomingMessageType, dataString: string): Record<
         category: parts[0] || '',
         options: parts[1] ? parts[1].split(',') : []
       } as SettingsOptionsData
+    }
+
+    case 'info_point': {
+      // Format: id:x:y:scale:label OR id:hide
+      // Examples:
+      //   info_point:yjunction_start:0.276:0.473:2.000:Start Measurement here
+      //   info_point:yjunction_start:hide
+      const id = parts[0] || ''
+
+      if (parts[1] === 'hide') {
+        return {
+          id,
+          visible: false,
+          x: 0,
+          y: 0,
+          scale: 1,
+          label: ''
+        } as InfoPointData
+      }
+
+      return {
+        id,
+        visible: true,
+        x: parseFloat(parts[1]) || 0,
+        y: parseFloat(parts[2]) || 0,
+        scale: parseFloat(parts[3]) || 1,
+        label: parts.slice(4).join(':') || '' // Label may contain colons
+      } as InfoPointData
+    }
+
+    case 'measurement_guidance': {
+      // Format: startX:startY:endX:endY:distance OR hide
+      // Examples:
+      //   measurement_guidance:0.557:0.656:0.517:0.676:21.6
+      //   measurement_guidance:hide
+      if (parts[0] === 'hide') {
+        return {
+          visible: false,
+          startX: 0,
+          startY: 0,
+          endX: 0,
+          endY: 0,
+          distance: 0
+        } as MeasurementGuidanceData
+      }
+
+      return {
+        visible: true,
+        startX: parseFloat(parts[0]) || 0,
+        startY: parseFloat(parts[1]) || 0,
+        endX: parseFloat(parts[2]) || 0,
+        endY: parseFloat(parts[3]) || 0,
+        distance: parseFloat(parts[4]) || 0
+      } as MeasurementGuidanceData
     }
 
     default:

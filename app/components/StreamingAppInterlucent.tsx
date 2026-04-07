@@ -62,6 +62,10 @@ const ModalContainer = dynamic(() => import("../components/ModalContainer"), {
   ssr: false,
   loading: () => null,
 });
+const InfoPointOverlayWithState = dynamic(
+  () => import("../features/measurement").then(mod => ({ default: mod.InfoPointOverlayWithState })),
+  { ssr: false, loading: () => null }
+);
 
 // Lazy load hooks - deferred until needed
 import { useTrainingMessagesCompositeInterlucent } from "../hooks/useTrainingMessagesCompositeInterlucent";
@@ -89,6 +93,8 @@ import {
 } from "../config/streamQuality.config";
 // Message creation for resolution control
 import { createResolutionMessage } from "../lib/messageTypes";
+// InfoPoint overlay hook
+import { useInfoPoints } from "../features/measurement";
 
 // =============================================================================
 // Helper Functions
@@ -169,6 +175,12 @@ export default function StreamingAppInterlucent() {
   // Modal Manager - Centralized modal state
   // ==========================================================================
   const modals = useModalManager();
+
+  // ==========================================================================
+  // InfoPoint Overlay - Measurement markers
+  // ==========================================================================
+  const infoPointsManager = useInfoPoints();
+  const streamContainerRef = useRef<HTMLDivElement>(null);
 
   // ==========================================================================
   // Screen Flow - State machine for screen transitions
@@ -323,32 +335,26 @@ export default function StreamingAppInterlucent() {
   useReduxSync(training);
 
   // ==========================================================================
-  // Measurement Guide Modal - Show AFTER quiz closes in Measuring phase (index 2)
+  // Measurement Guide Modal - Show when receiving tool_change:Measuring
   // ==========================================================================
   const measurementGuideShownRef = useRef(false);
-  const wasQuestionOpenRef = useRef(false);
 
   useEffect(() => {
-    const currentIndex = training.state.currentTaskIndex;
-    const isQuestionOpen = modals.isOpen('question');
+    const lastMessage = training.lastMessage;
+    if (!lastMessage) return;
 
-    // Track when question modal closes while in Measuring phase
-    if (wasQuestionOpenRef.current && !isQuestionOpen && currentIndex === 2 && !measurementGuideShownRef.current) {
-      console.log("📏 Quiz closed in Measuring phase - showing measurement guide");
+    // Check if we received tool_change:Measuring message
+    if (lastMessage.type === 'tool_change' && lastMessage.raw.includes('Measuring') && !measurementGuideShownRef.current) {
+      console.log("📏 Received tool_change:Measuring - showing measurement guide");
       measurementGuideShownRef.current = true;
-      // Small delay to let question modal fully close
-      setTimeout(() => {
-        modals.openMeasurementGuide();
-      }, 300);
+      modals.openMeasurementGuide();
     }
 
-    // Reset the shown flag if we leave phase 2 (so it can show again if user returns)
-    if (currentIndex !== 2) {
+    // Reset the flag when tool changes away from Measuring
+    if (lastMessage.type === 'tool_change' && !lastMessage.raw.includes('Measuring')) {
       measurementGuideShownRef.current = false;
     }
-
-    wasQuestionOpenRef.current = isQuestionOpen;
-  }, [training.state.currentTaskIndex, modals]);
+  }, [training.lastMessage, modals]);
 
   // ==========================================================================
   // Settings Hook - UE5 Settings Communication
@@ -378,6 +384,33 @@ export default function StreamingAppInterlucent() {
   useEffect(() => {
     if (!training.lastMessage) return;
     handleSettingsMessageRef.current(training.lastMessage);
+  }, [training.lastMessage]);
+
+  // ==========================================================================
+  // InfoPoint Message Handler - Handle measurement point markers
+  // ==========================================================================
+  const handleInfoPointRef = useRef(infoPointsManager.handleInfoPoint);
+  const handleMeasurementGuidanceRef = useRef(infoPointsManager.handleMeasurementGuidance);
+  handleInfoPointRef.current = infoPointsManager.handleInfoPoint;
+  handleMeasurementGuidanceRef.current = infoPointsManager.handleMeasurementGuidance;
+
+  useEffect(() => {
+    const lastMessage = training.lastMessage;
+    if (!lastMessage) return;
+
+    // Handle info_point messages
+    if (lastMessage.type === 'info_point') {
+      const data = lastMessage.data as import('../lib/messageTypes').InfoPointData;
+      console.log("📍 InfoPoint:", data.id, data.visible ? 'show' : 'hide');
+      handleInfoPointRef.current(data);
+    }
+
+    // Handle measurement_guidance messages
+    if (lastMessage.type === 'measurement_guidance') {
+      const data = lastMessage.data as import('../lib/messageTypes').MeasurementGuidanceData;
+      console.log("📏 MeasurementGuidance:", data.visible ? 'show' : 'hide', data.distance);
+      handleMeasurementGuidanceRef.current(data);
+    }
   }, [training.lastMessage]);
 
   // ==========================================================================
@@ -916,6 +949,7 @@ export default function StreamingAppInterlucent() {
 
       {/* Interlucent Video Stream */}
       <div
+        ref={streamContainerRef}
         style={{
           position: "absolute",
           inset: 0,
@@ -938,6 +972,13 @@ export default function StreamingAppInterlucent() {
           webrtcNegotiationTolerance={15}
           reconnectMode="recover"
           reconnectAttempts={3}
+        />
+
+        {/* InfoPoint Overlay - Measurement markers */}
+        <InfoPointOverlayWithState
+          containerRef={streamContainerRef}
+          infoPoints={infoPointsManager.infoPoints}
+          measurementLine={infoPointsManager.measurementLine}
         />
       </div>
 
