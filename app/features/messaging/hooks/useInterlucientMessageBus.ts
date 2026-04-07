@@ -146,6 +146,10 @@ function stringToJson(messageString: string): Record<string, unknown> {
     case 'pressure_test_start':
       return { type, testType: parts[0] }
 
+    // X-Ray Slider: "xray_slider:Floor:0.5" -> { type, sliderName, value }
+    case 'xray_slider':
+      return { type, sliderName: parts[0], value: parseFloat(parts[1]) || 0 }
+
     // Waypoint Control: "waypoint_control:activate:0" -> { type, action, index }
     case 'waypoint_control':
       if (parts[0] === 'activate' || parts[0] === 'deactivate') {
@@ -258,6 +262,9 @@ function jsonToString(obj: Record<string, unknown>): string | null {
 
     case 'setting_applied':
       return `${type}:${obj.settingType ?? obj.setting ?? ''}:${obj.value ?? ''}:${obj.success ?? false}`
+
+    case 'xray_slider_update':
+      return `${type}:${obj.sliderName ?? ''}:${obj.value ?? 0}`
 
     default:
       // Unknown type - include what we have

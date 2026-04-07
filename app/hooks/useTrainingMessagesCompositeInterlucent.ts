@@ -25,6 +25,7 @@ import { useQuestionFlow } from '@/app/features/questions'
 import { useCameraControl } from '@/app/features/camera'
 import { useExplosionControl } from '@/app/features/explosion'
 import { useLayerControl } from '@/app/features/layers'
+import { useXRaySliderControl } from '@/app/features/xray'
 
 import type { QuestionData, ToolName } from '@/app/lib/messageTypes'
 import { WEB_TO_UE_MESSAGES } from '@/app/lib/messageTypes'
@@ -91,6 +92,10 @@ export interface TrainingState {
   explosionValue: number
   isAnimating: boolean
 
+  // X-Ray slider state
+  xrayFloorValue: number
+  xrayWallValue: number
+
   // Layer state
   layers: { index: number; name: string; visible: boolean; actorCount: number }[]
   hierarchicalGroups: { name: string; visible: boolean; isChild: boolean; actorCount: number; parentName?: string; childIndex?: number }[]
@@ -141,6 +146,7 @@ export function useTrainingMessagesCompositeInterlucent(
   const cameraControl = useCameraControl(messageBus)
   const explosionControl = useExplosionControl(messageBus)
   const layerControl = useLayerControl(messageBus)
+  const xraySliderControl = useXRaySliderControl(messageBus)
 
   // ==========================================================================
   // Combine state (same as PureWeb version)
@@ -178,6 +184,10 @@ export function useTrainingMessagesCompositeInterlucent(
     explosionValue: explosionControl.state.explosionValue,
     isAnimating: explosionControl.state.isAnimating,
 
+    // X-Ray slider state
+    xrayFloorValue: xraySliderControl.state.floorValue,
+    xrayWallValue: xraySliderControl.state.wallValue,
+
     // Layer state
     layers: layerControl.state.layers,
     hierarchicalGroups: layerControl.state.hierarchicalGroups,
@@ -211,6 +221,9 @@ export function useTrainingMessagesCompositeInterlucent(
     // Explosion state
     explosionControl.state.explosionValue,
     explosionControl.state.isAnimating,
+    // X-Ray slider state
+    xraySliderControl.state.floorValue,
+    xraySliderControl.state.wallValue,
     // Layer state
     layerControl.state.layers,
     layerControl.state.hierarchicalGroups,
@@ -288,6 +301,11 @@ export function useTrainingMessagesCompositeInterlucent(
     explodeBuilding: explosionControl.explodeBuilding,
     assembleBuilding: explosionControl.assembleBuilding,
 
+    // X-Ray Slider Control
+    setXRayFloorValue: xraySliderControl.setFloorValue,
+    setXRayWallValue: xraySliderControl.setWallValue,
+    resetXRaySliders: xraySliderControl.resetSliders,
+
     // Waypoint Control
     refreshWaypoints: layerControl.refreshWaypoints,
     activateWaypoint: layerControl.activateWaypoint,
@@ -320,7 +338,8 @@ export function useTrainingMessagesCompositeInterlucent(
       questionFlow,
       cameraControl,
       explosionControl,
-      layerControl
+      layerControl,
+      xraySliderControl
     }
   }
 }

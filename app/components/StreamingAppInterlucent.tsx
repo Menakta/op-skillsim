@@ -769,6 +769,10 @@ export default function StreamingAppInterlucent() {
           trainingState={training.state}
           onSelectPipe={training.selectPipe}
           onSelectPressureTest={training.selectPressureTest}
+          xrayFloorValue={training.state.xrayFloorValue}
+          xrayWallValue={training.state.xrayWallValue}
+          onXRayFloorChange={training.setXRayFloorValue}
+          onXRayWallChange={training.setXRayWallValue}
           forceOpen={forceSidebarOpen}
           forceActiveTab={forceSidebarTab}
           onOpenChange={handleSidebarOpenChange}

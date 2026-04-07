@@ -323,6 +323,7 @@ export type IncomingMessageType =
   | 'hierarchical_list'
   | 'layer_update'
   | 'explosion_update'
+  | 'xray_slider_update'
   | 'camera_update'
   | 'error'
   | 'fps_update'

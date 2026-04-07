@@ -118,6 +118,12 @@ interface UnifiedSidebarProps {
   onSelectPipe?: (pipe: string) => void
   onSelectPressureTest?: (testType: 'air-plug' | 'conduct-test') => void
 
+  // X-Ray Slider Props (only used when mode === 'training' and phase 1)
+  xrayFloorValue?: number
+  xrayWallValue?: number
+  onXRayFloorChange?: (value: number) => void
+  onXRayWallChange?: (value: number) => void
+
   // External control props (for walkthrough integration)
   /** Force open/close the sidebar from parent component */
   forceOpen?: boolean
@@ -227,6 +233,12 @@ function UnifiedSidebarComponent({
   trainingState,
   onSelectPipe,
   onSelectPressureTest,
+
+  // X-Ray slider props
+  xrayFloorValue = 0,
+  xrayWallValue = 0,
+  onXRayFloorChange,
+  onXRayWallChange,
 
   // External control props
   forceOpen,
@@ -373,11 +385,13 @@ function UnifiedSidebarComponent({
 
   // Determine if current phase requires inventory (material selection)
   const currentTool = trainingState?.selectedTool
-  const requiresInventory = currentTool === 'PipeConnection' || currentTool === 'PressureTester'
+  const requiresInventory = currentTool === 'PipeConnection' || currentTool === 'PressureTester' || currentTool === 'XRay'
 
   // Determine which materials are enabled based on current phase
+  // X-Ray sliders are only enabled during XRay phase (index 0)
   // Pipes are only enabled during PipeConnection phase (index 3)
   // Pressure test is only enabled during PressureTester phase (index 5)
+  const isXRayEnabled = currentTool === 'XRay'
   const isPipesEnabled = currentTool === 'PipeConnection'
   const isPressureTestEnabled = currentTool === 'PressureTester'
 
@@ -741,6 +755,55 @@ function UnifiedSidebarComponent({
                   Training paused - controls disabled
                 </div>
               )}
+
+              {/* X-Ray Sliders (Phase 1 only) */}
+              <div className={!isXRayEnabled || isPaused ? 'opacity-50 pointer-events-none' : ''}>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className={`text-[11px] sm:text-xs font-medium flex items-center gap-1.5 sm:gap-2 ${isDark ? 'text-white/70' : 'text-gray-600'}`}>
+                    <Eye className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                    X-Ray Controls
+                  </h3>
+                  {!isXRayEnabled && (
+                    <span className={`text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded ${isDark ? 'bg-white/10 text-white/40' : 'bg-gray-200 text-gray-400'}`}>
+                      Phase 1
+                    </span>
+                  )}
+                </div>
+                <div className="space-y-3">
+                  {/* Floor Slider */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className={`text-[10px] sm:text-xs ${isDark ? 'text-white/50' : 'text-gray-500'}`}>Floor</label>
+                      <span className={`text-[10px] sm:text-xs font-mono ${isDark ? 'text-white/70' : 'text-gray-600'}`}>{Math.round(xrayFloorValue * 100)}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={xrayFloorValue * 100}
+                      onChange={(e) => isXRayEnabled && onXRayFloorChange?.(Number(e.target.value) / 100)}
+                      disabled={!isXRayEnabled || isPaused}
+                      className={`w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-[#39BEAE] ${isDark ? 'bg-gray-700' : 'bg-gray-300'} ${!isXRayEnabled ? 'cursor-not-allowed' : ''}`}
+                    />
+                  </div>
+                  {/* Wall Slider */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className={`text-[10px] sm:text-xs ${isDark ? 'text-white/50' : 'text-gray-500'}`}>Wall</label>
+                      <span className={`text-[10px] sm:text-xs font-mono ${isDark ? 'text-white/70' : 'text-gray-600'}`}>{Math.round(xrayWallValue * 100)}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={xrayWallValue * 100}
+                      onChange={(e) => isXRayEnabled && onXRayWallChange?.(Number(e.target.value) / 100)}
+                      disabled={!isXRayEnabled || isPaused}
+                      className={`w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-[#39BEAE] ${isDark ? 'bg-gray-700' : 'bg-gray-300'} ${!isXRayEnabled ? 'cursor-not-allowed' : ''}`}
+                    />
+                  </div>
+                </div>
+              </div>
 
               {/* Pipe Selection */}
               <div className={!isPipesEnabled || isPaused ? 'opacity-50 pointer-events-none' : ''}>
