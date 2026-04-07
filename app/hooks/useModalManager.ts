@@ -30,6 +30,7 @@ export type ModalType =
   | 'sessionEnd'
   | 'sessionExpiry'
   | 'quitTraining'
+  | 'measurementGuide'
   // Note: IdleWarningModal is controlled by useIdleDetection hook, not this manager
 
 // Modal-specific data types
@@ -81,6 +82,7 @@ export interface UseModalManagerReturn {
   openSessionEnd: (reason: SessionEndData['reason']) => void
   openSessionExpiry: () => void
   openQuitTraining: () => void
+  openMeasurementGuide: () => void
 
   // Close modal
   close: () => void
@@ -247,6 +249,20 @@ export function useModalManager(): UseModalManagerReturn {
     }))
   }, [])
 
+  const openMeasurementGuide = useCallback(() => {
+    setState(prev => {
+      // Don't open measurement guide if a question or other important modal is open
+      if (prev.activeModal === 'question' || prev.activeModal === 'trainingComplete') {
+        console.log(`⚠️ [useModalManager] ${prev.activeModal} modal is open - skipping MeasurementGuide modal`)
+        return prev
+      }
+      return {
+        ...prev,
+        activeModal: 'measurementGuide',
+      }
+    })
+  }, [])
+
   // ==========================================================================
   // Close Modals
   // ==========================================================================
@@ -299,6 +315,7 @@ export function useModalManager(): UseModalManagerReturn {
     openSessionEnd,
     openSessionExpiry,
     openQuitTraining,
+    openMeasurementGuide,
 
     // Closers
     close,
@@ -322,6 +339,7 @@ export function useModalManager(): UseModalManagerReturn {
     openSessionEnd,
     openSessionExpiry,
     openQuitTraining,
+    openMeasurementGuide,
     close,
     closeModal,
   ])

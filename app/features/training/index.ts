@@ -6,6 +6,7 @@
 
 // Components
 export { CompletionPopup } from './components/CompletionPopup'
+export { MeasurementGuideModal } from './components/MeasurementGuideModal'
 
 // Hooks
 export { useTrainingState } from './hooks/useTrainingState'

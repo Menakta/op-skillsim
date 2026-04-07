@@ -56,6 +56,10 @@ const IdleWarningModal = dynamic(
   () => import('../features/idle').then(mod => ({ default: mod.IdleWarningModal })),
   { ssr: false, loading: () => null }
 )
+const MeasurementGuideModal = dynamic(
+  () => import('../features/training').then(mod => ({ default: mod.MeasurementGuideModal })),
+  { ssr: false, loading: () => null }
+)
 
 // =============================================================================
 // Types
@@ -251,6 +255,12 @@ export default function ModalContainer({
         currentPhase={trainingState.currentTaskIndex}
         totalPhases={trainingState.totalTasks}
         isLti={isLtiSession}
+      />
+
+      {/* Measurement Guide Modal - Shows when entering Measuring phase */}
+      <MeasurementGuideModal
+        isOpen={modals.isOpen('measurementGuide')}
+        onClose={() => modals.closeModal('measurementGuide')}
       />
     </>
   )

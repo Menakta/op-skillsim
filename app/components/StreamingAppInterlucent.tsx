@@ -323,6 +323,34 @@ export default function StreamingAppInterlucent() {
   useReduxSync(training);
 
   // ==========================================================================
+  // Measurement Guide Modal - Show AFTER quiz closes in Measuring phase (index 2)
+  // ==========================================================================
+  const measurementGuideShownRef = useRef(false);
+  const wasQuestionOpenRef = useRef(false);
+
+  useEffect(() => {
+    const currentIndex = training.state.currentTaskIndex;
+    const isQuestionOpen = modals.isOpen('question');
+
+    // Track when question modal closes while in Measuring phase
+    if (wasQuestionOpenRef.current && !isQuestionOpen && currentIndex === 2 && !measurementGuideShownRef.current) {
+      console.log("📏 Quiz closed in Measuring phase - showing measurement guide");
+      measurementGuideShownRef.current = true;
+      // Small delay to let question modal fully close
+      setTimeout(() => {
+        modals.openMeasurementGuide();
+      }, 300);
+    }
+
+    // Reset the shown flag if we leave phase 2 (so it can show again if user returns)
+    if (currentIndex !== 2) {
+      measurementGuideShownRef.current = false;
+    }
+
+    wasQuestionOpenRef.current = isQuestionOpen;
+  }, [training.state.currentTaskIndex, modals]);
+
+  // ==========================================================================
   // Settings Hook - UE5 Settings Communication
   // ==========================================================================
   const handleSettingApplied = useCallback((settingType: string, value: string, success: boolean) => {

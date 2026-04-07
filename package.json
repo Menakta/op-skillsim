@@ -18,6 +18,8 @@
     "@pureweb/platform-admin-sdk": "^5.0.5",
     "@pureweb/platform-sdk": "^5.0.5",
     "@pureweb/platform-sdk-react": "^5.0.5",
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.5.0",
     "@reduxjs/toolkit": "^2.11.2",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.89.0",
@@ -31,13 +33,15 @@
     "jspdf": "^4.0.0",
     "jspdf-autotable": "^5.0.7",
     "libphonenumber-js": "^1.12.36",
+    "lottie-react": "^2.4.1",
     "lucide-react": "^0.561.0",
     "next": "16.0.7",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-redux": "^9.2.0",
     "recharts": "^3.6.0",
-    "resend": "^6.7.0"
+    "resend": "^6.7.0",
+    "three": "^0.183.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
