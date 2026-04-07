@@ -385,13 +385,14 @@ function UnifiedSidebarComponent({
 
   // Determine if current phase requires inventory (material selection)
   const currentTool = trainingState?.selectedTool
-  const requiresInventory = currentTool === 'PipeConnection' || currentTool === 'PressureTester' || currentTool === 'XRay'
+  const currentTaskIndex = trainingState?.currentTaskIndex ?? -1
+  const requiresInventory = currentTool === 'PipeConnection' || currentTool === 'PressureTester' || currentTool === 'XRay' || currentTaskIndex === 0
 
   // Determine which materials are enabled based on current phase
-  // X-Ray sliders are only enabled during XRay phase (index 0)
+  // X-Ray sliders are only enabled during XRay phase (index 0) - check both tool AND task index
   // Pipes are only enabled during PipeConnection phase (index 3)
   // Pressure test is only enabled during PressureTester phase (index 5)
-  const isXRayEnabled = currentTool === 'XRay'
+  const isXRayEnabled = currentTool === 'XRay' || currentTaskIndex === 0
   const isPipesEnabled = currentTool === 'PipeConnection'
   const isPressureTestEnabled = currentTool === 'PressureTester'
 
