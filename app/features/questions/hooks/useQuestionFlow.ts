@@ -212,6 +212,15 @@ export function useQuestionFlow(
       return { correct: true, message: question.explanation }
     } else {
       setState(prev => ({ ...prev, questionTryCount: prev.questionTryCount + 1 }))
+
+      // Send incorrect answer to UE5 only for pressure tester phase (Q6)
+      // UE5 needs to know about failed attempts to re-ask the question
+      if (question.id === 'Q6') {
+        const wrongMessage = `${question.id}:${state.questionTryCount}:false`
+        messageBus.sendMessage(WEB_TO_UE_MESSAGES.QUESTION_ANSWER, wrongMessage)
+        console.log('📝 [useQuestionFlow] Sent incorrect answer to UE5 (pressure tester):', wrongMessage)
+      }
+
       return { correct: false, message: 'Incorrect. Try again!' }
     }
   }, [state.currentQuestion, state.questionTryCount, messageBus, questionCount])
