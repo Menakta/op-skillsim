@@ -127,6 +127,10 @@ function MessageLogComponent({
     { label: 'Test', msg: 'training_control:test' },
     { label: 'XRay', msg: 'tool_select:XRay' },
     { label: 'Shovel', msg: 'tool_select:Shovel' },
+    { label: 'Measuring', msg: 'tool_select:Measuring' },
+    { label: 'PipeConnection', msg: 'tool_select:PipeConnection' },
+    { label: 'Glue', msg: 'tool_select:Glue' },
+    { label: 'PressureTester', msg: 'tool_select:PressureTester' },
     { label: 'Layers', msg: 'hierarchical_control:list' },
     { label: 'Waypoints', msg: 'waypoint_control:list' },
     { label: 'Camera', msg: 'camera_control:IsometricNE' }

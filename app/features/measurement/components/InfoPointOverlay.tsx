@@ -3,8 +3,10 @@
 /**
  * InfoPointOverlay Component
  *
- * Displays measurement start/end point markers on the stream.
- * Points are positioned using normalized coordinates (0-1) from UE5.
+ * Displays measurement guidance on the stream:
+ * - Info point markers: clickable icons that open explanation bubbles
+ * - Animated measurement line: draws A->B, fades out, repeats 3 times
+ *   with a "measure here" label
  */
 
 import { useEffect, useState, useCallback, useRef } from 'react'
@@ -47,10 +49,8 @@ export function useInfoPoints() {
       const next = new Map(prev)
 
       if (!data.visible) {
-        // Hide/remove the point
         next.delete(data.id)
       } else {
-        // Show/update the point
         next.set(data.id, {
           ...data,
           timestamp: Date.now()
@@ -87,7 +87,7 @@ export function useInfoPoints() {
 }
 
 // =============================================================================
-// Component: InfoPointMarker
+// Component: InfoPointMarker (clickable info bubble)
 // =============================================================================
 
 interface InfoPointMarkerProps {
@@ -99,155 +99,241 @@ interface InfoPointMarkerProps {
 function InfoPointMarker({ point, containerWidth, containerHeight }: InfoPointMarkerProps) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
+  const [showBubble, setShowBubble] = useState(false)
+  const bubbleRef = useRef<HTMLDivElement>(null)
 
   // Convert normalized coordinates to pixels
   const x = point.x * containerWidth
   const y = point.y * containerHeight
 
-  // Determine if this is a start or end point based on id
+  // Determine if this is a start (A) or end (B) point
   const isStart = point.id.includes('start')
-  const color = isStart ? '#39BEAE' : '#79CFC2'
-
-  // Scale the marker size
-  const baseSize = 16
+  const letter = isStart ? 'A' : 'B'
+  const color = '#39BEAE'
+  const baseSize = 20
   const size = baseSize * (point.scale || 1)
+
+  // Close bubble on click outside
+  useEffect(() => {
+    if (!showBubble) return
+    const handleClick = (e: MouseEvent) => {
+      if (bubbleRef.current && !bubbleRef.current.contains(e.target as Node)) {
+        setShowBubble(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [showBubble])
 
   return (
     <div
-      className="absolute pointer-events-none animate-in fade-in zoom-in duration-300"
+      className="absolute"
       style={{
         left: x,
         top: y,
         transform: 'translate(-50%, -50%)',
-        zIndex: 100,
+        zIndex: 10,
       }}
+      ref={bubbleRef}
     >
-      {/* Outer pulsing ring */}
-      <div
-        className="absolute rounded-full animate-ping"
-        style={{
-          width: size * 2.5,
-          height: size * 2.5,
-          left: '50%',
-          top: '50%',
-          transform: 'translate(-50%, -50%)',
-          backgroundColor: color,
-          opacity: 0.3,
-        }}
-      />
-
-      {/* Middle ring */}
+      {/* Soft pulsing glow behind the marker */}
       <div
         className="absolute rounded-full"
         style={{
-          width: size * 1.8,
-          height: size * 1.8,
+          width: size * 2.2,
+          height: size * 2.2,
           left: '50%',
           top: '50%',
           transform: 'translate(-50%, -50%)',
           backgroundColor: color,
-          opacity: 0.4,
+          opacity: 0.15,
+          animation: 'infoGlow 2s ease-in-out infinite',
         }}
       />
 
-      {/* Inner dot */}
-      <div
-        className="absolute rounded-full shadow-lg"
+      {/* Clickable point marker with A/B letter */}
+      <button
+        onClick={() => setShowBubble(prev => !prev)}
+        className="relative flex items-center justify-center rounded-full cursor-pointer transition-transform duration-200 hover:scale-110 active:scale-95"
         style={{
-          width: size,
-          height: size,
+          width: size * 1.4,
+          height: size * 1.4,
+          backgroundColor: color,
+          boxShadow: `0 0 ${size * 0.6}px ${color}, 0 2px 8px rgba(0,0,0,0.3)`,
+          border: '2px solid rgba(255,255,255,0.8)',
+          position: 'relative',
           left: '50%',
           top: '50%',
           transform: 'translate(-50%, -50%)',
-          backgroundColor: color,
-          boxShadow: `0 0 ${size}px ${color}`,
         }}
-      />
+        aria-label={`Measurement point ${letter}`}
+      >
+        <span
+          className="text-white font-bold select-none"
+          style={{ fontSize: size * 0.55, lineHeight: 1 }}
+        >
+          {letter}
+        </span>
+      </button>
 
-      {/* Label */}
-      {point.label && (
+      {/* Info bubble */}
+      {showBubble && (
         <div
-          className="absolute whitespace-nowrap px-2 py-1 rounded-md text-xs font-medium shadow-lg"
+          className="absolute whitespace-normal px-4 py-3 rounded-xl text-sm shadow-2xl animate-in fade-in zoom-in duration-200"
           style={{
             left: '50%',
-            top: size * 1.5 + 8,
-            transform: 'translateX(-50%)',
-            backgroundColor: isDark ? 'rgba(13, 29, 64, 0.9)' : 'rgba(255, 255, 255, 0.95)',
-            color: isDark ? '#fff' : '#0D1D40',
-            border: `1px solid ${color}`,
+            top: -(size * 1.2 + 12),
+            transform: 'translateX(-50%) translateY(-100%)',
+            width: 220,
+            backgroundColor: isDark ? 'rgba(13, 29, 64, 0.95)' : 'rgba(255, 255, 255, 0.97)',
+            color: isDark ? '#e2e8f0' : '#1e293b',
+            border: `1.5px solid ${color}`,
+            backdropFilter: 'blur(12px)',
+            zIndex: 100,
           }}
         >
-          {point.label}
+          {/* Arrow pointing down */}
+          <div
+            className="absolute"
+            style={{
+              left: '50%',
+              bottom: -6,
+              transform: 'translateX(-50%) rotate(45deg)',
+              width: 12,
+              height: 12,
+              backgroundColor: isDark ? 'rgba(13, 29, 64, 0.95)' : 'rgba(255, 255, 255, 0.97)',
+              borderRight: `1.5px solid ${color}`,
+              borderBottom: `1.5px solid ${color}`,
+            }}
+          />
+          <div className="font-semibold mb-1" style={{ color }}>
+            Point {letter}
+          </div>
+          <div className="leading-snug opacity-90 text-xs">
+            Measure the distance between the pipes in the main line. Place your tape at this point.
+          </div>
         </div>
       )}
-
-      {/* Point letter indicator (A for start, B for end) */}
-      <div
-        className="absolute flex items-center justify-center rounded-full text-white text-xs font-bold"
-        style={{
-          width: size * 0.9,
-          height: size * 0.9,
-          left: '50%',
-          top: '50%',
-          transform: 'translate(-50%, -50%)',
-          backgroundColor: 'transparent',
-        }}
-      >
-        {isStart ? 'A' : 'B'}
-      </div>
     </div>
   )
 }
 
 // =============================================================================
-// Component: MeasurementLineOverlay
+// Helper: extract paired info points for animated lines
+// Pairs are matched by prefix: e.g. "yjunction_start" <-> "yjunction_end"
 // =============================================================================
 
-interface MeasurementLineOverlayProps {
-  line: MeasurementLine
+function getPairedLines(infoPoints: Map<string, InfoPoint>): { prefix: string; start: InfoPoint; end: InfoPoint }[] {
+  const byPrefix = new Map<string, { start?: InfoPoint; end?: InfoPoint }>()
+
+  for (const point of infoPoints.values()) {
+    const isStart = point.id.endsWith('_start')
+    const isEnd = point.id.endsWith('_end')
+    if (!isStart && !isEnd) continue
+
+    const prefix = point.id.replace(/_start$|_end$/, '')
+    const entry = byPrefix.get(prefix) || {}
+    if (isStart) entry.start = point
+    if (isEnd) entry.end = point
+    byPrefix.set(prefix, entry)
+  }
+
+  const pairs: { prefix: string; start: InfoPoint; end: InfoPoint }[] = []
+  for (const [prefix, { start, end }] of byPrefix) {
+    if (start && end) pairs.push({ prefix, start, end })
+  }
+  return pairs
+}
+
+// =============================================================================
+// Component: AnimatedMeasurementLine
+// Draws from start->end info point positions (updates with camera movement).
+// Uses CSS animations for draw/fade/repeat since coordinates update every frame.
+// =============================================================================
+
+interface AnimatedMeasurementLineProps {
+  startPoint: InfoPoint
+  endPoint: InfoPoint
+  pairKey: string
   containerWidth: number
   containerHeight: number
 }
 
-function MeasurementLineOverlay({ line, containerWidth, containerHeight }: MeasurementLineOverlayProps) {
+function AnimatedMeasurementLine({ startPoint, endPoint, pairKey, containerWidth, containerHeight }: AnimatedMeasurementLineProps) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
 
-  // Convert normalized coordinates to pixels
-  const startX = line.startX * containerWidth
-  const startY = line.startY * containerHeight
-  const endX = line.endX * containerWidth
-  const endY = line.endY * containerHeight
+  // Convert normalized coordinates to pixels — updates every render as camera moves
+  const startX = startPoint.x * containerWidth
+  const startY = startPoint.y * containerHeight
+  const endX = endPoint.x * containerWidth
+  const endY = endPoint.y * containerHeight
 
-  // Calculate line properties
   const dx = endX - startX
   const dy = endY - startY
   const length = Math.sqrt(dx * dx + dy * dy)
-  const angle = Math.atan2(dy, dx) * (180 / Math.PI)
 
-  // Midpoint for distance label
+  // Midpoint for label
   const midX = (startX + endX) / 2
   const midY = (startY + endY) / 2
 
+  const color = '#39BEAE'
+
+  // CSS animation: draw, hold, fade — repeats 3 times
+  // We use CSS for the opacity cycle and inline stroke-dashoffset for the draw.
+  // Because coordinates change every frame (camera moves), we can't use SVG SMIL
+  // <animate> (it bakes in start/end values). Instead we use CSS @keyframes.
+  const drawDuration = 0.8
+  const holdDuration = 0.6
+  const fadeDuration = 0.5
+  const pauseDuration = 0.3
+  const cycleDuration = drawDuration + holdDuration + fadeDuration + pauseDuration
+
+  const drawPct = (drawDuration / cycleDuration * 100).toFixed(1)
+  const holdEndPct = ((drawDuration + holdDuration) / cycleDuration * 100).toFixed(1)
+  const fadeEndPct = ((drawDuration + holdDuration + fadeDuration) / cycleDuration * 100).toFixed(1)
+  const labelStartPct = ((drawDuration * 0.4) / cycleDuration * 100).toFixed(1)
+
+  const animName = `measureDraw-${pairKey}`
+  const labelAnimName = `measureLabel-${pairKey}`
+
   return (
     <>
-      {/* Measurement line */}
-      <div
-        className="absolute pointer-events-none"
-        style={{
-          left: startX,
-          top: startY,
-          width: length,
-          height: 3,
-          transform: `rotate(${angle}deg)`,
-          transformOrigin: '0 50%',
-          background: 'linear-gradient(90deg, #39BEAE, #79CFC2)',
-          zIndex: 99,
-          boxShadow: '0 0 8px rgba(57, 190, 174, 0.5)',
-        }}
-      />
+      <style>{`
+        @keyframes ${animName} {
+          0% { stroke-dashoffset: ${length}; opacity: 1; }
+          ${drawPct}% { stroke-dashoffset: 0; opacity: 1; }
+          ${holdEndPct}% { stroke-dashoffset: 0; opacity: 1; }
+          ${fadeEndPct}% { stroke-dashoffset: 0; opacity: 0; }
+          100% { stroke-dashoffset: ${length}; opacity: 0; }
+        }
+        @keyframes ${animName}-glow {
+          0% { opacity: 0; }
+          ${drawPct}% { opacity: 0.2; }
+          ${holdEndPct}% { opacity: 0.2; }
+          ${fadeEndPct}% { opacity: 0; }
+          100% { opacity: 0; }
+        }
+        @keyframes ${animName}-dot {
+          0% { opacity: 0; }
+          5% { opacity: 0.9; }
+          ${holdEndPct}% { opacity: 0.8; }
+          ${fadeEndPct}% { opacity: 0; }
+          100% { opacity: 0; }
+        }
+        @keyframes ${labelAnimName} {
+          0% { opacity: 0; transform: translateX(-50%) translateY(4px); }
+          ${labelStartPct}% { opacity: 1; transform: translateX(-50%) translateY(0); }
+          ${holdEndPct}% { opacity: 1; transform: translateX(-50%) translateY(0); }
+          ${fadeEndPct}% { opacity: 0; transform: translateX(-50%) translateY(-4px); }
+          100% { opacity: 0; transform: translateX(-50%) translateY(-4px); }
+        }
+        @keyframes infoGlow {
+          0%, 100% { opacity: 0.1; transform: translate(-50%, -50%) scale(1); }
+          50% { opacity: 0.25; transform: translate(-50%, -50%) scale(1.15); }
+        }
+      `}</style>
 
-      {/* Dashed line effect */}
       <svg
         className="absolute pointer-events-none"
         style={{
@@ -255,50 +341,95 @@ function MeasurementLineOverlay({ line, containerWidth, containerHeight }: Measu
           top: 0,
           width: containerWidth,
           height: containerHeight,
-          zIndex: 98,
+          zIndex: 99,
+          overflow: 'visible',
         }}
       >
+        <defs>
+          <filter id={`lineGlow-${pairKey}`} x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+
+        {/* Background glow line */}
         <line
-          x1={startX}
-          y1={startY}
-          x2={endX}
-          y2={endY}
-          stroke="#39BEAE"
-          strokeWidth="1"
-          strokeDasharray="5,5"
-          opacity="0.5"
+          x1={startX} y1={startY} x2={endX} y2={endY}
+          stroke={color} strokeWidth="6" strokeLinecap="round"
+          filter={`url(#lineGlow-${pairKey})`}
+          style={{
+            animation: `${animName}-glow ${cycleDuration}s ease-in-out 3`,
+            animationFillMode: 'forwards',
+          }}
+        />
+
+        {/* Main drawing line */}
+        <line
+          x1={startX} y1={startY} x2={endX} y2={endY}
+          stroke={color} strokeWidth="3" strokeLinecap="round"
+          strokeDasharray={length}
+          style={{
+            animation: `${animName} ${cycleDuration}s ease-in-out 3`,
+            animationFillMode: 'forwards',
+          }}
+        />
+
+        {/* Start dot */}
+        <circle cx={startX} cy={startY} r="5" fill={color}
+          style={{
+            animation: `${animName}-dot ${cycleDuration}s ease-in-out 3`,
+            animationFillMode: 'forwards',
+          }}
+        />
+
+        {/* End dot */}
+        <circle cx={endX} cy={endY} r="5" fill={color}
+          style={{
+            animation: `${animName}-dot ${cycleDuration}s ease-in-out 3`,
+            animationFillMode: 'forwards',
+          }}
         />
       </svg>
 
-      {/* Distance label */}
-      {line.distance > 0 && (
+      {/* "measure here" label at midpoint */}
+      <div
+        className="absolute pointer-events-none flex items-center justify-center"
+        style={{
+          left: midX,
+          top: midY - 24,
+          transform: 'translateX(-50%)',
+          zIndex: 100,
+          animation: `${labelAnimName} ${cycleDuration}s ease-in-out 3`,
+          animationFillMode: 'forwards',
+        }}
+      >
         <div
-          className="absolute pointer-events-none px-3 py-1.5 rounded-lg text-sm font-bold shadow-lg"
+          className="px-3 py-1.5 rounded-full text-xs font-semibold tracking-wide uppercase"
           style={{
-            left: midX,
-            top: midY - 30,
-            transform: 'translateX(-50%)',
-            backgroundColor: isDark ? 'rgba(13, 29, 64, 0.95)' : 'rgba(255, 255, 255, 0.95)',
-            color: '#39BEAE',
-            border: '2px solid #39BEAE',
-            zIndex: 101,
+            backgroundColor: isDark ? 'rgba(13, 29, 64, 0.9)' : 'rgba(255, 255, 255, 0.95)',
+            color,
+            border: `1.5px solid ${color}`,
+            boxShadow: `0 0 12px rgba(57, 190, 174, 0.3), 0 2px 8px rgba(0,0,0,0.2)`,
+            backdropFilter: 'blur(8px)',
           }}
         >
-          {line.distance.toFixed(1)} mm
+          measure here
         </div>
-      )}
+      </div>
     </>
   )
 }
 
 // =============================================================================
-// Main Component: InfoPointOverlay
+// Component: InfoPointOverlay (bare container, kept for backwards compat)
 // =============================================================================
 
 export function InfoPointOverlay({ containerRef, className = '' }: InfoPointOverlayProps) {
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 })
 
-  // Update container size on resize
   useEffect(() => {
     const updateSize = () => {
       if (containerRef.current) {
@@ -322,8 +453,6 @@ export function InfoPointOverlay({ containerRef, className = '' }: InfoPointOver
     }
   }, [containerRef])
 
-  // This component only provides the visual container
-  // State management is done via useInfoPoints hook
   return (
     <div
       className={`absolute inset-0 pointer-events-none overflow-hidden ${className}`}
@@ -351,7 +480,6 @@ export function InfoPointOverlayWithState({
 }: InfoPointOverlayWithStateProps) {
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 })
 
-  // Update container size on resize
   useEffect(() => {
     const updateSize = () => {
       if (containerRef.current) {
@@ -361,6 +489,7 @@ export function InfoPointOverlayWithState({
     }
 
     updateSize()
+    const timeoutId = setTimeout(updateSize, 100)
 
     const resizeObserver = new ResizeObserver(updateSize)
     if (containerRef.current) {
@@ -370,38 +499,48 @@ export function InfoPointOverlayWithState({
     window.addEventListener('resize', updateSize)
 
     return () => {
+      clearTimeout(timeoutId)
       resizeObserver.disconnect()
       window.removeEventListener('resize', updateSize)
     }
   }, [containerRef])
 
-  if (containerSize.width === 0 || containerSize.height === 0) {
-    return null
-  }
+  const shouldRenderMarkers = containerSize.width > 0 && containerSize.height > 0
 
   return (
     <div
-      className={`absolute inset-0 pointer-events-none overflow-hidden ${className}`}
-      style={{ zIndex: 50 }}
+      className={`absolute inset-0 overflow-hidden ${className}`}
+      style={{
+        zIndex: 20, // Below modals (z-30) but above the stream
+        pointerEvents: 'none',
+      }}
     >
-      {/* Measurement line */}
-      {measurementLine && (
-        <MeasurementLineOverlay
-          line={measurementLine}
-          containerWidth={containerSize.width}
-          containerHeight={containerSize.height}
-        />
-      )}
+      {shouldRenderMarkers && (
+        <>
+          {/* Animated measurement lines derived from info point pairs */}
+          {measurementLine && getPairedLines(infoPoints).map(({ prefix, start, end }) => (
+            <AnimatedMeasurementLine
+              key={prefix}
+              pairKey={prefix}
+              startPoint={start}
+              endPoint={end}
+              containerWidth={containerSize.width}
+              containerHeight={containerSize.height}
+            />
+          ))}
 
-      {/* Info points */}
-      {Array.from(infoPoints.values()).map(point => (
-        <InfoPointMarker
-          key={point.id}
-          point={point}
-          containerWidth={containerSize.width}
-          containerHeight={containerSize.height}
-        />
-      ))}
+          {/* Info point markers */}
+          {Array.from(infoPoints.values()).map(point => (
+            <div key={point.id} style={{ pointerEvents: 'auto' }}>
+              <InfoPointMarker
+                point={point}
+                containerWidth={containerSize.width}
+                containerHeight={containerSize.height}
+              />
+            </div>
+          ))}
+        </>
+      )}
     </div>
   )
 }

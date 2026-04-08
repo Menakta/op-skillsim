@@ -294,6 +294,13 @@ export default function StreamingAppInterlucent() {
           nextTaskIndex,
         );
 
+        // Clear info points and measurement lines when measurement phase completes
+        // Safety net in case individual hide messages are missed
+        if (taskId.includes('MEASUREMENT') || taskId.includes('MEASURING')) {
+          console.log("🧹 Clearing all info points after measurement phase completion");
+          infoPointsManager.clearAll();
+        }
+
         const phasesCompleted = nextTaskIndex;
         console.log("📊 Saving phase completion to database:", { phase: taskId, phasesCompleted });
         trainingSessionService.completePhase({
@@ -335,26 +342,26 @@ export default function StreamingAppInterlucent() {
   useReduxSync(training);
 
   // ==========================================================================
-  // Measurement Guide Modal - Show when receiving tool_change:Measuring
+  // Measurement Guide Modal - Show after Q4 is answered correctly
+  // Q4: "What is the correct slope for drainage pipes?" (Pipe Slope question)
+  // This shows before user enters measuring phase to provide visual guidance
   // ==========================================================================
   const measurementGuideShownRef = useRef(false);
-
+  
   useEffect(() => {
-    const lastMessage = training.lastMessage;
-    if (!lastMessage) return;
+    // Check if Q4 (Pipe Slope) has been answered correctly
+    const q4Answer = training.quizAnswers.find(answer => answer.questionId === 'Q4');
 
-    // Check if we received tool_change:Measuring message
-    if (lastMessage.type === 'tool_change' && lastMessage.raw.includes('Measuring') && !measurementGuideShownRef.current) {
-      console.log("📏 Received tool_change:Measuring - showing measurement guide");
+    if (q4Answer && q4Answer.isCorrect && !measurementGuideShownRef.current) {
+      console.log("📏 Q4 (Pipe Slope) answered correctly - showing measurement guide modal");
       measurementGuideShownRef.current = true;
-      modals.openMeasurementGuide();
-    }
 
-    // Reset the flag when tool changes away from Measuring
-    if (lastMessage.type === 'tool_change' && !lastMessage.raw.includes('Measuring')) {
-      measurementGuideShownRef.current = false;
+      // Question modal auto-closes after 2500ms, wait for it to fully close
+      setTimeout(() => {
+        modals.openMeasurementGuide();
+      }, 2000);
     }
-  }, [training.lastMessage, modals]);
+  }, [training.quizAnswers, modals]);
 
   // ==========================================================================
   // Settings Hook - UE5 Settings Communication
@@ -388,6 +395,9 @@ export default function StreamingAppInterlucent() {
 
   // ==========================================================================
   // InfoPoint Message Handler - Handle measurement point markers
+  // Uses onMessage callback to process EVERY message synchronously,
+  // avoiding the race condition where lastMessage batches drop messages
+  // that arrive in the same React render tick.
   // ==========================================================================
   const handleInfoPointRef = useRef(infoPointsManager.handleInfoPoint);
   const handleMeasurementGuidanceRef = useRef(infoPointsManager.handleMeasurementGuidance);
@@ -395,23 +405,22 @@ export default function StreamingAppInterlucent() {
   handleMeasurementGuidanceRef.current = infoPointsManager.handleMeasurementGuidance;
 
   useEffect(() => {
-    const lastMessage = training.lastMessage;
-    if (!lastMessage) return;
+    const unsubscribe = training.hooks.messageBus.onMessage((message) => {
+      if (message.type === 'info_point') {
+        const data = message.data as import('../lib/messageTypes').InfoPointData;
+        console.log("📍 InfoPoint:", data.id, data.visible ? 'show' : 'hide');
+        handleInfoPointRef.current(data);
+      }
 
-    // Handle info_point messages
-    if (lastMessage.type === 'info_point') {
-      const data = lastMessage.data as import('../lib/messageTypes').InfoPointData;
-      console.log("📍 InfoPoint:", data.id, data.visible ? 'show' : 'hide');
-      handleInfoPointRef.current(data);
-    }
+      if (message.type === 'measurement_guidance') {
+        const data = message.data as import('../lib/messageTypes').MeasurementGuidanceData;
+        console.log("📏 MeasurementGuidance:", data.visible ? 'show' : 'hide', data.distance);
+        handleMeasurementGuidanceRef.current(data);
+      }
+    });
 
-    // Handle measurement_guidance messages
-    if (lastMessage.type === 'measurement_guidance') {
-      const data = lastMessage.data as import('../lib/messageTypes').MeasurementGuidanceData;
-      console.log("📏 MeasurementGuidance:", data.visible ? 'show' : 'hide', data.distance);
-      handleMeasurementGuidanceRef.current(data);
-    }
-  }, [training.lastMessage]);
+    return unsubscribe;
+  }, [training.hooks.messageBus]);
 
   // ==========================================================================
   // Stream Quality Control - Sends resolution changes to UE5
@@ -968,10 +977,11 @@ export default function StreamingAppInterlucent() {
           onTransportSelected={stream.handleTransportSelected}
           swiftJobRequest={true}
           forceRelay={false}
-          queueWaitTolerance={60}
-          webrtcNegotiationTolerance={15}
+          queueWaitTolerance={120}
+          webrtcNegotiationTolerance={30}
           reconnectMode="recover"
-          reconnectAttempts={3}
+          reconnectAttempts={10}
+          reconnectStrategy="exponential-backoff"
         />
 
         {/* InfoPoint Overlay - Measurement markers */}

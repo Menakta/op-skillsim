@@ -171,6 +171,8 @@ export function useInterlucientConnection(
   const tokenFetchedRef = useRef(false)
   const disconnectRetryCountRef = useRef(0)
   const MAX_DISCONNECT_RETRIES = 2 // Try to reconnect up to 2 times before ending session
+  const totalReconnectAttemptsRef = useRef(0)
+  const MAX_TOTAL_RECONNECTS = 5 // Prevent infinite retry loop
 
   // =========================================================================
   // Derived State
@@ -263,7 +265,16 @@ export function useInterlucientConnection(
   }, [])
 
   const reconnect = useCallback(async () => {
-    console.log('🔄 Manual reconnection requested')
+    // Check if max total reconnects exceeded
+    if (totalReconnectAttemptsRef.current >= MAX_TOTAL_RECONNECTS) {
+      console.error(`❌ Maximum total reconnection attempts (${MAX_TOTAL_RECONNECTS}) exceeded`)
+      console.error('💡 Possible causes: Invalid app version, no GPU workers, network issues')
+      onSessionEnd?.('disconnected')
+      return
+    }
+
+    totalReconnectAttemptsRef.current += 1
+    console.log(`🔄 Reconnection attempt ${totalReconnectAttemptsRef.current}/${MAX_TOTAL_RECONNECTS}`)
 
     // Reset state
     setFailureReason(null)
@@ -273,7 +284,7 @@ export function useInterlucientConnection(
     await fetchToken()
 
     // Play will be triggered automatically when token is set
-  }, [fetchToken])
+  }, [fetchToken, onSessionEnd])
 
   // Ref to reconnect for use in handleSessionEnded
   const reconnectRef = useRef(reconnect)
@@ -293,6 +304,7 @@ export function useInterlucientConnection(
         const isFirstConnection = !wasConnectedRef.current
         wasConnectedRef.current = true
         disconnectRetryCountRef.current = 0 // Reset disconnect retry counter on successful connection
+        totalReconnectAttemptsRef.current = 0 // Reset total reconnect counter on successful connection
         onConnected?.(isFirstConnection)
 
         // Get session ID from stream ref
@@ -304,6 +316,14 @@ export function useInterlucientConnection(
       if (newStatus === 'failed') {
         const reason = streamRef.current?.getElement()?.failureReason || null
         setFailureReason(reason)
+
+        // Log detailed error information
+        console.error('❌ Stream failed with reason:', reason)
+        console.error('🔍 Check these common issues:')
+        console.error('  1. Invalid app version (check Interlucent dashboard)')
+        console.error('  2. No GPU workers available')
+        console.error('  3. Invalid admission token')
+        console.error('  4. Network/firewall blocking WebSocket')
       }
     },
     [onConnected]
