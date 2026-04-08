@@ -96,6 +96,21 @@ export function useToolSelection(
           }))
           break
         }
+
+        case 'test_plug_placed': {
+          const plugType = parts[0] || ''
+          console.log('🔌 Plug placed:', plugType)
+          break
+        }
+
+        case 'test_plugs_complete': {
+          const ready = parts[0] === 'true'
+          console.log('🔌 All plugs placed, system ready:', ready)
+          if (ready) {
+            setState(prev => ({ ...prev, airPlugSelected: true }))
+          }
+          break
+        }
       }
     })
 
@@ -221,10 +236,10 @@ export function useToolSelection(
     console.log('🔧 Pressure test selected:', testType)
 
     if (testType === 'air-plug') {
-      // Mark air plug as selected
-      setState(prev => ({ ...prev, airPlugSelected: true }))
+      // Send selection to UE5 — airPlugSelected will be set when UE5 confirms
+      // via test_plugs_complete:true
       messageBus.sendMessage(WEB_TO_UE_MESSAGES.TEST_PLUG_SELECT, 'AirPlug')
-      console.log('✅ Air Plug selection sent to UE5')
+      console.log('✅ Air Plug selection sent to UE5, waiting for confirmation')
     } else if (testType === 'conduct-test') {
       console.log('🔧 Starting conduct test...')
       messageBus.sendMessage(WEB_TO_UE_MESSAGES.PRESSURE_TEST_START, 'air_test')

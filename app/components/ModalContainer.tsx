@@ -181,14 +181,14 @@ export default function ModalContainer({
       {/* Phase Success Modal */}
       <SuccessModal
         isOpen={modals.isOpen('phaseSuccess')}
-        title={modals.completedPhase ? modals.completedPhase.taskName + ' Task Completed' : 'Task Completed'}
+        title={modals.completedPhase ? modals.completedPhase.taskName + ' Complete' : 'Task Completed'}
         message={modals.completedPhase ? `Success!` : ''}
-        successText={modals.completedPhase ? `${modals.completedPhase.taskName} Task completed successfully!` : 'Phase completed successfully!'}
+        successText={modals.completedPhase ? `${modals.completedPhase.taskName} completed successfully! Select the next tool from the toolbar to continue.` : 'Phase completed successfully!'}
         onContinue={phaseActions.continue}
         onRetry={phaseActions.retry}
-        continueButtonText="Continue"
+        continueButtonText="Got it"
         retryButtonText="Retry"
-        showRetryButton={true}
+        showRetryButton={false}
       />
 
       {/* Stream Error Modal */}
@@ -198,9 +198,9 @@ export default function ModalContainer({
         message="Error!"
         errorText={modals.initError || `Unable to connect to stream. Attempted ${RETRY_CONFIG.maxRetries} automatic retries.`}
         onRetry={connectionActions.retry}
-        onClose={connectionActions.refresh}
+        onClose={() => modals.closeModal('error')}
         retryButtonText="Try Again"
-        closeButtonText="Refresh Page"
+        closeButtonText="Dismiss"
         showCloseButton={true}
       />
 

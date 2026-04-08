@@ -266,6 +266,12 @@ function jsonToString(obj: Record<string, unknown>): string | null {
     case 'xray_slider_update':
       return `${type}:${obj.sliderName ?? ''}:${obj.value ?? 0}`
 
+    case 'test_plug_placed':
+      return `${type}:${obj.plugType ?? obj.plug ?? ''}`
+
+    case 'test_plugs_complete':
+      return `${type}:${obj.complete ?? obj.ready ?? obj.value ?? 'true'}`
+
     case 'info_point': {
       const id = (obj.id ?? obj.pointId ?? '') as string
       if (obj.visible === false || obj.hide === true) {

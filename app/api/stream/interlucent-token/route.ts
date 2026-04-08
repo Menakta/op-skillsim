@@ -128,11 +128,11 @@ export async function POST(request: Request) {
         let tokenBuilder = client
           .createToken()
           .withApplication(appId)
-          .withQueueWaitTolerance(60) // 1 min for GPU availability
-          .withRendezvousTolerance(30) // 30s for GPU worker connection
+          .withQueueWaitTolerance(120) // 2 min for GPU availability
+          .withRendezvousTolerance(60) // 60s for GPU worker connection
           .withFlexiblePresenceAllowance(120) // 2 min reconnection grace period
           .withLingerTolerance(30) // 30s - keep worker alive if browser drops
-          .withWebRtcNegotiationTolerance(15) // 15s for WebRTC setup
+          .withWebRtcNegotiationTolerance(45) // 45s for WebRTC setup
           .withSwiftJobRequest(true) // Always use swift job request for faster startup
           .withReference(`session-${effectiveUserId}-${Date.now()}`)
           .expiresIn(600) // 10 min token validity

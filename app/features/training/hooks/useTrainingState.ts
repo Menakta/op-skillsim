@@ -250,8 +250,20 @@ export function useTrainingState(
               callbacksRef.current.onTaskCompleted?.(taskId, nextIndex, completedTaskIndex)
             }, 0)
 
-            // Update phase display
-            if (trainingService.isTrainingComplete(nextIndex)) {
+            // Trigger training completion from task_completed
+            // UE5 doesn't send a separate completion message — OnTrainingCompleted
+            // is broadcast internally but never forwarded to the web.
+            // Check both: nextIndex >= totalTasks (if training_progress already bumped it)
+            // OR this is the last task in the sequence (if task_completed arrived first)
+            const isLastTask = trainingService.isTrainingComplete(nextIndex) ||
+              TASK_SEQUENCE[TASK_SEQUENCE.length - 1]?.taskId === taskId
+
+            if (isLastTask) {
+              console.log(`🎉 TRAINING COMPLETED (via task_completed)! taskId=${taskId}, nextIndex=${nextIndex}`)
+              setTimeout(() => {
+                callbacksRef.current.onTrainingComplete?.(prev.progress, nextIndex, prev.totalTasks)
+                eventBus.emit('training:completed', { totalTasks: prev.totalTasks })
+              }, 0)
               return {
                 ...prev,
                 phase: 'All Tasks Complete'
@@ -450,7 +462,7 @@ export function useTrainingState(
   }, [])
 
   const setCurrentTaskIndex = useCallback((currentTaskIndex: number) => {
-    setState(prev => ({ ...prev, currentTaskIndex }))
+    setState(prev => ({ ...prev, currentTaskIndex, progress: Math.round((currentTaskIndex / prev.totalTasks) * 100) }))
   }, [])
 
   const setTrainingStarted = useCallback((trainingStarted: boolean) => {

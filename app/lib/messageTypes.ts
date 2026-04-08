@@ -79,6 +79,8 @@ export const UE_TO_WEB_MESSAGES = {
 
   // Pressure Test
   PRESSURE_TEST_RESULT: 'pressure_test_result', // passed:pressure:testType (e.g., true:20:air_test)
+  TEST_PLUG_PLACED: 'test_plug_placed',         // plugType (e.g., AirPlug)
+  TEST_PLUGS_COMPLETE: 'test_plugs_complete',   // true/false — all plugs placed, ready for conduct test
 
   // Waypoints
   WAYPOINT_LIST: 'waypoint_list',           // count:index:name,...
@@ -339,6 +341,8 @@ export type IncomingMessageType =
   | 'task_debug'
   | 'question_request'
   | 'pressure_test_result'
+  | 'test_plug_placed'
+  | 'test_plugs_complete'
   | 'waypoint_list'
   | 'waypoint_update'
   | 'layer_list'

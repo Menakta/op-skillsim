@@ -93,10 +93,23 @@ export function QuestionModal({
       }
     } else {
       setWrongAnswer(selectedAnswer)
-      setAnswerFeedback({
-        correct: false,
-        message: result?.message || 'Incorrect. Try again!'
-      })
+
+      // Q6 (Pressure Tester): auto-close after wrong answer so UE5 can reset gauge
+      if (question.id === 'Q6') {
+        setAnswerFeedback({
+          correct: false,
+          message: 'Incorrect. System depressurized. Click Conduct Test to try again.'
+        })
+        autoCloseTimeoutRef.current = setTimeout(() => {
+          autoCloseTimeoutRef.current = null
+          handleClose()
+        }, 1500)
+      } else {
+        setAnswerFeedback({
+          correct: false,
+          message: result?.message || 'Incorrect. Try again!'
+        })
+      }
     }
   }, [selectedAnswer, question, onSubmitAnswer, handleClose])
 

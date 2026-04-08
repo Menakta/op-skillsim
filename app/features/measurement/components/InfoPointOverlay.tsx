@@ -11,7 +11,7 @@
 
 import { useEffect, useState, useCallback, useRef, type ReactNode } from 'react'
 import { useTheme } from '@/app/context/ThemeContext'
-import { Shovel, Wrench, Ruler } from 'lucide-react'
+import { Shovel, Wrench, Ruler, Package, Droplets } from 'lucide-react'
 import type { InfoPointData, MeasurementGuidanceData } from '@/app/lib/messageTypes'
 
 // =============================================================================
@@ -34,8 +34,8 @@ function getInfoPointContent(pointId: string): InfoPointContent {
     return {
       icon: <Shovel className="w-4 h-4" />,
       title: 'Excavation Point',
-      description: 'Begin digging at this location. Ensure the trench meets the required depth and width before proceeding.',
-      color: '#EAB308', // yellow — action/warning
+      description: 'Click on the marked area to start digging.',
+      color: '#39BEAE',
     }
   }
 
@@ -44,6 +44,24 @@ function getInfoPointContent(pointId: string): InfoPointContent {
       icon: <Wrench className="w-4 h-4" />,
       title: 'Access Cap',
       description: 'Open the access cap and fit the air plug securely to prepare for the pressure test.',
+      color: '#39BEAE',
+    }
+  }
+
+  if (id.includes('pipeconnection')) {
+    return {
+      icon: <Package className="w-4 h-4" />,
+      title: 'Pipe Connection',
+      description: 'Select a fitting from the inventory, then position it over the open section. A ghost preview will appear when aligned correctly. Click to attach.',
+      color: '#79CFC2',
+    }
+  }
+
+  if (id.includes('glue')) {
+    return {
+      icon: <Droplets className="w-4 h-4" />,
+      title: 'Glue Application',
+      description: 'Click on each blinking joint to apply adhesive. The glue will seal automatically once applied to all marked spots.',
       color: '#39BEAE',
     }
   }
@@ -143,16 +161,10 @@ interface InfoPointMarkerProps {
 function InfoPointMarker({ point, containerWidth, containerHeight }: InfoPointMarkerProps) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
-  const [showBubble, setShowBubble] = useState(false)
-  const bubbleRef = useRef<HTMLDivElement>(null)
 
-  // Convert normalized coordinates to pixels
   const x = point.x * containerWidth
   const y = point.y * containerHeight
 
-  // Determine point type from the ID
-  // Measurement points: *_start / *_end → show A/B with teal color
-  // Interaction points: ExcavationTip, AccessCapTip, etc. → show icon with contextual color
   const isMeasurementPoint = point.id.endsWith('_start') || point.id.endsWith('_end')
   const isStart = point.id.endsWith('_start')
 
@@ -161,30 +173,33 @@ function InfoPointMarker({ point, containerWidth, containerHeight }: InfoPointMa
   const baseSize = 20
   const size = baseSize * (point.scale || 1)
 
-  // Close bubble on click outside
-  useEffect(() => {
-    if (!showBubble) return
-    const handleClick = (e: MouseEvent) => {
-      if (bubbleRef.current && !bubbleRef.current.contains(e.target as Node)) {
-        setShowBubble(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [showBubble])
-
+  // Use CSS :hover via the group class — no JS events needed, no click blocking
   return (
     <div
-      className="absolute"
+      className="absolute group/marker"
       style={{
         left: x,
         top: y,
         transform: 'translate(-50%, -50%)',
         zIndex: 10,
+        pointerEvents: 'none',
       }}
-      ref={bubbleRef}
     >
-      {/* Soft pulsing glow behind the marker */}
+      {/* Invisible hover target — pointer-events: auto but passes clicks through */}
+      <div
+        className="absolute rounded-full"
+        style={{
+          width: size * 3,
+          height: size * 3,
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -50%)',
+          pointerEvents: 'auto',
+          cursor: 'default',
+        }}
+      />
+
+      {/* Soft pulsing glow */}
       <div
         className="absolute rounded-full"
         style={{
@@ -199,28 +214,22 @@ function InfoPointMarker({ point, containerWidth, containerHeight }: InfoPointMa
         }}
       />
 
-      {/* Clickable point marker with A/B letter */}
-      <button
-        onClick={() => setShowBubble(prev => !prev)}
-        className="relative flex items-center justify-center rounded-full cursor-pointer transition-transform duration-200 hover:scale-110 active:scale-95"
+      {/* Marker circle */}
+      <div
+        className="relative flex items-center justify-center rounded-full transition-transform duration-200 group-hover/marker:scale-110"
         style={{
           width: size * 1.4,
           height: size * 1.4,
           backgroundColor: color,
           boxShadow: `0 0 ${size * 0.6}px ${color}, 0 2px 8px rgba(0,0,0,0.3)`,
           border: '2px solid rgba(255,255,255,0.8)',
-          position: 'relative',
           left: '50%',
           top: '50%',
           transform: 'translate(-50%, -50%)',
         }}
-        aria-label={isMeasurementPoint ? `Measurement point ${isStart ? 'A' : 'B'}` : interactionContent!.title}
       >
         {isMeasurementPoint ? (
-          <span
-            className="text-white font-bold select-none"
-            style={{ fontSize: size * 0.55, lineHeight: 1 }}
-          >
+          <span className="text-white font-bold select-none" style={{ fontSize: size * 0.55, lineHeight: 1 }}>
             {isStart ? 'A' : 'B'}
           </span>
         ) : (
@@ -228,64 +237,63 @@ function InfoPointMarker({ point, containerWidth, containerHeight }: InfoPointMa
             {interactionContent!.icon}
           </span>
         )}
-      </button>
+      </div>
 
-      {/* Info bubble */}
-      {showBubble && (
+      {/* Info bubble — shown on hover via CSS group */}
+      <div
+        className="absolute whitespace-normal rounded-xl text-sm shadow-2xl opacity-0 scale-95 group-hover/marker:opacity-100 group-hover/marker:scale-100 transition-all duration-200"
+        style={{
+          left: '50%',
+          top: -(size * 1.2 + 12),
+          transform: 'translateX(-50%) translateY(-100%)',
+          width: 230,
+          backgroundColor: isDark ? 'rgba(13, 29, 64, 0.95)' : 'rgba(255, 255, 255, 0.97)',
+          color: isDark ? '#e2e8f0' : '#1e293b',
+          border: `1.5px solid ${color}`,
+          backdropFilter: 'blur(12px)',
+          zIndex: 100,
+          pointerEvents: 'none',
+        }}
+      >
+        {/* Arrow pointing down */}
         <div
-          className="absolute whitespace-normal rounded-xl text-sm shadow-2xl animate-in fade-in zoom-in duration-200"
+          className="absolute"
           style={{
             left: '50%',
-            top: -(size * 1.2 + 12),
-            transform: 'translateX(-50%) translateY(-100%)',
-            width: 230,
+            bottom: -6,
+            transform: 'translateX(-50%) rotate(45deg)',
+            width: 12,
+            height: 12,
             backgroundColor: isDark ? 'rgba(13, 29, 64, 0.95)' : 'rgba(255, 255, 255, 0.97)',
-            color: isDark ? '#e2e8f0' : '#1e293b',
-            border: `1.5px solid ${color}`,
-            backdropFilter: 'blur(12px)',
-            zIndex: 100,
+            borderRight: `1.5px solid ${color}`,
+            borderBottom: `1.5px solid ${color}`,
           }}
-        >
-          {/* Arrow pointing down */}
-          <div
-            className="absolute"
-            style={{
-              left: '50%',
-              bottom: -6,
-              transform: 'translateX(-50%) rotate(45deg)',
-              width: 12,
-              height: 12,
-              backgroundColor: isDark ? 'rgba(13, 29, 64, 0.95)' : 'rgba(255, 255, 255, 0.97)',
-              borderRight: `1.5px solid ${color}`,
-              borderBottom: `1.5px solid ${color}`,
-            }}
-          />
+        />
 
-          {isMeasurementPoint ? (
-            <div className="px-4 py-3">
-              <div className="flex items-center gap-2 mb-1">
-                <Ruler className="w-3.5 h-3.5" style={{ color }} />
-                <span className="font-semibold" style={{ color }}>Point {isStart ? 'A' : 'B'}</span>
-              </div>
-              <div className="leading-snug opacity-90 text-xs">
-                Measure the distance between the pipes in the main line. Place your tape at this point.
-              </div>
+        {isMeasurementPoint ? (
+          <div className="px-4 py-3">
+            <div className="flex items-center gap-2 mb-1">
+              <Ruler className="w-3.5 h-3.5" style={{ color }} />
+              <span className="font-semibold" style={{ color }}>Point {isStart ? 'A' : 'B'}</span>
             </div>
-          ) : (
-            <div className="px-4 py-3">
-              <div className="flex items-center gap-2 mb-1.5">
-                <div className="p-1 rounded-md" style={{ backgroundColor: `${color}20` }}>
-                  <span style={{ color }}>{interactionContent!.icon}</span>
-                </div>
-                <span className="font-semibold" style={{ color }}>{interactionContent!.title}</span>
-              </div>
-              <div className="leading-snug opacity-90 text-xs">
-                {interactionContent!.description}
-              </div>
+            <div className="leading-snug opacity-90 text-xs">
+              Measure the distance between the pipes in the main line. Place your tape at this point.
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        ) : (
+          <div className="px-4 py-3">
+            <div className="flex items-center gap-2 mb-1.5">
+              <div className="p-1 rounded-md" style={{ backgroundColor: `${color}20` }}>
+                <span style={{ color }}>{interactionContent!.icon}</span>
+              </div>
+              <span className="font-semibold" style={{ color }}>{interactionContent!.title}</span>
+            </div>
+            <div className="leading-snug opacity-90 text-xs">
+              {interactionContent!.description}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -601,16 +609,17 @@ export function InfoPointOverlayWithState({
             />
           ))}
 
-          {/* Info point markers */}
-          {Array.from(infoPoints.values()).map(point => (
-            <div key={point.id} style={{ pointerEvents: 'auto' }}>
+          {/* Info point markers — only render interaction points, not measurement A/B */}
+          {Array.from(infoPoints.values())
+            .filter(point => !point.id.endsWith('_start') && !point.id.endsWith('_end'))
+            .map(point => (
               <InfoPointMarker
+                key={point.id}
                 point={point}
                 containerWidth={containerSize.width}
                 containerHeight={containerSize.height}
               />
-            </div>
-          ))}
+            ))}
         </>
       )}
     </div>

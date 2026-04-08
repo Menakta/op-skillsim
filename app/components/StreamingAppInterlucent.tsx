@@ -346,16 +346,18 @@ export default function StreamingAppInterlucent() {
   // Q4: "What is the correct slope for drainage pipes?" (Pipe Slope question)
   // This shows before user enters measuring phase to provide visual guidance
   // ==========================================================================
-  // When Q4 is answered correctly, flag it so the guide opens when the question modal closes
+  // NOTE: MeasurementGuideModal is temporarily disabled — kept in code but not triggered.
+  // To re-enable, uncomment the useEffect below and the pendingMeasurementGuideRef check
+  // in questionActions.close().
   const pendingMeasurementGuideRef = useRef(false);
   const measurementGuideShownRef = useRef(false);
 
-  useEffect(() => {
-    const q4Answer = training.quizAnswers.find(answer => answer.questionId === 'Q4');
-    if (q4Answer && q4Answer.isCorrect && !measurementGuideShownRef.current) {
-      pendingMeasurementGuideRef.current = true;
-    }
-  }, [training.quizAnswers]);
+  // useEffect(() => {
+  //   const q4Answer = training.quizAnswers.find(answer => answer.questionId === 'Q4');
+  //   if (q4Answer && q4Answer.isCorrect && !measurementGuideShownRef.current) {
+  //     pendingMeasurementGuideRef.current = true;
+  //   }
+  // }, [training.quizAnswers]);
 
   // ==========================================================================
   // Settings Hook - UE5 Settings Communication
@@ -410,6 +412,24 @@ export default function StreamingAppInterlucent() {
         const data = message.data as import('../lib/messageTypes').MeasurementGuidanceData;
         console.log("📏 MeasurementGuidance:", data.visible ? 'show' : 'hide', data.distance);
         handleMeasurementGuidanceRef.current(data);
+      }
+
+      if (message.type === 'pressure_test_result') {
+        const data = message.data as import('../lib/messageTypes').PressureTestResultData;
+        console.log(`🔧 Pressure test result: ${data.passed ? 'PASSED' : 'FAILED'} at ${data.pressure} PSI`);
+
+        // UE5 doesn't send task_completed or training_progress:100 after the pressure test.
+        // This is the last message we receive, so trigger training completion here
+        // and set progress to 100%.
+        if (data.passed) {
+          console.log('🎉 Pressure test passed — setting progress to 100% and triggering training completion');
+          training.hooks.trainingState.setCurrentTaskIndex(TASK_SEQUENCE.length);
+          if (modals.isOpen("question")) {
+            pendingTrainingCompleteRef.current = true;
+          } else {
+            modals.openTrainingComplete();
+          }
+        }
       }
     });
 
@@ -539,11 +559,7 @@ export default function StreamingAppInterlucent() {
   const phaseActions = useMemo(
     () => ({
       continue: () => {
-        const completedPhase = modals.completedPhase;
-        if (completedPhase && completedPhase.nextTaskIndex < TASK_SEQUENCE.length) {
-          const nextTask = TASK_SEQUENCE[completedPhase.nextTaskIndex];
-          training.selectTool(nextTask.tool);
-        }
+        // Close the modal — user selects the next tool from the toolbar
         modals.closeModal("phaseSuccess");
       },
       retry: () => {
@@ -986,7 +1002,7 @@ export default function StreamingAppInterlucent() {
         <InfoPointOverlayWithState
           containerRef={streamContainerRef}
           infoPoints={infoPointsManager.infoPoints}
-          measurementLine={infoPointsManager.measurementLine}
+          measurementLine={modals.isOpen('question') ? null : infoPointsManager.measurementLine}
         />
       </div>
 
