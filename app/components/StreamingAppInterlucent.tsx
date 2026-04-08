@@ -346,22 +346,16 @@ export default function StreamingAppInterlucent() {
   // Q4: "What is the correct slope for drainage pipes?" (Pipe Slope question)
   // This shows before user enters measuring phase to provide visual guidance
   // ==========================================================================
+  // When Q4 is answered correctly, flag it so the guide opens when the question modal closes
+  const pendingMeasurementGuideRef = useRef(false);
   const measurementGuideShownRef = useRef(false);
-  
+
   useEffect(() => {
-    // Check if Q4 (Pipe Slope) has been answered correctly
     const q4Answer = training.quizAnswers.find(answer => answer.questionId === 'Q4');
-
     if (q4Answer && q4Answer.isCorrect && !measurementGuideShownRef.current) {
-      console.log("📏 Q4 (Pipe Slope) answered correctly - showing measurement guide modal");
-      measurementGuideShownRef.current = true;
-
-      // Question modal auto-closes after 2500ms, wait for it to fully close
-      setTimeout(() => {
-        modals.openMeasurementGuide();
-      }, 2000);
+      pendingMeasurementGuideRef.current = true;
     }
-  }, [training.quizAnswers, modals]);
+  }, [training.quizAnswers]);
 
   // ==========================================================================
   // Settings Hook - UE5 Settings Communication
@@ -532,6 +526,10 @@ export default function StreamingAppInterlucent() {
           setTimeout(() => {
             modals.openTrainingComplete();
           }, 100);
+        } else if (pendingMeasurementGuideRef.current && !measurementGuideShownRef.current) {
+          pendingMeasurementGuideRef.current = false;
+          measurementGuideShownRef.current = true;
+          modals.openMeasurementGuide();
         }
       },
     }),

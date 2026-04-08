@@ -9,9 +9,53 @@
  *   with a "measure here" label
  */
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, type ReactNode } from 'react'
 import { useTheme } from '@/app/context/ThemeContext'
+import { Shovel, Wrench, Ruler } from 'lucide-react'
 import type { InfoPointData, MeasurementGuidanceData } from '@/app/lib/messageTypes'
+
+// =============================================================================
+// Info Point Content Registry
+// Maps point ID prefixes to their display content (icon, title, description).
+// Measurement points (*_start / *_end) are handled separately.
+// =============================================================================
+
+interface InfoPointContent {
+  icon: ReactNode
+  title: string
+  description: string
+  color: string
+}
+
+function getInfoPointContent(pointId: string): InfoPointContent {
+  const id = pointId.toLowerCase()
+
+  if (id.includes('excavation')) {
+    return {
+      icon: <Shovel className="w-4 h-4" />,
+      title: 'Excavation Point',
+      description: 'Begin digging at this location. Ensure the trench meets the required depth and width before proceeding.',
+      color: '#EAB308', // yellow — action/warning
+    }
+  }
+
+  if (id.includes('accesscap')) {
+    return {
+      icon: <Wrench className="w-4 h-4" />,
+      title: 'Access Cap',
+      description: 'Open the access cap and fit the air plug securely to prepare for the pressure test.',
+      color: '#39BEAE',
+    }
+  }
+
+  // Default fallback for unknown interaction points
+  return {
+    icon: <Ruler className="w-4 h-4" />,
+    title: 'Interaction Point',
+    description: 'Interact with this location to continue.',
+    color: '#39BEAE',
+  }
+}
 
 // =============================================================================
 // Types
@@ -106,10 +150,14 @@ function InfoPointMarker({ point, containerWidth, containerHeight }: InfoPointMa
   const x = point.x * containerWidth
   const y = point.y * containerHeight
 
-  // Determine if this is a start (A) or end (B) point
-  const isStart = point.id.includes('start')
-  const letter = isStart ? 'A' : 'B'
-  const color = '#39BEAE'
+  // Determine point type from the ID
+  // Measurement points: *_start / *_end → show A/B with teal color
+  // Interaction points: ExcavationTip, AccessCapTip, etc. → show icon with contextual color
+  const isMeasurementPoint = point.id.endsWith('_start') || point.id.endsWith('_end')
+  const isStart = point.id.endsWith('_start')
+
+  const interactionContent = !isMeasurementPoint ? getInfoPointContent(point.id) : null
+  const color = isMeasurementPoint ? '#39BEAE' : interactionContent!.color
   const baseSize = 20
   const size = baseSize * (point.scale || 1)
 
@@ -166,25 +214,31 @@ function InfoPointMarker({ point, containerWidth, containerHeight }: InfoPointMa
           top: '50%',
           transform: 'translate(-50%, -50%)',
         }}
-        aria-label={`Measurement point ${letter}`}
+        aria-label={isMeasurementPoint ? `Measurement point ${isStart ? 'A' : 'B'}` : interactionContent!.title}
       >
-        <span
-          className="text-white font-bold select-none"
-          style={{ fontSize: size * 0.55, lineHeight: 1 }}
-        >
-          {letter}
-        </span>
+        {isMeasurementPoint ? (
+          <span
+            className="text-white font-bold select-none"
+            style={{ fontSize: size * 0.55, lineHeight: 1 }}
+          >
+            {isStart ? 'A' : 'B'}
+          </span>
+        ) : (
+          <span className="text-white flex items-center justify-center" style={{ width: size * 0.6, height: size * 0.6 }}>
+            {interactionContent!.icon}
+          </span>
+        )}
       </button>
 
       {/* Info bubble */}
       {showBubble && (
         <div
-          className="absolute whitespace-normal px-4 py-3 rounded-xl text-sm shadow-2xl animate-in fade-in zoom-in duration-200"
+          className="absolute whitespace-normal rounded-xl text-sm shadow-2xl animate-in fade-in zoom-in duration-200"
           style={{
             left: '50%',
             top: -(size * 1.2 + 12),
             transform: 'translateX(-50%) translateY(-100%)',
-            width: 220,
+            width: 230,
             backgroundColor: isDark ? 'rgba(13, 29, 64, 0.95)' : 'rgba(255, 255, 255, 0.97)',
             color: isDark ? '#e2e8f0' : '#1e293b',
             border: `1.5px solid ${color}`,
@@ -206,12 +260,30 @@ function InfoPointMarker({ point, containerWidth, containerHeight }: InfoPointMa
               borderBottom: `1.5px solid ${color}`,
             }}
           />
-          <div className="font-semibold mb-1" style={{ color }}>
-            Point {letter}
-          </div>
-          <div className="leading-snug opacity-90 text-xs">
-            Measure the distance between the pipes in the main line. Place your tape at this point.
-          </div>
+
+          {isMeasurementPoint ? (
+            <div className="px-4 py-3">
+              <div className="flex items-center gap-2 mb-1">
+                <Ruler className="w-3.5 h-3.5" style={{ color }} />
+                <span className="font-semibold" style={{ color }}>Point {isStart ? 'A' : 'B'}</span>
+              </div>
+              <div className="leading-snug opacity-90 text-xs">
+                Measure the distance between the pipes in the main line. Place your tape at this point.
+              </div>
+            </div>
+          ) : (
+            <div className="px-4 py-3">
+              <div className="flex items-center gap-2 mb-1.5">
+                <div className="p-1 rounded-md" style={{ backgroundColor: `${color}20` }}>
+                  <span style={{ color }}>{interactionContent!.icon}</span>
+                </div>
+                <span className="font-semibold" style={{ color }}>{interactionContent!.title}</span>
+              </div>
+              <div className="leading-snug opacity-90 text-xs">
+                {interactionContent!.description}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

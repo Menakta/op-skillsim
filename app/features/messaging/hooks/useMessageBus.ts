@@ -49,7 +49,7 @@ export function useMessageBus(
   messageSubject: Subject<string> | undefined,
   config: UseMessageBusConfig = {}
 ): UseMessageBusReturn {
-  const { debug = false, maxLogSize = 100 } = config
+  const { debug = false, maxLogSize = 0 } = config
 
   // State
   const [isConnected, setIsConnected] = useState(false)
@@ -85,7 +85,7 @@ export function useMessageBus(
       raw: message,
       timestamp: Date.now()
     }
-    setMessageLog(prev => [entry, ...prev].slice(0, maxLogSize))
+    setMessageLog(prev => [entry, ...prev])
   }, [emitter, debug, maxLogSize])
 
   // ==========================================================================
@@ -110,7 +110,7 @@ export function useMessageBus(
       raw: message,
       timestamp: Date.now()
     }
-    setMessageLog(prev => [entry, ...prev].slice(0, maxLogSize))
+    setMessageLog(prev => [entry, ...prev])
   }, [emitter, debug, maxLogSize])
 
   // ==========================================================================
@@ -144,7 +144,7 @@ export function useMessageBus(
         raw,
         timestamp: Date.now()
       }
-      setMessageLog(prev => [entry, ...prev].slice(0, maxLogSize))
+      setMessageLog(prev => [entry, ...prev])
 
       // Notify all registered handlers
       messageHandlersRef.current.forEach(handler => {

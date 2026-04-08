@@ -266,6 +266,21 @@ function jsonToString(obj: Record<string, unknown>): string | null {
     case 'xray_slider_update':
       return `${type}:${obj.sliderName ?? ''}:${obj.value ?? 0}`
 
+    case 'info_point': {
+      const id = (obj.id ?? obj.pointId ?? '') as string
+      if (obj.visible === false || obj.hide === true) {
+        return `${type}:${id}:hide`
+      }
+      return `${type}:${id}:${obj.x ?? 0}:${obj.y ?? 0}:${obj.scale ?? 1}:${obj.label ?? ''}`
+    }
+
+    case 'measurement_guidance': {
+      if (obj.visible === false || obj.hide === true) {
+        return `${type}:hide`
+      }
+      return `${type}:${obj.startX ?? 0}:${obj.startY ?? 0}:${obj.endX ?? 0}:${obj.endY ?? 0}:${obj.distance ?? 0}`
+    }
+
     default:
       // Unknown type - include what we have
       if (obj.data !== undefined) {
@@ -347,7 +362,7 @@ export function useInterlucientMessageBus(
   isDataChannelOpen: boolean,
   config: UseInterlucientMessageBusConfig = {}
 ): UseInterlucientMessageBusReturn {
-  const { debug = false, maxLogSize = 100 } = config
+  const { debug = false, maxLogSize = 0 } = config
 
   // State
   const [isConnected, setIsConnected] = useState(false)
@@ -387,7 +402,7 @@ export function useInterlucientMessageBus(
       raw: JSON.stringify(payload),
       timestamp: Date.now()
     }
-    setMessageLog(prev => [entry, ...prev].slice(0, maxLogSize))
+    setMessageLog(prev => [entry, ...prev])
   }, [streamRef, isDataChannelOpen, debug, maxLogSize])
 
   // ==========================================================================
@@ -420,7 +435,7 @@ export function useInterlucientMessageBus(
       raw: JSON.stringify(payload),
       timestamp: Date.now()
     }
-    setMessageLog(prev => [entry, ...prev].slice(0, maxLogSize))
+    setMessageLog(prev => [entry, ...prev])
   }, [streamRef, isDataChannelOpen, debug, maxLogSize])
 
   // ==========================================================================
@@ -452,7 +467,7 @@ export function useInterlucientMessageBus(
       raw: JSON.stringify(payload),
       timestamp: Date.now()
     }
-    setMessageLog(prev => [entry, ...prev].slice(0, maxLogSize))
+    setMessageLog(prev => [entry, ...prev])
   }, [streamRef, isDataChannelOpen, debug, maxLogSize])
 
   // ==========================================================================
@@ -488,7 +503,7 @@ export function useInterlucientMessageBus(
       raw: rawString,
       timestamp: Date.now()
     }
-    setMessageLog(prev => [entry, ...prev].slice(0, maxLogSize))
+    setMessageLog(prev => [entry, ...prev])
 
     // Notify all registered handlers
     messageHandlersRef.current.forEach(handler => {
