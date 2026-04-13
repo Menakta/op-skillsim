@@ -50,6 +50,7 @@ export interface TrainingMessageCallbacks {
   onTrainingComplete?: (progress: number, currentTask: number, totalTasks: number) => void
   onMessage?: (message: { type: string; dataString: string }) => void
   onAutoAdvance?: (nextTool: ToolName, nextTaskIndex: number) => void
+  onQ6WrongAnswer?: (attemptCount: number) => void
 }
 
 export interface UseTrainingMessagesConfig {
@@ -140,7 +141,8 @@ export function useTrainingMessagesCompositeInterlucent(
   })
 
   const questionFlow = useQuestionFlow(messageBus, {
-    onQuestionRequest: callbacks.onQuestionRequest
+    onQuestionRequest: callbacks.onQuestionRequest,
+    onQ6WrongAnswer: callbacks.onQ6WrongAnswer,
   })
 
   const cameraControl = useCameraControl(messageBus)

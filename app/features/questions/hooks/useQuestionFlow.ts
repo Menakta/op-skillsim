@@ -27,6 +27,8 @@ export interface QuestionFlowCallbacks {
   onQuestionRequest?: (questionId: string, question: QuestionData) => void
   onQuizComplete?: (answers: QuizAnswerState[], totalQuestions: number) => void
   onAnswerSaved?: (answer: QuizAnswerState, success: boolean) => void
+  /** Called when Q6 is answered incorrectly (modal will auto-close) */
+  onQ6WrongAnswer?: (attemptCount: number) => void
 }
 
 // =============================================================================
@@ -76,6 +78,11 @@ export function useQuestionFlow(
   // Track when question was displayed for time_to_answer
   const questionStartTimeRef = useRef<number | null>(null)
 
+  // Persist Q6 attempt count across modal close/reopen cycles.
+  // Unlike Q1-Q5 (which stay open on wrong answer), Q6 auto-closes so
+  // the in-state tryCount resets. This ref survives that reset.
+  const q6AttemptCountRef = useRef<number>(0)
+
   // Get questions from context (loaded from Supabase)
   // questionCount is the actual number of quiz questions from database
   const { isLoading: questionsLoading, getQuestion, questionCount } = useQuestions()
@@ -118,9 +125,16 @@ export function useQuestionFlow(
           console.log('Question requested:', questionId, '(from Supabase)')
           // Start timer for time_to_answer tracking
           questionStartTimeRef.current = Date.now()
+
+          // For Q6, restore persisted attempt count from previous tries.
+          // Other questions keep the modal open so tryCount accumulates naturally.
+          const restoredTryCount = questionId === 'Q6' && q6AttemptCountRef.current > 0
+            ? q6AttemptCountRef.current + 1
+            : 1
+
           setState({
             currentQuestion: question,
-            questionTryCount: 1,
+            questionTryCount: restoredTryCount,
             questionAnsweredCorrectly: false
           })
           eventBus.emit('question:asked', { questionId })
@@ -203,6 +217,8 @@ export function useQuestionFlow(
 
       // Special handling for Q6 pressure testing
       if (question.id === 'Q6') {
+        // Reset persisted attempt count — Q6 answered successfully
+        q6AttemptCountRef.current = 0
         console.log('🔧 Q6 ANSWERED CORRECTLY! NEW FLOW:')
         console.log('  → Q6 answer sent to UE5:', answerMessage)
         console.log('  → UE5 will wait for player to close question')
@@ -216,9 +232,15 @@ export function useQuestionFlow(
       // Send incorrect answer to UE5 only for pressure tester phase (Q6)
       // UE5 needs to know about failed attempts to re-ask the question
       if (question.id === 'Q6') {
+        // Persist attempt count so it survives modal auto-close
+        q6AttemptCountRef.current = state.questionTryCount
+
         const wrongMessage = `${question.id}:${state.questionTryCount}:false`
         messageBus.sendMessage(WEB_TO_UE_MESSAGES.QUESTION_ANSWER, wrongMessage)
         console.log('📝 [useQuestionFlow] Sent incorrect answer to UE5 (pressure tester):', wrongMessage)
+
+        // Notify parent so it can show feedback and open sidebar
+        callbacksRef.current.onQ6WrongAnswer?.(state.questionTryCount)
       }
 
       return { correct: false, message: 'Incorrect. Try again!' }
@@ -315,6 +337,7 @@ export function useQuestionFlow(
   // ==========================================================================
 
   const resetQuestionState = useCallback(() => {
+    q6AttemptCountRef.current = 0
     setState(initialState)
   }, [])
 

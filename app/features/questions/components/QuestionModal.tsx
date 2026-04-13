@@ -98,12 +98,12 @@ export function QuestionModal({
       if (question.id === 'Q6') {
         setAnswerFeedback({
           correct: false,
-          message: 'Incorrect. System depressurized. Click Conduct Test to try again.'
+          message: 'Incorrect answer. System depressurized.'
         })
         autoCloseTimeoutRef.current = setTimeout(() => {
           autoCloseTimeoutRef.current = null
           handleClose()
-        }, 1500)
+        }, 2500)
       } else {
         setAnswerFeedback({
           correct: false,
@@ -238,9 +238,9 @@ export function QuestionModal({
           {!answerFeedback?.correct ? (
             <button
               onClick={handleAnswerSubmit}
-              disabled={selectedAnswer === null}
+              disabled={selectedAnswer === null || (question.id === 'Q6' && wrongAnswer !== null)}
               className={`py-2 px-4 rounded-full font-medium transition-all duration-200 ${
-                selectedAnswer !== null
+                selectedAnswer !== null && !(question.id === 'Q6' && wrongAnswer !== null)
                   ? 'bg-[#44CF8A] text-white hover:bg-[#2ea89a] cursor-pointer shadow-lg shadow-[#39BEAE]/20'
                   : isDark
                     ? 'bg-gray-700/50 text-gray-500 cursor-not-allowed'

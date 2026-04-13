@@ -425,10 +425,9 @@ export const InterlucientStream = forwardRef<InterlucientStreamRef, Interlucient
       console.log('🔑 Setting admission token:', admissionToken.substring(0, 50) + '...')
       elementRef.current.admissionToken = admissionToken
 
-      // The component auto-connects when admissionToken is set
-      // play() will be called from user gesture or we can call it here
-      // Note: play() must be called from user gesture for autoplay policy
-      console.log('📡 Token set, component will auto-connect')
+      // Token is set but play() must be called explicitly to start streaming.
+      // StreamingAppInterlucent calls stream.play() via useEffect after token is ready.
+      console.log('📡 Token set, waiting for play() call')
     }, [admissionToken])
 
     // =========================================================================

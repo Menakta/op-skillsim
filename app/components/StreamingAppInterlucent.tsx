@@ -66,6 +66,10 @@ const InfoPointOverlayWithState = dynamic(
   () => import("../features/measurement").then(mod => ({ default: mod.InfoPointOverlayWithState })),
   { ssr: false, loading: () => null }
 );
+const PressureRetryToast = dynamic(
+  () => import("../components/PressureRetryToast"),
+  { ssr: false, loading: () => null }
+);
 
 // Lazy load hooks - deferred until needed
 import { useTrainingMessagesCompositeInterlucent } from "../hooks/useTrainingMessagesCompositeInterlucent";
@@ -235,10 +239,52 @@ export default function StreamingAppInterlucent() {
   const [forceSidebarOpen, setForceSidebarOpen] = useState<boolean | undefined>(undefined);
   const [forceSidebarTab, setForceSidebarTab] = useState<'inventory' | 'controls' | 'settings' | 'system' | undefined>(undefined);
 
+  // Pressure retry toast state (shown after Q6 wrong answer)
+  const [pressureRetryToast, setPressureRetryToast] = useState<{ visible: boolean; attemptCount: number }>({ visible: false, attemptCount: 0 });
+
   // Handler for closing navigation walkthrough
   const handleCloseNavigationWalkthrough = useCallback(() => {
     modals.closeModal("navigationWalkthrough");
   }, [modals]);
+
+  // Stable dismiss handler for pressure retry toast
+  const dismissPressureRetryToast = useCallback(() => {
+    setPressureRetryToast({ visible: false, attemptCount: 0 });
+  }, []);
+
+  // ==========================================================================
+  // Auto-play when token is ready
+  // The <pixel-stream> element needs an explicit play() call after the
+  // admission token is set. Without this, the first connection times out
+  // because the element just sits idle with the token.
+  // ==========================================================================
+  const hasCalledPlayRef = useRef(false);
+
+  useEffect(() => {
+    const status = stream.interlucientStatus;
+    const shouldCallPlay =
+      screenFlow.streamStarted &&
+      stream.admissionToken &&
+      stream.streamRef.current &&
+      !hasCalledPlayRef.current &&
+      (status === 'idle' || status === 'connected' || status === null);
+
+    if (shouldCallPlay) {
+      console.log('🎮 Calling play() after token ready');
+      hasCalledPlayRef.current = true;
+      stream.play().catch((err) => {
+        console.error('Play failed:', err);
+        hasCalledPlayRef.current = false;
+      });
+    }
+  }, [screenFlow.streamStarted, stream.admissionToken, stream.interlucientStatus, stream]);
+
+  // Reset play flag when stream stops
+  useEffect(() => {
+    if (!screenFlow.streamStarted) {
+      hasCalledPlayRef.current = false;
+    }
+  }, [screenFlow.streamStarted]);
 
   // Prefetch heavy components when user hovers on Start button
   const prefetchedRef = useRef(false);
@@ -331,6 +377,16 @@ export default function StreamingAppInterlucent() {
             nextTaskIndex,
           });
         }
+      },
+      onQ6WrongAnswer: (attemptCount) => {
+        console.log(`🔧 Q6 wrong answer (attempt ${attemptCount}) — showing retry toast and opening sidebar`);
+        // Show feedback toast after modal auto-closes (2.5s delay in QuestionModal)
+        setTimeout(() => {
+          setPressureRetryToast({ visible: true, attemptCount });
+          // Open sidebar to inventory tab so Conduct Test button is visible
+          setForceSidebarOpen(true);
+          setForceSidebarTab('inventory');
+        }, 2600);
       },
     },
     {
@@ -992,7 +1048,7 @@ export default function StreamingAppInterlucent() {
           swiftJobRequest={true}
           forceRelay={false}
           queueWaitTolerance={120}
-          webrtcNegotiationTolerance={30}
+          webrtcNegotiationTolerance={45}
           reconnectMode="recover"
           reconnectAttempts={10}
           reconnectStrategy="exponential-backoff"
@@ -1005,6 +1061,13 @@ export default function StreamingAppInterlucent() {
           measurementLine={modals.isOpen('question') ? null : infoPointsManager.measurementLine}
         />
       </div>
+
+      {/* Pressure Test Retry Toast - shown after Q6 wrong answer */}
+      <PressureRetryToast
+        isVisible={pressureRetryToast.visible}
+        attemptCount={pressureRetryToast.attemptCount}
+        onDismiss={dismissPressureRetryToast}
+      />
 
       {/* All Modals */}
       <ModalContainer
