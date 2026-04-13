@@ -257,32 +257,33 @@ export default function StreamingAppInterlucent() {
   // The <pixel-stream> element needs an explicit play() call after the
   // admission token is set. Without this, the first connection times out
   // because the element just sits idle with the token.
+  //
+  // Tracks which token we already called play() for, so reconnects
+  // (which fetch a new token) will trigger play() again.
   // ==========================================================================
-  const hasCalledPlayRef = useRef(false);
+  const playedTokenRef = useRef<string | null>(null);
 
   useEffect(() => {
-    const status = stream.interlucientStatus;
-    const shouldCallPlay =
+    const token = stream.admissionToken;
+    if (
       screenFlow.streamStarted &&
-      stream.admissionToken &&
+      token &&
       stream.streamRef.current &&
-      !hasCalledPlayRef.current &&
-      (status === 'idle' || status === 'connected' || status === null);
-
-    if (shouldCallPlay) {
-      console.log('🎮 Calling play() after token ready');
-      hasCalledPlayRef.current = true;
+      playedTokenRef.current !== token // new token = new play() call
+    ) {
+      console.log('🎮 Calling play() for token:', token.substring(0, 20) + '...');
+      playedTokenRef.current = token;
       stream.play().catch((err) => {
         console.error('Play failed:', err);
-        hasCalledPlayRef.current = false;
+        playedTokenRef.current = null; // allow retry
       });
     }
-  }, [screenFlow.streamStarted, stream.admissionToken, stream.interlucientStatus, stream]);
+  }, [screenFlow.streamStarted, stream.admissionToken, stream]);
 
-  // Reset play flag when stream stops
+  // Reset when stream stops entirely
   useEffect(() => {
     if (!screenFlow.streamStarted) {
-      hasCalledPlayRef.current = false;
+      playedTokenRef.current = null;
     }
   }, [screenFlow.streamStarted]);
 
@@ -1048,7 +1049,10 @@ export default function StreamingAppInterlucent() {
           swiftJobRequest={true}
           forceRelay={false}
           queueWaitTolerance={120}
-          webrtcNegotiationTolerance={45}
+          rendezvousTolerance={60}
+          lingerTolerance={30}
+          webrtcNegotiationTolerance={90}
+          flexiblePresenceAllowance={120}
           reconnectMode="recover"
           reconnectAttempts={10}
           reconnectStrategy="exponential-backoff"

@@ -132,8 +132,8 @@ export const INTERLUCENT_CONFIG: InterlucientConfig = {
   cdnUrl: 'https://cdn.interlucent.ai/dev/pixel-stream/0.0.66/pixel-stream.iife.min.js',
   reconnectMode: 'recover',
   reconnectAttempts: 3,
-  queueWaitTolerance: 45,
-  webrtcNegotiationTolerance: 10,
+  queueWaitTolerance: 120,
+  webrtcNegotiationTolerance: 90,
   swiftJobRequest: true,
   flexiblePresenceAllowance: 120,
 }
