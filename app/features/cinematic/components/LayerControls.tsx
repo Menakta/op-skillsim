@@ -248,7 +248,7 @@ export function LayerControls({
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
           background: ${isDark ? '#4b5563' : '#d1d5db'};
-          border-radius: 2px;
+          border-radius: 0.4rem;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
           background: ${isDark ? '#6b7280' : '#9ca3af'};

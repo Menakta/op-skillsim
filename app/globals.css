@@ -242,7 +242,7 @@
 .theme-card {
   background-color: var(--color-card-bg);
   border: 1px solid var(--color-card-border);
-  border-radius: 0.75rem;
+  border-radius: 0.4rem;
 }
 
 .theme-card-hover:hover {
@@ -370,12 +370,12 @@
 }
 
 .theme-scrollbar::-webkit-scrollbar-track {
-  background: var(--color-bg-secondary);
+  background: rgba(113, 255, 160, 0.966);
 }
 
 .theme-scrollbar::-webkit-scrollbar-thumb {
   background: var(--color-border-secondary);
-  border-radius: 4px;
+  border-radius: 0.4rem;
 }
 
 .theme-scrollbar::-webkit-scrollbar-thumb:hover {
@@ -412,13 +412,13 @@
 
 .sidebar-tabs-scroll-dark::-webkit-scrollbar-track {
   background: transparent;
-  border-radius: 4px;
+  border-radius: 0.4rem;
   margin: 0 4px;
 }
 
 .sidebar-tabs-scroll-dark::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.15);
-  border-radius: 4px;
+  border-radius: 0.4rem;
   transition: background 0.2s ease;
 }
 
@@ -441,13 +441,13 @@
 
 .sidebar-tabs-scroll-light::-webkit-scrollbar-track {
   background: transparent;
-  border-radius: 4px;
+  border-radius: 0.4rem;
   margin: 0 4px;
 }
 
 .sidebar-tabs-scroll-light::-webkit-scrollbar-thumb {
   background: rgba(0, 0, 0, 0.12);
-  border-radius: 4px;
+  border-radius: 0.4rem;
   transition: background 0.2s ease;
 }
 

@@ -37,6 +37,7 @@ function ToolBarComponent({ state, onSelectTool }: ToolBarProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const currentTaskDef = TASK_SEQUENCE[state.currentTaskIndex]
   const isTrainingComplete = state.currentTaskIndex >= TASK_SEQUENCE.length
+  const isDisabled = isTrainingComplete || (state.trainingStarted && !state.isActive)
 
   // Memoize the toggle handler
   const handleToggleExpand = useCallback(() => {
@@ -86,13 +87,13 @@ function ToolBarComponent({ state, onSelectTool }: ToolBarProps) {
             >
               <button
                 onClick={() => onSelectTool(tool.id)}
-                disabled={isTrainingComplete}
+                disabled={isDisabled}
                 className={`w-12 md:w-15 h-10 md:h-15 bg-[#000000]/55 rounded-lg flex items-center justify-center transition-all duration-200 ${
                   isSelected
                     ? 'bg-[#43CF89] shadow-lg scale-110'
-                    : isRequired
+                    : isRequired && !isDisabled
                     ? 'bg-[#39BEAE]/40 animate-pulse'
-                    : isTrainingComplete
+                    : isDisabled
                     ? 'opacity-50 cursor-not-allowed'
                     : 'hover:bg-[#79CFC2] hover:scale-105'
                 }`}

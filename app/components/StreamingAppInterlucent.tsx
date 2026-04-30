@@ -96,7 +96,7 @@ import {
   saveStreamQuality,
 } from "../config/streamQuality.config";
 // Message creation for resolution control
-import { createResolutionMessage } from "../lib/messageTypes";
+import { createResolutionMessage, type QuestionData } from "../lib/messageTypes";
 // InfoPoint overlay hook
 import { useInfoPoints } from "../features/measurement";
 
@@ -218,19 +218,15 @@ export default function StreamingAppInterlucent() {
   const [showExplosionControls, setShowExplosionControls] = useState(true);
   // Training pause state
   const [isTrainingPaused, setIsTrainingPaused] = useState(false);
+  // Question that was open when training was paused — re-opened on resume
+  const pausedQuestionRef = useRef<QuestionData | null>(null);
   // Cinematic walkthrough state - check localStorage on init
   const [showCinematicWalkthrough, setShowCinematicWalkthrough] = useState(() => {
     if (typeof window === 'undefined') return true;
     return localStorage.getItem('op-skillsim-cinematic-walkthrough-completed') !== 'true';
   });
-  // Training walkthrough state - check localStorage on init
-  const [showTrainingWalkthrough, setShowTrainingWalkthrough] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    // Only show if cinematic is done but training isn't
-    const cinematicDone = localStorage.getItem('op-skillsim-cinematic-walkthrough-completed') === 'true';
-    const trainingDone = localStorage.getItem('op-skillsim-training-walkthrough-completed') === 'true';
-    return cinematicDone && !trainingDone;
-  });
+  // Training walkthrough state — always false on init, set to true when skipToTraining is called
+  const [showTrainingWalkthrough, setShowTrainingWalkthrough] = useState(false);
   // Track if user is transitioning from cinematic to training
   const isTransitioningToTrainingRef = useRef(false);
   // Pending training start
@@ -588,6 +584,19 @@ export default function StreamingAppInterlucent() {
   // Stream health (simplified for Interlucent)
   const streamHealth = { status: 'healthy' as const };
 
+  // Close question modal on pause; re-open it on resume
+  useEffect(() => {
+    if (isTrainingPaused) {
+      if (modals.isOpen("question")) {
+        pausedQuestionRef.current = modals.showingQuestion;
+        modals.closeModal("question");
+      }
+    } else if (pausedQuestionRef.current) {
+      modals.openQuestion(pausedQuestionRef.current);
+      pausedQuestionRef.current = null;
+    }
+  }, [isTrainingPaused]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ==========================================================================
   // Consolidated Action Handlers
   // ==========================================================================
@@ -641,13 +650,20 @@ export default function StreamingAppInterlucent() {
         sessionSelection.actions.confirmResume(modals.resumePhaseIndex);
       },
       skipToTraining: async () => {
+        // Reset scene before walkthrough starts — camera to Front, building assembled
+        training.setCameraPerspective('Front');
+        training.assembleBuilding();
         isTransitioningToTrainingRef.current = true;
-        pendingTrainingStartRef.current = training.startTraining;
+        // Clear completed flag so walkthrough always shows fresh — otherwise
+        // useTrainingWalkthrough marks isComplete=true immediately from localStorage
+        // and renders null while walkthroughActive stays true (invisible overlay bug).
+        localStorage.removeItem('op-skillsim-training-walkthrough-completed');
+        // Always show training walkthrough — training starts when user clicks X-Ray tool
         setShowTrainingWalkthrough(true);
         await sessionSelection.actions.skipToTraining({ delayTrainingStart: true });
       },
     }),
-    [sessionSelection.actions, modals, training.startTraining],
+    [sessionSelection.actions, modals, training.startTraining, training.setCameraPerspective, training.assembleBuilding],
   );
 
   const connectionActions = useMemo(
@@ -780,6 +796,15 @@ export default function StreamingAppInterlucent() {
   });
 
   // ==========================================================================
+  // Walkthrough active — blocks UE5 input and toolbar during walkthroughs.
+  // Mirrors the exact render conditions of each walkthrough component so
+  // controls are only locked when a walkthrough is actually visible on screen.
+  // ==========================================================================
+  const walkthroughActive =
+    (stream.isConnected && screenFlow.isCinematicMode && showCinematicWalkthrough) ||
+    (stream.isConnected && !screenFlow.isCinematicMode && showTrainingWalkthrough);
+
+  // ==========================================================================
   // Memoized Callbacks
   // ==========================================================================
   const handleSidebarOpenChange = useCallback((isOpen: boolean) => {
@@ -804,37 +829,25 @@ export default function StreamingAppInterlucent() {
   const handleCloseSidebar = useCallback(() => setForceSidebarOpen(false), []);
 
   const handleTrainingWalkthroughComplete = useCallback(() => {
-    console.log('🎓 Training walkthrough COMPLETE');
+    console.log('🎓 Training walkthrough COMPLETE — waiting for user to click X-Ray tool');
     setShowTrainingWalkthrough(false);
     setForceSidebarOpen(false);
     setForceSidebarTab(undefined);
-    setTimeout(() => {
-      console.log('🎓 Checking pendingTrainingStartRef:', !!pendingTrainingStartRef.current);
-      if (pendingTrainingStartRef.current) {
-        console.log('🎓 Calling pendingTrainingStartRef (startTraining)');
-        pendingTrainingStartRef.current();
-        pendingTrainingStartRef.current = null;
-      }
-      isTransitioningToTrainingRef.current = false;
-      setForceSidebarOpen(undefined);
-    }, 100);
+    // Don't call startTraining here — training begins when user clicks the X-Ray tool.
+    // The X-Ray tool blinks via isRequired (currentTaskIndex=0, tool='XRay').
+    pendingTrainingStartRef.current = null;
+    isTransitioningToTrainingRef.current = false;
+    setForceSidebarOpen(undefined);
   }, []);
 
   const handleTrainingWalkthroughSkip = useCallback(() => {
-    console.log('🎓 Training walkthrough SKIPPED');
+    console.log('🎓 Training walkthrough SKIPPED — waiting for user to click X-Ray tool');
     setShowTrainingWalkthrough(false);
     setForceSidebarOpen(false);
     setForceSidebarTab(undefined);
-    setTimeout(() => {
-      console.log('🎓 Checking pendingTrainingStartRef:', !!pendingTrainingStartRef.current);
-      if (pendingTrainingStartRef.current) {
-        console.log('🎓 Calling pendingTrainingStartRef (startTraining)');
-        pendingTrainingStartRef.current();
-        pendingTrainingStartRef.current = null;
-      }
-      isTransitioningToTrainingRef.current = false;
-      setForceSidebarOpen(undefined);
-    }, 100);
+    pendingTrainingStartRef.current = null;
+    isTransitioningToTrainingRef.current = false;
+    setForceSidebarOpen(undefined);
   }, []);
 
   const handleTrainingOpenSidebar = useCallback(() => {
@@ -917,7 +930,7 @@ export default function StreamingAppInterlucent() {
           forceOpen={forceSidebarOpen}
           forceActiveTab={forceSidebarTab}
           onOpenChange={handleSidebarOpenChange}
-          controlsLocked={showCinematicWalkthrough || showTrainingWalkthrough}
+          controlsLocked={walkthroughActive}
           settingsState={{
             audioEnabled: settings.settings.audioEnabled,
             masterVolume: settings.settings.masterVolume,
@@ -981,12 +994,14 @@ export default function StreamingAppInterlucent() {
 
       {/* Control Panel (ToolBar) */}
       {stream.isConnected && !screenFlow.isCinematicMode && (
-        <ControlPanel
-          isDark={isDark}
-          onSelectTool={training.selectTool}
-          onSelectPipe={training.selectPipe}
-          onSelectPressureTest={training.selectPressureTest}
-        />
+        <div className={walkthroughActive ? 'pointer-events-none' : ''}>
+          <ControlPanel
+            isDark={isDark}
+            onSelectTool={training.selectTool}
+            onSelectPipe={training.selectPipe}
+            onSelectPressureTest={training.selectPressureTest}
+          />
+        </div>
       )}
 
       {/* Message Log */}
@@ -1037,6 +1052,20 @@ export default function StreamingAppInterlucent() {
           height: "100%",
         }}
       >
+        {/* Block all mouse/keyboard input to UE5 during walkthroughs or pause */}
+        {(walkthroughActive || isTrainingPaused) && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 10,
+              cursor: "not-allowed",
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            tabIndex={-1}
+          />
+        )}
         <InterlucientStream
           ref={stream.streamRef}
           admissionToken={stream.admissionToken || undefined}

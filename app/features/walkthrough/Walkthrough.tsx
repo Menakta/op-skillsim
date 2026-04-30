@@ -136,7 +136,7 @@ export function Walkthrough({
     return mode === 'training' ? 'Start Training' : 'Get Started'
   }
 
-  // Open sidebar when step requires it
+  // Open or close sidebar based on whether current step needs it
   useEffect(() => {
     if (!currentStep) return
 
@@ -146,8 +146,11 @@ export function Walkthrough({
         onOpenSidebar?.()
       }, 100)
       return () => clearTimeout(timer)
+    } else {
+      // Close sidebar immediately if step doesn't need it
+      onCloseSidebar?.()
     }
-  }, [currentStep, onOpenSidebar])
+  }, [currentStep, onOpenSidebar, onCloseSidebar])
 
   // Highlight target element when step changes
   useEffect(() => {
@@ -221,12 +224,13 @@ export function Walkthrough({
 
   return (
     <>
-      {/* Dark overlay - only show when no target element */}
-      {!hasTargetElement && (
-        <div
-          className="fixed inset-0 z-[2147483645] bg-black/80 pointer-events-none animate-fade-in"
-        />
-      )}
+      {/* Dark overlay - always visible while walkthrough is active.
+          z-30 keeps it below the sidebar (z-40/z-50) so the sidebar
+          remains visible. The spotlight's box-shadow (z-[2147483646])
+          paints a higher overlay with a cutout around the target. */}
+      <div
+        className="fixed inset-0 z-30 bg-black/80 pointer-events-none animate-fade-in"
+      />
 
       {/* Spotlight highlight for target element */}
       <div

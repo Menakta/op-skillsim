@@ -137,7 +137,8 @@ export function useToolSelection(
           selectedTool: toolForPhase,
           currentTool: toolForPhase,
           selectedPipe: null,
-          airPlugSelected: false
+          // Preserve airPlugSelected — plugs placed before pause must stay active
+          // so Conduct Test remains enabled after resume
         }))
 
         // Send tool selection to UE5
