@@ -11,7 +11,7 @@
 
 import { useEffect, useState, useCallback, useRef, type ReactNode } from 'react'
 import { useTheme } from '@/app/context/ThemeContext'
-import { Shovel, Wrench, Ruler, Package, Droplets } from 'lucide-react'
+import { Shovel, Wrench, Ruler, Package, Droplets,ScanSearch } from 'lucide-react'
 import type { InfoPointData, MeasurementGuidanceData } from '@/app/lib/messageTypes'
 
 // =============================================================================
@@ -68,9 +68,9 @@ function getInfoPointContent(pointId: string): InfoPointContent {
 
   // Default fallback for unknown interaction points
   return {
-    icon: <Ruler className="w-4 h-4" />,
+    icon: <ScanSearch className="w-4 h-4" />,
     title: 'Interaction Point',
-    description: 'Interact with this location to continue.',
+    description: 'X-Ray pipe to measure internal dimensions and check for structural issues. Use X-Ray controls from the sidebar to toggle visibility.',
     color: '#39BEAE',
   }
 }
